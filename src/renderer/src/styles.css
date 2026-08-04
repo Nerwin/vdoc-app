@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #16171b;
+  --color-panel: #1d1f25;
+  --color-raised: #23262e;
+  --color-line: #2c2f38;
+  --color-ink: #d6d9e0;
+  --color-ink-dim: #8a909e;
+  --color-ink-faint: #565c69;
+  --color-accent: #5b8dd9;
+  --color-sync: #4e9e77;
+  --color-behind: #4e97d8;
+  --color-ahead: #d9a036;
+  --color-conflict: #d95f4e;
+  --color-unknown: #9a86cf;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+}
+
+:root[data-theme="light"] {
+  --color-bg: #f2f3f5;
+  --color-panel: #fafafc;
+  --color-raised: #e8eaee;
+  --color-line: #d8dbe2;
+  --color-ink: #2a2e37;
+  --color-ink-dim: #5d6470;
+  --color-ink-faint: #9aa1ad;
+  --color-accent: #3f6fb5;
+  --color-sync: #257a4e;
+  --color-behind: #2b72b8;
+  --color-ahead: #a06f10;
+  --color-conflict: #c04435;
+  --color-unknown: #6f57b0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  user-select: none;
+  overflow: hidden;
+}
+
+.drag-region {
+  -webkit-app-region: drag;
+}
+
+.drag-region button,
+.drag-region input {
+  -webkit-app-region: no-drag;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-raised);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-line);
+  background-clip: padding-box;
+}
