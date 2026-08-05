@@ -139,6 +139,7 @@ function Row({ node, entries, selected, collapsed, onClick }: RowProps) {
       </span>
       <span className="truncate">{node.name}</span>
       {entry?.check?.titleMismatch && <span className="text-[10px] text-ahead" title="Frontmatter title differs from the body H1">T</span>}
+      {entry?.gitDirty && <span className="ml-auto pl-1 text-[10px] text-ink-faint" title="Uncommitted git changes">±</span>}
     </button>
   )
 }

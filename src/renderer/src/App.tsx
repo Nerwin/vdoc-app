@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { FileTree } from './components/FileTree.tsx'
 import { DetailPane } from './components/DetailPane.tsx'
+import { Dashboard } from './components/Dashboard.tsx'
 import { StatusBar } from './components/StatusBar.tsx'
 import { TokenPanel } from './components/TokenPanel.tsx'
 import { CommandPalette } from './components/CommandPalette.tsx'
@@ -35,8 +36,19 @@ export function App() {
   }), [app.entries])
   const selected = app.selection ? app.entries.get(app.selection) ?? null : null
 
+  // Global shortcuts stand down while any dialog is open — each dialog owns its keys.
+  const dialogOpen = paletteOpen || tokenOpen || settingsOpen
+    || app.pushPreview !== null || app.pullConfirm !== null || app.createForm !== null
+
   useEffect(() => {
+    if (dialogOpen) return
     const onKey = (event: KeyboardEvent): void => {
+      const target = event.target as HTMLElement | null
+      const inField = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement
+      if (event.key === 'Escape' && !inField) {
+        app.setSelection(null)
+        return
+      }
       if (!event.metaKey) return
       if (event.key === 'r') {
         event.preventDefault()
@@ -57,14 +69,18 @@ export function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [app.checkAll])
+  }, [app.checkAll, dialogOpen])
 
   return (
     <div className="flex h-screen flex-col bg-bg font-sans text-[13px] text-ink">
       <header className="drag-region flex h-11 shrink-0 items-center gap-3 border-b border-line bg-panel pl-20 pr-3">
-        <span className="select-none font-mono text-[13px] font-semibold tracking-[0.18em] text-ink">
+        <button
+          onClick={() => app.setSelection(null)}
+          title="Dashboard — Esc"
+          className="select-none font-mono text-[13px] font-semibold tracking-[0.18em] text-ink hover:text-accent"
+        >
           V<span className="text-accent">-</span>DOC
-        </span>
+        </button>
         <span className="truncate rounded-full border border-line px-2 py-0.5 font-mono text-[10px] text-ink-faint">
           {app.root.split('/').slice(-1)[0]}
         </span>
@@ -114,23 +130,40 @@ export function App() {
           />
         </aside>
         <main className="min-w-0 flex-1">
-          <DetailPane
-            entry={selected}
-            totals={totals}
-            diff={app.diff}
-            diffLoading={app.diffLoading}
-            busyOp={app.busyOp}
-            onDiff={path => void app.loadDiff(path, true)}
-            onCheck={path => void app.checkOne(path)}
-            onPull={app.requestPull}
-            onPush={(path, force) => void app.requestPush(path, force)}
-            onLint={path => void app.runLint(path)}
-            onSync={path => void app.syncFile(path)}
-            onCreate={path => app.setCreateForm({ path })}
-            onOpenConfluence={path => void app.openConfluence(path)}
-            onOpenEditor={path => void app.openEditor(path)}
-            onRevealFinder={path => void app.revealFinder(path)}
-          />
+          {selected
+            ? (
+                <DetailPane
+                  entry={selected}
+                  diff={app.diff}
+                  diffLoading={app.diffLoading}
+                  busyOp={app.busyOp}
+                  theme={theme}
+                  onError={app.reportError}
+                  onDiff={path => void app.loadDiff(path, true)}
+                  onCheck={path => void app.checkOne(path)}
+                  onMarkVerified={path => void app.markVerified(path)}
+                  onPull={app.requestPull}
+                  onPush={(path, force) => void app.requestPush(path, force)}
+                  onLint={path => void app.runLint(path)}
+                  onSync={path => void app.syncFile(path)}
+                  onCreate={path => app.setCreateForm({ path })}
+                  onOpenConfluence={path => void app.openConfluence(path)}
+                  onOpenEditor={path => void app.openEditor(path)}
+                  onRevealFinder={path => void app.revealFinder(path)}
+                />
+              )
+            : (
+                <Dashboard
+                  entries={app.entries}
+                  authors={app.authors}
+                  totals={totals}
+                  unverifiedCount={app.counts.byState.get('unverified') ?? 0}
+                  busy={app.busyOp !== null}
+                  loadAuthors={app.loadAuthors}
+                  onSelect={app.setSelection}
+                  onVerifyAll={app.verifyAllUnverified}
+                />
+              )}
         </main>
       </div>
 
@@ -140,6 +173,7 @@ export function App() {
         checking={app.checking}
         lastChecked={app.lastChecked}
         busyOp={app.busyOp}
+        appVersion={app.settings?.appVersion ?? null}
         stateFilter={app.stateFilter}
         onFilterState={app.setStateFilter}
         onOpenToken={() => setTokenOpen(true)}
@@ -201,9 +235,12 @@ export function App() {
       {settingsOpen && app.settings && (
         <SettingsModal
           settings={app.settings}
+          auth={app.auth}
           busy={app.busyOp !== null}
           onUpdate={app.updateSettings}
           onReloadVersion={app.reloadVersion}
+          onSaveApiKey={(email, token) => void app.saveApiKey(email, token)}
+          onSetAuthMethod={method => void app.setAuthMethod(method)}
           onClose={() => setSettingsOpen(false)}
         />
       )}

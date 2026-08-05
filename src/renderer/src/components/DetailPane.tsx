@@ -4,16 +4,20 @@ import type { DiffResult } from '../../../shared/types.ts'
 import { displayState, type FileEntry } from '../../../shared/status.ts'
 import { STATE_META } from '../state-meta.ts'
 import { CodeView } from './CodeView.tsx'
+import { CommentsView } from './CommentsView.tsx'
 import { DiffView } from './DiffView.tsx'
+import { PreviewView } from './PreviewView.tsx'
 
 interface Props {
-  entry: FileEntry | null
-  totals: { files: number, tracked: number }
+  entry: FileEntry
   diff: { path: string, result: DiffResult } | null
   diffLoading: string | null
   busyOp: string | null
+  theme: 'dark' | 'light'
+  onError(error: unknown): void
   onDiff(path: string): void
   onCheck(path: string): void
+  onMarkVerified(path: string): void
   onPull(path: string): void
   onPush(path: string, force: boolean): void
   onLint(path: string): void
@@ -33,17 +37,18 @@ function pushModeFor(state: ReturnType<typeof displayState>): PushMode {
   return 'disabled'
 }
 
+type ViewMode = 'content' | 'preview' | 'diff' | 'comments'
+
 export function DetailPane(props: Props) {
-  const { entry, totals } = props
-  const [view, setView] = useState<'content' | 'diff'>('content')
+  const { entry } = props
+  const [view, setView] = useState<ViewMode>('content')
   const [content, setContent] = useState<string | null>(null)
 
-  const path = entry?.path
+  const path = entry.path
 
   useEffect(() => {
     setView('content')
     setContent(null)
-    if (!path) return
     let live = true
     window.vdoc.readFile(path)
       .then(text => live && setContent(text))
@@ -58,15 +63,6 @@ export function DetailPane(props: Props) {
   useEffect(() => {
     if (diffReady) setView('diff')
   }, [diffReady])
-
-  if (!entry || !path) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 text-ink-faint">
-        <p className="font-mono text-[13px]">{totals.files} files · {totals.tracked} tracked on Confluence</p>
-        <p className="text-[12px]">Select a file — ↑↓ to browse, ⏎ to compare, ⌘P to go to a file, ⌘R to check all</p>
-      </div>
-    )
-  }
 
   const state = displayState(entry)
   const meta = STATE_META[state]
@@ -90,6 +86,11 @@ export function DetailPane(props: Props) {
               local v{check.localVersion ?? '—'} → remote v{check.remoteVersion ?? '—'}
             </span>
           )}
+          {entry.gitDirty && (
+            <span className="font-mono text-[11px] text-ink-faint" title="This file has uncommitted git changes">
+              ± uncommitted
+            </span>
+          )}
         </div>
         <button
           onClick={() => void navigator.clipboard.writeText(path)}
@@ -105,13 +106,15 @@ export function DetailPane(props: Props) {
 
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
           <div className="flex overflow-hidden rounded-md border border-line">
-            <ViewTab label="Content" active={!showDiff} onClick={() => setView('content')} />
+            <ViewTab label="Content" active={view === 'content' || (view === 'diff' && !showDiff)} onClick={() => setView('content')} />
+            <ViewTab label="Preview" active={view === 'preview'} disabled={content === null} onClick={() => setView('preview')} />
             <ViewTab
               label={loadingDiff ? 'Diff…' : 'Diff'}
               active={Boolean(showDiff)}
               disabled={!entry.tracked || loadingDiff}
               onClick={() => (diffReady ? setView('diff') : props.onDiff(path))}
             />
+            <ViewTab label="Comments" active={view === 'comments'} disabled={!entry.tracked} onClick={() => setView('comments')} />
           </div>
           <span className="mx-1 w-px self-stretch bg-line" />
           <Action label="Check" disabled={!entry.tracked || busy} onClick={() => props.onCheck(path)} />
@@ -145,10 +148,28 @@ export function DetailPane(props: Props) {
       </header>
 
       <div className="min-h-0 flex-1">
-        {showDiff && props.diff
+        {view === 'comments'
+          ? <CommentsView path={path} onError={props.onError} />
+          : view === 'preview' && content !== null
+            ? <PreviewView content={content} theme={props.theme} />
+            : showDiff && props.diff
           ? (
               props.diff.result.identical
-                ? <CenterNote text="No content differences with Confluence" tone="text-sync" />
+                ? (
+                    <div className="flex h-full flex-col items-center justify-center gap-3">
+                      <p className="text-[12px] text-sync">No content differences with Confluence</p>
+                      {state === 'unverified' && !props.diff.result.versionDrift && (
+                        <button
+                          onClick={() => props.onMarkVerified(path)}
+                          disabled={busy}
+                          className="rounded-md border border-sync/50 px-3 py-1.5 text-[12px] text-sync hover:bg-sync/10 disabled:opacity-40"
+                          title="Record the local-edit baseline so this file shows In sync"
+                        >
+                          Mark verified
+                        </button>
+                      )}
+                    </div>
+                  )
                 : (
                     <div className="flex h-full flex-col">
                       <div className="flex border-b border-line font-mono text-[11px] text-ink-dim">

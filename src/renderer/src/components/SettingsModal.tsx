@@ -1,19 +1,32 @@
 import { useState } from 'react'
 
-import type { SettingsInfo } from '../../../shared/types.ts'
+import type { AuthStatus, SettingsInfo } from '../../../shared/types.ts'
 import { Modal, ModalButton } from './Modal.tsx'
 
 interface Props {
   settings: SettingsInfo
+  auth: AuthStatus | null
   busy: boolean
   onUpdate(patch: { theme?: 'dark' | 'light', vdocBin?: string | null }): void
   onReloadVersion(): void
+  onSaveApiKey(email: string, apiToken: string): void
+  onSetAuthMethod(method: 'api-token' | 'session-token'): void
   onClose(): void
 }
 
-export function SettingsModal({ settings, busy, onUpdate, onReloadVersion, onClose }: Props) {
+export function SettingsModal({ settings, auth, busy, onUpdate, onReloadVersion, onSaveApiKey, onSetAuthMethod, onClose }: Props) {
   const [bin, setBin] = useState(settings.vdocBin ?? '')
   const binDirty = (bin.trim() || null) !== settings.vdocBin
+  const [method, setMethod] = useState<'api-token' | 'session-token'>(auth?.method === 'api-token' ? 'api-token' : 'session-token')
+  const [email, setEmail] = useState(auth?.email ?? '')
+  const [apiToken, setApiToken] = useState('')
+
+  const pickMethod = (next: 'api-token' | 'session-token'): void => {
+    setMethod(next)
+    // Session is always switchable; API key activates on switch only if one is stored.
+    if (next === 'session-token' && auth?.method !== 'session-token') onSetAuthMethod('session-token')
+    if (next === 'api-token' && auth?.hasApiKey && auth.method !== 'api-token') onSetAuthMethod('api-token')
+  }
 
   return (
     <Modal
@@ -37,6 +50,61 @@ export function SettingsModal({ settings, busy, onUpdate, onReloadVersion, onClo
               </button>
             ))}
           </div>
+        </section>
+
+        <section>
+          <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-faint">Confluence authentication</h3>
+          <div className="flex w-fit overflow-hidden rounded-md border border-line">
+            <button
+              onClick={() => pickMethod('session-token')}
+              className={`px-3 py-1.5 text-[12px] ${method === 'session-token' ? 'bg-raised text-ink' : 'bg-panel text-ink-dim hover:text-ink'}`}
+            >
+              Session token
+            </button>
+            <button
+              onClick={() => pickMethod('api-token')}
+              className={`px-3 py-1.5 text-[12px] ${method === 'api-token' ? 'bg-raised text-ink' : 'bg-panel text-ink-dim hover:text-ink'}`}
+            >
+              API key
+            </button>
+          </div>
+          {method === 'session-token' && (
+            <p className="mt-1.5 text-[11px] text-ink-faint">
+              Cookie-based, expires every couple of weeks — renew it from the status-bar chip.
+            </p>
+          )}
+          {method === 'api-token' && (
+            <div className="mt-2 space-y-2">
+              <input
+                value={email}
+                onChange={event => setEmail(event.target.value)}
+                placeholder="you@company.com"
+                spellCheck={false}
+                className="w-72 rounded-md border border-line bg-bg px-2 py-1.5 font-mono text-[12px] text-ink placeholder-ink-faint outline-none focus:border-accent"
+              />
+              <div className="flex items-center gap-2">
+                <input
+                  value={apiToken}
+                  onChange={event => setApiToken(event.target.value)}
+                  type="password"
+                  placeholder={auth?.hasApiKey ? 'API token stored — paste to replace' : 'Atlassian API token'}
+                  spellCheck={false}
+                  className="w-72 rounded-md border border-line bg-bg px-2 py-1.5 font-mono text-[12px] text-ink placeholder-ink-faint outline-none focus:border-accent"
+                />
+                <ModalButton
+                  label="Save key"
+                  disabled={email.trim() === '' || apiToken.trim() === '' || busy}
+                  onClick={() => {
+                    onSaveApiKey(email, apiToken)
+                    setApiToken('')
+                  }}
+                />
+              </div>
+              <p className="text-[11px] text-ink-faint">
+                Stored encrypted via <code className="font-mono">config set --encrypt</code> and activated immediately.
+              </p>
+            </div>
+          )}
         </section>
 
         <section>

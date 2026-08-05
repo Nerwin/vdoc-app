@@ -56,6 +56,8 @@ function watchDocs(window: BrowserWindow): void {
   }
 }
 
+app.setName('V-DOC')
+
 app.whenReady().then(() => {
   const settings = loadSettings()
   setVdocBin(settings.vdocBin)

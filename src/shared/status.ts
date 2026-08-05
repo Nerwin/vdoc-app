@@ -3,6 +3,8 @@ import type { CheckFile, DisplayState } from './types.ts'
 export interface FileEntry {
   path: string
   tracked: boolean
+  /** Uncommitted git changes — display-only, never feeds sync logic. */
+  gitDirty?: boolean
   check?: CheckFile
 }
 

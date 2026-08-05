@@ -9,6 +9,7 @@ interface Props {
   checking: { done: number, total: number } | null
   lastChecked: Date | null
   busyOp: string | null
+  appVersion: string | null
   stateFilter: DisplayState | 'attention' | null
   onFilterState(state: DisplayState | 'attention' | null): void
   onOpenToken(): void
@@ -24,6 +25,16 @@ export function StatusBar(props: Props) {
       <AuthChip auth={props.auth} tick={tick} onClick={props.onOpenToken} />
 
       <span className="h-3 w-px bg-line" />
+
+      {props.counts.attention > 0 && (
+        <button
+          onClick={() => props.onFilterState(props.stateFilter === 'attention' ? null : 'attention')}
+          className={`hover:text-ink ${props.stateFilter === 'attention' ? 'text-ink underline underline-offset-3' : ''}`}
+          title="Everything behind, ahead, in conflict, or with local edits — click to filter"
+        >
+          {props.counts.attention} attention
+        </button>
+      )}
 
       {SUMMARY_STATES.map(state => {
         const count = props.counts.byState.get(state) ?? 0
@@ -60,6 +71,7 @@ export function StatusBar(props: Props) {
             </span>
           )
         : props.lastChecked && <span>checked {timeAgo(props.lastChecked, tick)}</span>}
+      {props.appVersion && <span className="text-ink-faint">v{props.appVersion}</span>}
     </footer>
   )
 }

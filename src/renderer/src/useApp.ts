@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import type { AuthStatus, CheckFile, DiffResult, DisplayState, PushFile, ScanFile, Settings, SettingsInfo } from '../../shared/types.ts'
+import type { AuthStatus, CheckFile, DiffResult, DisplayState, PushFile, ScanFile, Settings, SettingsInfo, VersionEntry } from '../../shared/types.ts'
 import { displayState, needsAttention, type FileEntry } from '../../shared/status.ts'
 import { STATE_META } from './state-meta.ts'
 
@@ -23,6 +23,11 @@ export interface PullConfirm {
 
 const normalize = (path: string): string => path.replace(/^\.\//, '')
 
+/** A full re-check runs at most once per hour on window focus. */
+const FULL_CHECK_TTL_MS = 60 * 60 * 1000
+/** Focus-triggered partial re-checks are throttled to once a minute. */
+const FOCUS_THROTTLE_MS = 60 * 1000
+
 export function useApp() {
   const api = window.vdoc
 
@@ -41,9 +46,12 @@ export function useApp() {
   const [pullConfirm, setPullConfirm] = useState<PullConfirm | null>(null)
   const [createForm, setCreateForm] = useState<{ path: string } | null>(null)
   const [settings, setSettings] = useState<SettingsInfo | null>(null)
+  /** Latest remote version info per file, keyed `path@vN` so a new version refetches. */
+  const [authors, setAuthors] = useState<Map<string, VersionEntry | null>>(new Map())
   const [message, setMessage] = useState<Message | null>(null)
 
   const checkingRef = useRef(false)
+  const lastFocusCheckRef = useRef(0)
 
   const fail = useCallback((error: unknown) => {
     setMessage({ kind: 'error', text: error instanceof Error ? error.message : String(error) })
@@ -55,7 +63,7 @@ export function useApp() {
       for (const result of results) {
         const path = normalize(result.file)
         const entry = next.get(path)
-        next.set(path, { path, tracked: entry?.tracked ?? true, check: result })
+        next.set(path, { ...entry, path, tracked: entry?.tracked ?? true, check: result })
       }
       return next
     })
@@ -69,6 +77,7 @@ export function useApp() {
         next.set(file.path, {
           path: file.path,
           tracked: file.tracked,
+          gitDirty: file.gitDirty,
           check: file.tracked ? previous?.check : undefined,
         })
       }
@@ -141,6 +150,28 @@ export function useApp() {
       }
     })()
   }), [api, applyChecks, fail, mergeScan])
+
+  // On window focus: full check when the last one is over an hour old, otherwise
+  // just refresh the files already needing attention (cheap, one API call each).
+  useEffect(() => {
+    const onFocus = (): void => {
+      if (checkingRef.current || busyOp) return
+      const now = Date.now()
+      if (now - lastFocusCheckRef.current < FOCUS_THROTTLE_MS) return
+      lastFocusCheckRef.current = now
+
+      if (!lastChecked || now - lastChecked.getTime() > FULL_CHECK_TTL_MS) {
+        void checkAll()
+        return
+      }
+      const attention = [...entries.values()]
+        .filter(entry => needsAttention(displayState(entry)))
+        .map(entry => entry.path)
+      if (attention.length > 0) void recheck(attention)
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [busyOp, checkAll, entries, lastChecked, recheck])
 
   const loadDiff = useCallback(async (path: string, force = false) => {
     if (!force && diff?.path === path) return
@@ -270,6 +301,64 @@ export function useApp() {
     }
   }), [api, runOp])
 
+  const markVerified = useCallback((path: string) => runOp('verify', async () => {
+    const result = await api.recordBaseline(path)
+    const name = path.split('/').at(-1)
+    if (result.baselineRecorded) {
+      setMessage({ kind: 'info', text: `${name} verified — baseline recorded at v${result.remoteVersion}` })
+      await recheck([path])
+    } else {
+      setDiff({ path, result })
+      setMessage({ kind: 'error', text: `${name} differs from Confluence — baseline not recorded, review the diff` })
+    }
+  }), [api, recheck, runOp])
+
+  const verifyAllUnverified = useCallback(() => {
+    const targets = [...entries.values()].filter(entry => displayState(entry) === 'unverified').map(entry => entry.path)
+    if (targets.length === 0) return
+    void runOp('verify', async () => {
+      const verified: string[] = []
+      let differing = 0
+      for (const [index, path] of targets.entries()) {
+        setBusyOp(`verify ${index + 1}/${targets.length}`)
+        const result = await api.recordBaseline(path).catch(() => null)
+        if (result?.baselineRecorded) verified.push(path)
+        else differing += 1
+      }
+      if (verified.length > 0) await recheck(verified)
+      setMessage(differing > 0
+        ? { kind: 'error', text: `${verified.length} verified; ${differing} differ from Confluence — review them` }
+        : { kind: 'info', text: `${verified.length} file(s) verified — baselines recorded` })
+    })
+  }, [api, entries, recheck, runOp])
+
+  const loadAuthors = useCallback((requests: Array<{ path: string, remoteVersion: number }>) => {
+    const missing = requests.filter(request => !authors.has(`${request.path}@v${request.remoteVersion}`))
+    if (missing.length === 0) return
+    void (async () => {
+      for (const request of missing) {
+        const entry = await api.lastVersion(request.path).catch(() => null)
+        setAuthors(prev => new Map(prev).set(`${request.path}@v${request.remoteVersion}`, entry))
+      }
+    })()
+  }, [api, authors])
+
+  const saveApiKey = useCallback((email: string, apiToken: string) => runOp('save API key', async () => {
+    const status = await api.saveApiKey(email, apiToken)
+    setAuth(status)
+    setMessage(status.ok
+      ? { kind: 'info', text: `API key saved — authenticated as ${status.displayName ?? email}` }
+      : { kind: 'error', text: status.error ?? 'API key rejected' })
+  }), [api, runOp])
+
+  const setAuthMethod = useCallback((method: 'api-token' | 'session-token') => runOp('switch auth', async () => {
+    const status = await api.setAuthMethod(method)
+    setAuth(status)
+    setMessage(status.ok
+      ? { kind: 'info', text: `Now using ${method === 'api-token' ? 'the API key' : 'the session token'} (${status.displayName ?? '?'})` }
+      : { kind: 'error', text: status.error ?? 'Authentication failed with this method' })
+  }), [api, runOp])
+
   const updateSettings = useCallback((patch: Partial<Settings>) => {
     void api.settingsSet(patch).then(setSettings).catch(fail)
   }, [api, fail])
@@ -326,8 +415,15 @@ export function useApp() {
     settings,
     updateSettings,
     reloadVersion,
+    authors,
+    loadAuthors,
+    markVerified,
+    verifyAllUnverified,
+    saveApiKey,
+    setAuthMethod,
     message,
     dismissMessage: () => setMessage(null),
+    reportError: fail,
     counts,
     checkAll,
     loadDiff,

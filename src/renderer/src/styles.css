@@ -71,3 +71,151 @@ body {
   background-color: var(--color-line);
   background-clip: padding-box;
 }
+
+/* Markdown preview typography */
+.preview {
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--color-ink);
+  user-select: text;
+}
+
+.preview h1,
+.preview h2,
+.preview h3,
+.preview h4 {
+  font-weight: 600;
+  margin: 1.4em 0 0.5em;
+  line-height: 1.25;
+}
+
+.preview h1 {
+  font-size: 24px;
+  margin-top: 0;
+  border-bottom: 1px solid var(--color-line);
+  padding-bottom: 0.3em;
+}
+
+.preview h2 {
+  font-size: 19px;
+}
+
+.preview h3 {
+  font-size: 15px;
+}
+
+.preview h4 {
+  font-size: 13px;
+}
+
+.preview p,
+.preview ul,
+.preview ol,
+.preview table,
+.preview blockquote {
+  margin: 0 0 0.9em;
+}
+
+.preview ul,
+.preview ol {
+  padding-left: 1.5em;
+}
+
+.preview ul {
+  list-style: disc;
+}
+
+.preview ol {
+  list-style: decimal;
+}
+
+.preview li > ul,
+.preview li > ol {
+  margin-bottom: 0;
+}
+
+.preview a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.preview code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--color-raised);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+}
+
+.preview .code-block {
+  background: var(--color-panel);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  padding: 12px;
+  overflow-x: auto;
+  margin: 0 0 0.9em;
+}
+
+.preview .code-block code {
+  background: none;
+  padding: 0;
+}
+
+.preview blockquote {
+  border-left: 3px solid var(--color-line);
+  padding-left: 1em;
+  color: var(--color-ink-dim);
+}
+
+.preview table {
+  border-collapse: collapse;
+  display: block;
+  overflow-x: auto;
+}
+
+.preview th,
+.preview td {
+  border: 1px solid var(--color-line);
+  padding: 5px 10px;
+  text-align: left;
+}
+
+.preview th {
+  background: var(--color-panel);
+  font-weight: 600;
+}
+
+.preview hr {
+  border: none;
+  border-top: 1px solid var(--color-line);
+  margin: 1.5em 0;
+}
+
+.preview img {
+  max-width: 100%;
+}
+
+.preview .mermaid-diagram {
+  margin: 0 0 0.9em;
+  overflow-x: auto;
+}
+
+.preview .mermaid-diagram svg {
+  max-width: 100%;
+}
+
+.preview .mermaid-source {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-ink-faint);
+  background: var(--color-panel);
+  border: 1px dashed var(--color-line);
+  border-radius: 8px;
+  padding: 12px;
+  margin: 0 0 0.9em;
+}
+
+.preview .mermaid-error {
+  border-color: var(--color-conflict);
+}

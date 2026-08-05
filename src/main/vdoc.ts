@@ -1,7 +1,7 @@
-import { execFile } from 'node:child_process'
+import { execFile, execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 
 export const DOCS_ROOT = process.env.VDOC_APP_ROOT ?? join(homedir(), 'Projects/documentation/Vosker-doc')
 
@@ -38,7 +38,15 @@ export function runVdoc(args: string[]): Promise<VdocRun> {
       args,
       {
         cwd: DOCS_ROOT,
-        env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: '0' },
+        env: {
+          ...process.env,
+          NO_COLOR: '1',
+          FORCE_COLOR: '0',
+          // The vdoc shebang is `#!/usr/bin/env bun`; a Finder-launched .app has a
+          // minimal PATH, so make sure the binary's own directory (where bun also
+          // lives) is searchable.
+          PATH: `${process.env.PATH ?? ''}:${dirname(resolvedVdocBin())}`,
+        },
         maxBuffer: 64 * 1024 * 1024,
       },
       (error, stdout, stderr) => {
@@ -78,6 +86,26 @@ export async function runVdocJson<T>(args: string[]): Promise<T> {
 function vdocFailureMessage(args: string[], stderr: string, stdout: string): string {
   const detail = (stderr || stdout).trim().split('\n').slice(-4).join('\n')
   return `vdoc ${args.join(' ')} failed${detail ? `:\n${detail}` : ''}`
+}
+
+/** Relative paths of files with uncommitted git changes under the content dirs. */
+export function gitDirtyFiles(): Set<string> {
+  try {
+    const output = execFileSync(
+      'git',
+      ['status', '--porcelain=v1', '--untracked-files=all', '--', ...CONTENT_DIRS],
+      { cwd: DOCS_ROOT, encoding: 'utf8' },
+    )
+    return new Set(
+      output.split('\n')
+        .filter(line => line.length > 3)
+        // "XY path" — renames are "R  old -> new"; keep the new path.
+        .map(line => line.slice(3).split(' -> ').at(-1) ?? '')
+        .filter(Boolean),
+    )
+  } catch {
+    return new Set()
+  }
 }
 
 /** Relative paths of all Markdown files in the content dirs, tracked = has confluencePageId frontmatter. */

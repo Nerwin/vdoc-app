@@ -34,6 +34,25 @@ export interface DiffResult {
   localVersion?: number
   remoteVersion: number
   versionDrift: boolean
+  baselineRecorded?: boolean
+}
+
+export interface VersionEntry {
+  number: number
+  createdAt: string
+  author: string
+}
+
+export interface CommentEntry {
+  id: string
+  kind: 'footer' | 'inline'
+  author: string
+  authorId: string
+  createdAt: string
+  resolutionStatus?: string
+  /** The inline comment's highlighted text on the page, when available. */
+  selection?: string
+  markdown: string
 }
 
 export interface PullFile {
@@ -91,12 +110,17 @@ export interface AuthStatus {
   displayName?: string
   /** Session token JWT expiry, epoch seconds. */
   tokenExp?: number
+  /** An API key is stored in the config (regardless of the active method). */
+  hasApiKey: boolean
+  email?: string
   error?: string
 }
 
 export interface ScanFile {
   path: string
   tracked: boolean
+  /** Has uncommitted git changes (purely informational — no sync logic depends on it). */
+  gitDirty: boolean
 }
 
 export interface ScanResult {
@@ -120,6 +144,8 @@ export interface SettingsInfo extends Settings {
   resolvedBin: string
   /** `vdoc --version` output, null when the binary cannot be run. */
   version: string | null
+  /** This app's own version (package.json / bundle). */
+  appVersion: string
 }
 
 export interface VdocApi {
@@ -128,6 +154,10 @@ export interface VdocApi {
   checkFiles(paths: string[]): Promise<CheckFile[]>
   readFile(path: string): Promise<string>
   diff(path: string): Promise<DiffResult>
+  recordBaseline(path: string): Promise<DiffResult>
+  lastVersion(path: string): Promise<VersionEntry | null>
+  comments(path: string): Promise<CommentEntry[]>
+  postComment(path: string, text: string): Promise<void>
   pull(paths: string[], force?: boolean): Promise<PullFile[]>
   push(path: string, dryRun: boolean, force?: boolean): Promise<PushFile[]>
   create(path: string, space: string, parent?: string): Promise<CreateResult>
@@ -135,6 +165,8 @@ export interface VdocApi {
   lint(path: string): Promise<LintFile[]>
   authStatus(): Promise<AuthStatus>
   setToken(token: string): Promise<AuthStatus>
+  saveApiKey(email: string, apiToken: string): Promise<AuthStatus>
+  setAuthMethod(method: 'api-token' | 'session-token'): Promise<AuthStatus>
   openConfluence(path: string): Promise<void>
   openEditor(path: string): Promise<void>
   revealFinder(path: string): Promise<void>

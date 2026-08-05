@@ -1,15 +1,19 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { ipcMain, shell } from 'electron'
+import { app, ipcMain, shell } from 'electron'
 
-import type { AuthStatus, CheckFile, CreateResult, DiffResult, LintFile, PullFile, PushFile, Settings, SettingsInfo, SyncFile } from '../shared/types.ts'
-import { DOCS_ROOT, resolvedVdocBin, runVdoc, runVdocJson, scanMarkdownFiles, setVdocBin } from './vdoc.ts'
+import type { AuthStatus, CheckFile, CommentEntry, CreateResult, DiffResult, LintFile, PullFile, PushFile, Settings, SettingsInfo, SyncFile, VersionEntry } from '../shared/types.ts'
+import { DOCS_ROOT, gitDirtyFiles, resolvedVdocBin, runVdoc, runVdocJson, scanMarkdownFiles, setVdocBin } from './vdoc.ts'
 import { loadSettings, saveSettings } from './settings.ts'
 
 const CHECK_BATCH = 24
 
 export function registerIpc(): void {
-  ipcMain.handle('scan', () => ({ root: DOCS_ROOT, files: scanMarkdownFiles() }))
+  ipcMain.handle('scan', () => {
+    const dirty = gitDirtyFiles()
+    const files = scanMarkdownFiles().map(file => ({ ...file, gitDirty: dirty.has(file.path) }))
+    return { root: DOCS_ROOT, files }
+  })
 
   ipcMain.handle('check-all', async event => {
     const tracked = scanMarkdownFiles().filter(file => file.tracked).map(file => file.path)
@@ -38,6 +42,23 @@ export function registerIpc(): void {
   ipcMain.handle('read-file', (_event, path: string) => readFileSync(join(DOCS_ROOT, path), 'utf8'))
 
   ipcMain.handle('diff', (_event, path: string) => runVdocJson<DiffResult>(['cf', 'diff', path]))
+
+  ipcMain.handle('record-baseline', (_event, path: string) =>
+    runVdocJson<DiffResult>(['cf', 'diff', path, '--record']))
+
+  ipcMain.handle('last-version', async (_event, path: string) => {
+    const { versions } = await runVdocJson<{ versions: VersionEntry[] }>(['cf', 'versions', path, '--limit', '1'])
+    return versions[0] ?? null
+  })
+
+  ipcMain.handle('comments', async (_event, path: string) => {
+    const { comments } = await runVdocJson<{ comments: CommentEntry[] }>(['cf', 'comments', path])
+    return comments
+  })
+
+  ipcMain.handle('post-comment', async (_event, path: string, text: string) => {
+    await runVdocJson(['cf', 'comment', path, text])
+  })
 
   ipcMain.handle('pull', async (_event, paths: string[], force?: boolean) => {
     const args = ['cf', 'pull', ...paths]
@@ -77,6 +98,18 @@ export function registerIpc(): void {
     return authStatus()
   })
 
+  ipcMain.handle('save-api-key', async (_event, email: string, apiToken: string) => {
+    await runVdocJson(['config', 'set', 'confluence.email', email.trim()])
+    await runVdocJson(['config', 'set', 'confluence.apiToken', '--encrypt', apiToken.trim()])
+    await runVdocJson(['config', 'set', 'confluence.authMethod', 'api-token'])
+    return authStatus()
+  })
+
+  ipcMain.handle('set-auth-method', async (_event, method: 'api-token' | 'session-token') => {
+    await runVdocJson(['config', 'set', 'confluence.authMethod', method])
+    return authStatus()
+  })
+
   ipcMain.handle('open-confluence', async (_event, path: string) => {
     const { url } = await runVdocJson<{ url: string }>(['cf', 'open', path, '--print'])
     await shell.openExternal(url)
@@ -104,7 +137,7 @@ export function registerIpc(): void {
 }
 
 async function settingsInfo(): Promise<SettingsInfo> {
-  return { ...loadSettings(), resolvedBin: resolvedVdocBin(), version: await probeVersion() }
+  return { ...loadSettings(), resolvedBin: resolvedVdocBin(), version: await probeVersion(), appVersion: app.getVersion() }
 }
 
 /** First stdout line of `vdoc --version`, or null when the binary is unusable. */
@@ -114,22 +147,34 @@ async function probeVersion(): Promise<string | null> {
   return stdout.trim().split('\n')[0] || null
 }
 
-/** Probe credentials via whoami; token itself never leaves the main process. */
+interface ConfluenceConfig {
+  apiToken?: string
+  sessionToken?: string
+  authMethod?: 'api-token' | 'session-token'
+  email?: string
+}
+
+/** Probe credentials via whoami; tokens themselves never leave the main process. */
 async function authStatus(): Promise<AuthStatus> {
-  const config = await runVdocJson<{ apiToken?: string, sessionToken?: string }>(
-    ['config', 'get', 'confluence', '--decrypt'],
-  ).catch(() => ({}) as { apiToken?: string, sessionToken?: string })
+  const config = await runVdocJson<ConfluenceConfig>(['config', 'get', 'confluence', '--decrypt'])
+    .catch(() => ({}) as ConfluenceConfig)
 
-  const method: AuthStatus['method'] = config.apiToken ? 'api-token' : config.sessionToken ? 'session-token' : 'none'
-  const tokenExp = config.sessionToken && !config.apiToken ? decodeJwtExp(config.sessionToken) : undefined
+  // Mirror the CLI's resolution: an explicit session-token preference skips the stored API key.
+  const method: AuthStatus['method'] = config.authMethod === 'session-token'
+    ? (config.sessionToken ? 'session-token' : 'none')
+    : config.apiToken
+      ? 'api-token'
+      : config.sessionToken ? 'session-token' : 'none'
+  const tokenExp = method === 'session-token' && config.sessionToken ? decodeJwtExp(config.sessionToken) : undefined
+  const base = { method, tokenExp, hasApiKey: Boolean(config.apiToken), email: config.email }
 
-  if (method === 'none') return { ok: false, method, error: 'No Confluence credentials configured' }
+  if (method === 'none') return { ok: false, ...base, error: 'No Confluence credentials configured' }
 
   try {
     const whoami = await runVdocJson<{ displayName: string }>(['cf', 'whoami'])
-    return { ok: true, method, displayName: whoami.displayName, tokenExp }
+    return { ok: true, ...base, displayName: whoami.displayName }
   } catch (error) {
-    return { ok: false, method, tokenExp, error: error instanceof Error ? error.message : String(error) }
+    return { ok: false, ...base, error: error instanceof Error ? error.message : String(error) }
   }
 }
 

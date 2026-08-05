@@ -24,11 +24,8 @@ export function CodeView({ content }: { content: string }) {
       occurrencesHighlight: 'off',
     })
     editorRef.current = editor
-    return () => {
-      const model = editor.getModel()
-      editor.dispose()
-      model?.dispose()
-    }
+    // The editor owns the implicit model created from `value` and disposes it itself.
+    return () => editor.dispose()
   }, [])
 
   useEffect(() => {
