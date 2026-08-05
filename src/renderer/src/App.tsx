@@ -14,9 +14,6 @@ import { applyMonacoTheme } from './components/monaco-setup.ts'
 import { useApp } from './useApp.ts'
 import logo from './assets/logo.png'
 
-/** Folder → Confluence space defaults, from the repo's space mapping. */
-const SPACE_BY_DIR: Record<string, string> = { '1-Backend': 'BACK', '2-DDA': 'BDA' }
-
 export function App() {
   const app = useApp()
   const [tokenOpen, setTokenOpen] = useState(false)
@@ -245,12 +242,15 @@ export function App() {
           settings={app.settings}
           auth={app.auth}
           busy={app.busyOp !== null}
+          spaceMapping={app.spaceMapping}
           onUpdate={app.updateSettings}
           onReloadVersion={app.reloadVersion}
           onSaveApiKey={(email, token) => void app.saveApiKey(email, token)}
           onSetAuthMethod={method => void app.setAuthMethod(method)}
           onAddFolder={() => void app.addFolder()}
           onRemoveFolder={app.removeFolder}
+          onSetSpaceMapping={app.setSpaceMappingEntry}
+          onRevealConfig={() => void app.revealConfig()}
           onClose={() => setSettingsOpen(false)}
         />
       )}
@@ -258,7 +258,7 @@ export function App() {
       {app.createForm && (
         <CreateForm
           path={app.createForm.path}
-          defaultSpace={SPACE_BY_DIR[app.createForm.path.split('/')[0]] ?? ''}
+          defaultSpace={app.spaceMapping[app.createForm.path.split('/')[0]] ?? ''}
           busy={app.busyOp !== null}
           onSubmit={app.submitCreate}
           onClose={() => app.setCreateForm(null)}

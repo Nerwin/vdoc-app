@@ -46,6 +46,7 @@ export function useApp() {
   const [pullConfirm, setPullConfirm] = useState<PullConfirm | null>(null)
   const [createForm, setCreateForm] = useState<{ path: string } | null>(null)
   const [settings, setSettings] = useState<SettingsInfo | null>(null)
+  const [spaceMapping, setSpaceMapping] = useState<Record<string, string>>({})
   /** Latest remote version info per file, keyed `path@vN` so a new version refetches. */
   const [authors, setAuthors] = useState<Map<string, VersionEntry | null>>(new Map())
   const [message, setMessage] = useState<Message | null>(null)
@@ -110,6 +111,7 @@ export function useApp() {
 
   useEffect(() => {
     void api.settingsGet().then(setSettings).catch(fail)
+    void api.spaceMappingGet().then(setSpaceMapping).catch(fail)
   }, [api, fail])
 
   // Initial load: tree first (fast, local), then auth probe, then the full check.
@@ -256,7 +258,8 @@ export function useApp() {
   }), [api, applyChecks, runOp])
 
   const syncFile = useCallback((path: string) => runOp('sync', async () => {
-    const [result] = await api.sync(path)
+    // Restrict the title search to the folder's mapped space when one is configured.
+    const [result] = await api.sync(path, spaceMapping[path.split('/')[0]])
     const name = path.split('/').at(-1)
     switch (result?.status) {
       case 'linked':
@@ -275,7 +278,7 @@ export function useApp() {
       default:
         setMessage({ kind: 'error', text: `Sync skipped: ${result?.reason ?? 'no result'}` })
     }
-  }), [api, recheck, runOp])
+  }), [api, recheck, runOp, spaceMapping])
 
   const submitCreate = useCallback((space: string, parent: string) => {
     if (!createForm) return
@@ -407,6 +410,12 @@ export function useApp() {
     updateSettings({ pinnedDirs: pinned })
   }, [settings, updateSettings])
 
+  const setSpaceMappingEntry = useCallback((dir: string, space: string | null) => {
+    void api.spaceMappingSet(dir.trim(), space === null ? null : space.trim().toUpperCase())
+      .then(setSpaceMapping)
+      .catch(fail)
+  }, [api, fail])
+
   const checkFolder = useCallback((dir: string) => {
     const targets = [...entries.values()]
       .filter(entry => entry.tracked && entry.path.startsWith(`${dir}/`))
@@ -478,6 +487,9 @@ export function useApp() {
     togglePin,
     checkFolder,
     openFolder: (path: string) => api.openFolder(path).catch(fail),
+    spaceMapping,
+    setSpaceMappingEntry,
+    revealConfig: () => api.revealConfig().catch(fail),
     authors,
     loadAuthors,
     markVerified,

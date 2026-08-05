@@ -82,8 +82,10 @@ export function registerIpc(): void {
     return runVdocJson<CreateResult>(args)
   })
 
-  ipcMain.handle('sync', async (_event, path: string) => {
-    const { files } = await runVdocJson<{ files: SyncFile[] }>(['cf', 'sync', path])
+  ipcMain.handle('sync', async (_event, path: string, space?: string) => {
+    const args = ['cf', 'sync', path]
+    if (space) args.push('--space', space)
+    const { files } = await runVdocJson<{ files: SyncFile[] }>(args)
     return files
   })
 
@@ -156,11 +158,33 @@ export function registerIpc(): void {
 
   ipcMain.handle('open-folder', (_event, path: string) => shell.openPath(join(DOCS_ROOT, path)).then(() => undefined))
 
+  ipcMain.handle('space-mapping-get', () => spaceMapping())
+
+  ipcMain.handle('space-mapping-set', async (_event, dir: string, space: string | null) => {
+    const key = `confluence.spaceMapping.${dir}`
+    if (space === null) await runVdocJson(['config', 'set', key, '--delete'])
+    else await runVdocJson(['config', 'set', key, space])
+    return spaceMapping()
+  })
+
+  ipcMain.handle('reveal-config', async () => {
+    const { path } = await runVdocJson<{ path: string }>(['config', 'path'])
+    shell.showItemInFolder(path)
+  })
+
   ipcMain.handle('vdoc-version', () => probeVersion())
 }
 
 async function settingsInfo(): Promise<SettingsInfo> {
-  return { ...loadSettings(), resolvedBin: resolvedVdocBin(), version: await probeVersion(), appVersion: app.getVersion() }
+  const configPath = await runVdocJson<{ path: string }>(['config', 'path']).then(r => r.path).catch(() => null)
+  return { ...loadSettings(), resolvedBin: resolvedVdocBin(), version: await probeVersion(), appVersion: app.getVersion(), configPath }
+}
+
+/** The shared .vdocrc's folder → space mapping ({} when absent). */
+function spaceMapping(): Promise<Record<string, string>> {
+  return runVdocJson<Record<string, string>>(['config', 'get', 'confluence.spaceMapping'])
+    .then(mapping => mapping ?? {})
+    .catch(() => ({}))
 }
 
 /** First stdout line of `vdoc --version`, or null when the binary is unusable. */

@@ -7,18 +7,23 @@ interface Props {
   settings: SettingsInfo
   auth: AuthStatus | null
   busy: boolean
+  spaceMapping: Record<string, string>
   onUpdate(patch: { theme?: 'dark' | 'light', vdocBin?: string | null }): void
   onReloadVersion(): void
   onSaveApiKey(email: string, apiToken: string): void
   onSetAuthMethod(method: 'api-token' | 'session-token'): void
   onAddFolder(): void
   onRemoveFolder(path: string): void
+  onSetSpaceMapping(dir: string, space: string | null): void
+  onRevealConfig(): void
   onClose(): void
 }
 
-export function SettingsModal({ settings, auth, busy, onUpdate, onReloadVersion, onSaveApiKey, onSetAuthMethod, onAddFolder, onRemoveFolder, onClose }: Props) {
+export function SettingsModal({ settings, auth, busy, spaceMapping, onUpdate, onReloadVersion, onSaveApiKey, onSetAuthMethod, onAddFolder, onRemoveFolder, onSetSpaceMapping, onRevealConfig, onClose }: Props) {
   const [bin, setBin] = useState(settings.vdocBin ?? '')
   const binDirty = (bin.trim() || null) !== settings.vdocBin
+  const [mapDir, setMapDir] = useState('')
+  const [mapSpace, setMapSpace] = useState('')
   const [method, setMethod] = useState<'api-token' | 'session-token'>(auth?.method === 'api-token' ? 'api-token' : 'session-token')
   const [email, setEmail] = useState(auth?.email ?? '')
   const [apiToken, setApiToken] = useState('')
@@ -77,6 +82,61 @@ export function SettingsModal({ settings, auth, busy, onUpdate, onReloadVersion,
           <p className="mt-1 text-[11px] text-ink-faint">
             Folders must live inside the docs repository. Only Markdown files are ever listed.
           </p>
+        </section>
+
+        <section>
+          <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-faint">Space mapping</h3>
+          <p className="mb-2 text-[11px] text-ink-faint">
+            Default Confluence space per folder — prefills Create and narrows Sync's title search.
+            Stored in the shared <code className="font-mono">.vdocrc</code>, so the CLI sees it too.
+          </p>
+          <ul className="mb-2 space-y-1">
+            {Object.entries(spaceMapping).sort(([a], [b]) => a.localeCompare(b)).map(([dir, space]) => (
+              <li key={dir} className="flex items-center gap-2 rounded-md border border-line bg-bg px-2.5 py-1.5 font-mono text-[12px]">
+                <span className="flex-1 truncate text-ink">{dir}</span>
+                <span className="text-ink-faint">→</span>
+                <span className="w-16 text-ink">{space}</span>
+                <button
+                  onClick={() => onSetSpaceMapping(dir, null)}
+                  title={`Remove the ${dir} mapping`}
+                  className="text-ink-faint hover:text-conflict"
+                >
+                  ✕
+                </button>
+              </li>
+            ))}
+            {Object.keys(spaceMapping).length === 0 && (
+              <li className="text-[11px] text-ink-faint">No mapping yet.</li>
+            )}
+          </ul>
+          <div className="flex items-center gap-2">
+            <select
+              value={settings.contentDirs.includes(mapDir) ? mapDir : ''}
+              onChange={event => setMapDir(event.target.value)}
+              className="rounded-md border border-line bg-bg px-2 py-1.5 font-mono text-[12px] text-ink outline-none focus:border-accent"
+            >
+              <option value="">folder…</option>
+              {settings.contentDirs.filter(dir => !(dir in spaceMapping)).map(dir => (
+                <option key={dir} value={dir}>{dir}</option>
+              ))}
+            </select>
+            <input
+              value={mapSpace}
+              onChange={event => setMapSpace(event.target.value.toUpperCase())}
+              placeholder="SPACE"
+              spellCheck={false}
+              className="w-24 rounded-md border border-line bg-bg px-2 py-1.5 font-mono text-[12px] text-ink placeholder-ink-faint outline-none focus:border-accent"
+            />
+            <ModalButton
+              label="Add"
+              disabled={mapDir === '' || mapSpace.trim() === '' || busy}
+              onClick={() => {
+                onSetSpaceMapping(mapDir, mapSpace)
+                setMapDir('')
+                setMapSpace('')
+              }}
+            />
+          </div>
         </section>
 
         <section>
@@ -162,6 +222,19 @@ export function SettingsModal({ settings, auth, busy, onUpdate, onReloadVersion,
             >
               ↻
             </button>
+          </p>
+        </section>
+
+        <section>
+          <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-faint">Config file</h3>
+          <div className="flex items-center gap-2">
+            <span className="flex-1 truncate font-mono text-[11px] text-ink-dim" title={settings.configPath ?? undefined}>
+              {settings.configPath ?? 'not resolved — is the CLI runnable?'}
+            </span>
+            <ModalButton label="Reveal in Finder" disabled={settings.configPath === null} onClick={onRevealConfig} />
+          </div>
+          <p className="mt-1 text-[11px] text-ink-faint">
+            One file for the CLI and the app: credentials, auth method, and space mapping all live here.
           </p>
         </section>
       </div>

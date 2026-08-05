@@ -150,6 +150,8 @@ export interface SettingsInfo extends Settings {
   version: string | null
   /** This app's own version (package.json / bundle). */
   appVersion: string
+  /** The .vdocrc actually in use — shared between the CLI and the app. */
+  configPath: string | null
 }
 
 export interface VdocApi {
@@ -165,7 +167,7 @@ export interface VdocApi {
   pull(paths: string[], force?: boolean): Promise<PullFile[]>
   push(path: string, dryRun: boolean, force?: boolean): Promise<PushFile[]>
   create(path: string, space: string, parent?: string): Promise<CreateResult>
-  sync(path: string): Promise<SyncFile[]>
+  sync(path: string, space?: string): Promise<SyncFile[]>
   lint(path: string): Promise<LintFile[]>
   authStatus(): Promise<AuthStatus>
   setToken(token: string): Promise<AuthStatus>
@@ -180,6 +182,11 @@ export interface VdocApi {
   /** Native folder picker rooted at the docs repo; returns a relative path or null. */
   pickFolder(): Promise<string | null>
   openFolder(path: string): Promise<void>
+  /** Folder → Confluence space mapping, stored in the shared .vdocrc. */
+  spaceMappingGet(): Promise<Record<string, string>>
+  /** Set (or delete with null) one mapping entry; returns the fresh mapping. */
+  spaceMappingSet(dir: string, space: string | null): Promise<Record<string, string>>
+  revealConfig(): Promise<void>
   onFilesChanged(cb: (paths: string[]) => void): () => void
   onCheckProgress(cb: (progress: CheckProgress) => void): () => void
 }

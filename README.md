@@ -39,9 +39,16 @@ CLI's `#!/usr/bin/env bun` shebang resolves even from a Finder-launched app.
 
 ## Settings (⌘,)
 
-Stored in `settings.json` under Electron's `userData` directory.
+App-local preferences (theme, folders, pins, binary path) live in `settings.json` under Electron's
+`userData` directory. Everything Confluence-related — credentials, auth method, and the
+**space mapping** — lives in the shared `.vdocrc` written through `vdoc config set`, so the CLI and
+the app always agree; the resolved config path is shown in Settings with a "Reveal in Finder" button
+(`vdoc config path`).
 
 - **Theme** — light or dark (applies to the UI and the Monaco editors).
+- **Folders** — the tree's root folders (add via native picker, remove; also right-click a folder in the tree).
+- **Space mapping** — folder → Confluence space key; prefills Create's space and narrows Sync's title search.
+- **Confluence authentication** — session token or API key.
 - **vdoc CLI** — explicit binary path (empty = auto-detect), with the resolved `--version` shown and reloadable.
 
 ## Environment
