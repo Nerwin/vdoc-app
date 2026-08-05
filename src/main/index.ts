@@ -1,10 +1,11 @@
-import { existsSync, watch } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { app, BrowserWindow } from 'electron'
 
-import { CONTENT_DIRS, DOCS_ROOT, setVdocBin } from './vdoc.ts'
+import { setVdocBin } from './vdoc.ts'
 import { loadSettings } from './settings.ts'
 import { registerIpc } from './ipc.ts'
+import { watchDocs } from './watcher.ts'
 
 // Automation hook: VDOC_DEBUG_PORT=9222 npm run dev exposes CDP for driving the app.
 if (process.env.VDOC_DEBUG_PORT) {
@@ -29,45 +30,31 @@ function createWindow(theme: 'dark' | 'light'): BrowserWindow {
   return window
 }
 
-/** Debounced watcher over the content dirs; notifies the renderer with changed .md paths. */
-function watchDocs(window: BrowserWindow): void {
-  const pending = new Set<string>()
-  let timer: NodeJS.Timeout | undefined
-
-  const flush = (): void => {
-    if (pending.size > 0 && !window.isDestroyed()) {
-      window.webContents.send('files-changed', [...pending])
-    }
-    pending.clear()
-  }
-
-  for (const dir of CONTENT_DIRS) {
-    try {
-      watch(join(DOCS_ROOT, dir), { recursive: true }, (_eventType, filename) => {
-        if (!filename || !filename.endsWith('.md')) return
-        if (filename.split('/').some(segment => segment.startsWith('.'))) return
-        pending.add(`${dir}/${filename}`)
-        clearTimeout(timer)
-        timer = setTimeout(flush, 400)
-      })
-    } catch {
-      // Missing content dir: nothing to watch.
-    }
-  }
-}
-
 app.setName('V-DOC')
 
-app.whenReady().then(() => {
-  const settings = loadSettings()
-  setVdocBin(settings.vdocBin)
+let mainWindow: BrowserWindow | null = null
 
-  const icon = join(__dirname, '../../icon.png')
-  if (app.dock && existsSync(icon)) app.dock.setIcon(icon)
+if (!app.requestSingleInstanceLock()) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    if (!mainWindow) return
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.focus()
+  })
 
-  registerIpc()
-  const window = createWindow(settings.theme)
-  watchDocs(window)
-})
+  app.whenReady().then(() => {
+    const settings = loadSettings()
+    setVdocBin(settings.vdocBin)
+
+    // Dev only — the packaged bundle carries its own icon from build/icon.png.
+    const icon = join(__dirname, '../../build/icon.png')
+    if (app.dock && existsSync(icon)) app.dock.setIcon(icon)
+
+    registerIpc()
+    mainWindow = createWindow(settings.theme)
+    watchDocs(mainWindow)
+  })
+}
 
 app.on('window-all-closed', () => app.quit())

@@ -34,6 +34,8 @@ const api: VdocApi = {
   settingsGet: () => ipcRenderer.invoke('settings-get'),
   settingsSet: patch => ipcRenderer.invoke('settings-set', patch),
   vdocVersion: () => ipcRenderer.invoke('vdoc-version'),
+  pickFolder: () => ipcRenderer.invoke('pick-folder'),
+  openFolder: path => ipcRenderer.invoke('open-folder', path),
   onFilesChanged: cb => subscribe<string[]>('files-changed', cb),
   onCheckProgress: cb => subscribe<CheckProgress>('check-progress', cb),
 }

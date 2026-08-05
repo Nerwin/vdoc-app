@@ -7,13 +7,25 @@ session-token renewal.
 ## Run
 
 ```sh
-npm run dev        # launch in dev mode
-npm test           # typecheck + unit tests
-npm run build      # production bundle to out/
-npm run pack       # build V-DOC.app into release/mac-arm64/ (unsigned, version from package.json)
+npm run dev            # launch in dev mode
+npm test               # typecheck + unit tests
+npm run build          # production bundle to out/
+npm run pack           # quick unsigned V-DOC.app into release/mac-arm64/
+npm run release        # dmg+zip (mac), nsis+portable (win), AppImage+deb (linux)
+npm run release:mac    # or per-platform: release:win / release:linux
 ```
 
-Requires the `vdoc` binary (auto-detected at `~/.bun/bin/vdoc`, then PATH — overridable in Settings).
+Builds target the host arch (arm64 here); add `-- --x64` to an electron-builder script for Intel
+artifacts. All artifacts are unsigned. Version comes from `package.json` and stamps the bundle,
+the artifacts' names, and the status bar. The app icon lives in `build/icon.png` (1024×1024 —
+electron-builder converts it per platform).
+
+Everything ships bundled by Vite, so all npm packages are devDependencies and the package contains
+`out/` only (33 MB asar) — no `node_modules`.
+
+Requires the `vdoc` binary (auto-detected at `~/.bun/bin/vdoc`, then PATH — overridable in
+Settings). Spawns extend PATH with `~/.bun/bin`, `/opt/homebrew/bin`, and `/usr/local/bin` so the
+CLI's `#!/usr/bin/env bun` shebang resolves even from a Finder-launched app.
 
 ## Shortcuts
 
@@ -39,7 +51,10 @@ Stored in `settings.json` under Electron's `userData` directory.
 
 ## Scope
 
-The tree covers `1-Backend`, `2-DDA`, and `3-Projects` (`4-Notes` is local-only by choice).
+The tree's root folders are user-configurable (Settings → Folders, defaults: `1-Backend`, `2-DDA`,
+`3-Projects`) and must live inside the docs repository; only Markdown files are ever listed.
+Right-click any folder for actions: pin on top, check only that folder, open in Finder, and — on
+root folders — remove from the tree.
 
 ## How it talks to the CLI
 

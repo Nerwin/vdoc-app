@@ -11,10 +11,12 @@ interface Props {
   onReloadVersion(): void
   onSaveApiKey(email: string, apiToken: string): void
   onSetAuthMethod(method: 'api-token' | 'session-token'): void
+  onAddFolder(): void
+  onRemoveFolder(path: string): void
   onClose(): void
 }
 
-export function SettingsModal({ settings, auth, busy, onUpdate, onReloadVersion, onSaveApiKey, onSetAuthMethod, onClose }: Props) {
+export function SettingsModal({ settings, auth, busy, onUpdate, onReloadVersion, onSaveApiKey, onSetAuthMethod, onAddFolder, onRemoveFolder, onClose }: Props) {
   const [bin, setBin] = useState(settings.vdocBin ?? '')
   const binDirty = (bin.trim() || null) !== settings.vdocBin
   const [method, setMethod] = useState<'api-token' | 'session-token'>(auth?.method === 'api-token' ? 'api-token' : 'session-token')
@@ -50,6 +52,31 @@ export function SettingsModal({ settings, auth, busy, onUpdate, onReloadVersion,
               </button>
             ))}
           </div>
+        </section>
+
+        <section>
+          <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-faint">Folders</h3>
+          <ul className="mb-2 space-y-1">
+            {settings.contentDirs.map(dir => (
+              <li key={dir} className="flex items-center gap-2 rounded-md border border-line bg-bg px-2.5 py-1.5">
+                <span className="flex-1 truncate font-mono text-[12px] text-ink">{dir}</span>
+                <button
+                  onClick={() => onRemoveFolder(dir)}
+                  title={`Remove ${dir} from the tree`}
+                  className="text-[12px] text-ink-faint hover:text-conflict"
+                >
+                  ✕
+                </button>
+              </li>
+            ))}
+            {settings.contentDirs.length === 0 && (
+              <li className="text-[11px] text-ink-faint">No folders — the tree is empty.</li>
+            )}
+          </ul>
+          <ModalButton label="Add folder…" disabled={busy} onClick={onAddFolder} />
+          <p className="mt-1 text-[11px] text-ink-faint">
+            Folders must live inside the docs repository. Only Markdown files are ever listed.
+          </p>
         </section>
 
         <section>
@@ -127,7 +154,7 @@ export function SettingsModal({ settings, auth, busy, onUpdate, onReloadVersion,
           <p className="mt-2 flex items-center gap-2 font-mono text-[11px]">
             {settings.version
               ? <span className="text-ink-dim">{settings.version}</span>
-              : <span className="text-conflict">binary not found at {settings.resolvedBin}</span>}
+              : <span className="text-conflict">cannot run {settings.resolvedBin} — check the path (and that bun is installed)</span>}
             <button
               onClick={onReloadVersion}
               title="Reload version"

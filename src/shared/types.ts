@@ -138,6 +138,10 @@ export interface Settings {
   theme: 'dark' | 'light'
   /** Explicit vdoc binary path; null = auto-detect (~/.bun/bin/vdoc, then PATH). */
   vdocBin: string | null
+  /** Root folders (relative to the docs repo) shown in the tree. Only .md files are ever listed. */
+  contentDirs: string[]
+  /** Folder paths pinned to the top of their parent's listing. */
+  pinnedDirs: string[]
 }
 
 export interface SettingsInfo extends Settings {
@@ -173,6 +177,9 @@ export interface VdocApi {
   settingsGet(): Promise<SettingsInfo>
   settingsSet(patch: Partial<Settings>): Promise<SettingsInfo>
   vdocVersion(): Promise<string | null>
+  /** Native folder picker rooted at the docs repo; returns a relative path or null. */
+  pickFolder(): Promise<string | null>
+  openFolder(path: string): Promise<void>
   onFilesChanged(cb: (paths: string[]) => void): () => void
   onCheckProgress(cb: (progress: CheckProgress) => void): () => void
 }

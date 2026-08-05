@@ -4,7 +4,12 @@ import { app } from 'electron'
 
 import type { Settings } from '../shared/types.ts'
 
-const DEFAULTS: Settings = { theme: 'dark', vdocBin: null }
+const DEFAULTS: Settings = {
+  theme: 'dark',
+  vdocBin: null,
+  contentDirs: ['1-Backend', '2-DDA', '3-Projects'],
+  pinnedDirs: [],
+}
 
 const settingsFile = (): string => join(app.getPath('userData'), 'settings.json')
 

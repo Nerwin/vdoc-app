@@ -10,14 +10,11 @@
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "npm run typecheck && node --experimental-strip-types --test src/shared/__tests__/*.test.ts",
-    "pack": "electron-vite build && electron-builder --dir"
-  },
-  "dependencies": {
-    "marked": "^18.0.9",
-    "mermaid": "^11.16.1",
-    "monaco-editor": "^0.56.0",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "pack": "electron-vite build && electron-builder --dir",
+    "release": "electron-vite build && electron-builder --mac --win --linux",
+    "release:mac": "electron-vite build && electron-builder --mac",
+    "release:win": "electron-vite build && electron-builder --win",
+    "release:linux": "electron-vite build && electron-builder --linux"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
@@ -28,27 +25,57 @@
     "electron": "^43.2.0",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
+    "marked": "^18.0.9",
+    "mermaid": "^11.16.1",
+    "monaco-editor": "^0.56.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vite": "^7.3.6"
   },
   "productName": "V-DOC",
-  "author": "Nerwin",
+  "author": "Nerwin <anthropic@nerwin.dev>",
   "build": {
     "appId": "dev.nerwin.vdoc",
     "productName": "V-DOC",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "npmRebuild": false,
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
     "files": [
-      "out/**",
-      "icon.png"
+      "out/**"
     ],
     "mac": {
-      "target": "dir",
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "identity": null,
-      "icon": "icon.png",
       "category": "public.app-category.developer-tools"
+    },
+    "dmg": {
+      "title": "${productName} ${version}"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Development",
+      "synopsis": "GUI over the vdoc CLI"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable-${arch}.${ext}"
     }
-  }
+  },
+  "homepage": "https://github.com/nerwin/vdoc-app"
 }

@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { buildTree, flattenVisible, filesUnder } from '../tree.ts'
+import { buildTree, flattenVisible, filesUnder, orderPinnedFirst } from '../tree.ts'
 import { displayState } from '../status.ts'
 
 test('buildTree nests files under their directories', () => {
@@ -29,6 +29,18 @@ test('flattenVisible hides children of collapsed dirs', () => {
 
   const collapsed = flattenVisible(tree, new Set(['a/b']))
   assert.deepEqual(collapsed.map(node => node.path), ['a', 'a/b', 'a/two.md', 'c', 'c/three.md'])
+})
+
+test('orderPinnedFirst hoists pinned dirs at every depth, stable otherwise', () => {
+  const tree = buildTree(['a/x.md', 'b/deep/y.md', 'b/first.md', 'c/z.md'])
+
+  const ordered = orderPinnedFirst(tree, new Set(['c', 'b/deep']))
+  assert.deepEqual(ordered.map(node => node.path), ['c', 'a', 'b'])
+  const b = ordered[2]
+  assert.ok(b.kind === 'dir')
+  assert.deepEqual(b.children.map(node => node.path), ['b/deep', 'b/first.md'])
+
+  assert.deepEqual(orderPinnedFirst(tree, new Set()).map(node => node.path), ['a', 'b', 'c'])
 })
 
 test('displayState refuses to show green without a local-edit baseline', () => {

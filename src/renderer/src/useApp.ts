@@ -363,6 +363,64 @@ export function useApp() {
     void api.settingsSet(patch).then(setSettings).catch(fail)
   }, [api, fail])
 
+  /** Settings change that alters which files exist in the tree → rescan after. */
+  const applyFolderSettings = useCallback(async (patch: Partial<Settings>) => {
+    try {
+      setSettings(await api.settingsSet(patch))
+      const scan = await api.scan()
+      setRoot(scan.root)
+      mergeScan(scan.files)
+    } catch (error) {
+      fail(error)
+    }
+  }, [api, fail, mergeScan])
+
+  const addFolder = useCallback(async () => {
+    try {
+      const picked = await api.pickFolder()
+      if (!picked || !settings) return
+      if (settings.contentDirs.includes(picked)) {
+        setMessage({ kind: 'info', text: `${picked} is already in the tree` })
+        return
+      }
+      await applyFolderSettings({ contentDirs: [...settings.contentDirs, picked].sort() })
+      setMessage({ kind: 'info', text: `Added ${picked} — right-click it to check its files` })
+    } catch (error) {
+      fail(error)
+    }
+  }, [api, applyFolderSettings, fail, settings])
+
+  const removeFolder = useCallback((dir: string) => {
+    if (!settings) return
+    setSelection(current => (current?.startsWith(`${dir}/`) ? null : current))
+    void applyFolderSettings({
+      contentDirs: settings.contentDirs.filter(entry => entry !== dir),
+      pinnedDirs: settings.pinnedDirs.filter(entry => entry !== dir && !entry.startsWith(`${dir}/`)),
+    }).then(() => setMessage({ kind: 'info', text: `Removed ${dir} from the tree — add it back in Settings` }))
+  }, [applyFolderSettings, settings])
+
+  const togglePin = useCallback((dir: string) => {
+    if (!settings) return
+    const pinned = settings.pinnedDirs.includes(dir)
+      ? settings.pinnedDirs.filter(entry => entry !== dir)
+      : [...settings.pinnedDirs, dir]
+    updateSettings({ pinnedDirs: pinned })
+  }, [settings, updateSettings])
+
+  const checkFolder = useCallback((dir: string) => {
+    const targets = [...entries.values()]
+      .filter(entry => entry.tracked && entry.path.startsWith(`${dir}/`))
+      .map(entry => entry.path)
+    if (targets.length === 0) {
+      setMessage({ kind: 'info', text: `No tracked files under ${dir}` })
+      return
+    }
+    void runOp('check folder', async () => {
+      applyChecks(await api.checkFiles(targets))
+      setMessage({ kind: 'info', text: `Checked ${targets.length} file(s) under ${dir}` })
+    })
+  }, [api, applyChecks, entries, runOp])
+
   const reloadVersion = useCallback(() => {
     void api.vdocVersion()
       .then(version => setSettings(current => (current ? { ...current, version } : current)))
@@ -415,6 +473,11 @@ export function useApp() {
     settings,
     updateSettings,
     reloadVersion,
+    addFolder,
+    removeFolder,
+    togglePin,
+    checkFolder,
+    openFolder: (path: string) => api.openFolder(path).catch(fail),
     authors,
     loadAuthors,
     markVerified,

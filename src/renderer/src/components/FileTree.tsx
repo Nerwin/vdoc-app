@@ -1,8 +1,8 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { DisplayState } from '../../../shared/types.ts'
 import { displayState, needsAttention, type FileEntry } from '../../../shared/status.ts'
-import { buildTree, filesUnder, flattenVisible, type TreeNode } from '../../../shared/tree.ts'
+import { buildTree, filesUnder, flattenVisible, orderPinnedFirst, type TreeNode } from '../../../shared/tree.ts'
 import { STATE_META } from '../state-meta.ts'
 
 interface Props {
@@ -10,14 +10,41 @@ interface Props {
   selection: string | null
   filterText: string
   stateFilter: DisplayState | 'attention' | null
+  /** Configured root folders — the only ones removable from the tree. */
+  rootDirs: string[]
+  pinnedDirs: string[]
   onSelect(path: string): void
   onOpenDiff(path: string): void
+  onCheckFolder(path: string): void
+  onTogglePin(path: string): void
+  onOpenFolder(path: string): void
+  onRemoveFolder(path: string): void
 }
 
-export function FileTree({ entries, selection, filterText, stateFilter, onSelect, onOpenDiff }: Props) {
+interface FolderMenu {
+  x: number
+  y: number
+  path: string
+}
+
+export function FileTree({ entries, selection, filterText, stateFilter, rootDirs, pinnedDirs, onSelect, onOpenDiff, onCheckFolder, onTogglePin, onOpenFolder, onRemoveFolder }: Props) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [menu, setMenu] = useState<FolderMenu | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const filtering = filterText !== '' || stateFilter !== null
+
+  // While the context menu is open, Escape closes it (and nothing else).
+  useEffect(() => {
+    if (!menu) return
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        event.stopPropagation()
+        setMenu(null)
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [menu])
 
   const rows = useMemo(() => {
     const query = filterText.toLowerCase()
@@ -30,8 +57,9 @@ export function FileTree({ entries, selection, filterText, stateFilter, onSelect
       })
       .map(entry => entry.path)
     // A filter shows every match expanded; the collapse set only applies when browsing.
-    return flattenVisible(buildTree(paths), filtering ? new Set() : collapsed)
-  }, [entries, filterText, stateFilter, filtering, collapsed])
+    const tree = orderPinnedFirst(buildTree(paths), new Set(pinnedDirs))
+    return flattenVisible(tree, filtering ? new Set() : collapsed)
+  }, [entries, filterText, stateFilter, filtering, collapsed, pinnedDirs])
 
   const fileRows = useMemo(() => rows.filter(row => row.kind === 'file'), [rows])
 
@@ -80,11 +108,62 @@ export function FileTree({ entries, selection, filterText, stateFilter, onSelect
           node={row}
           entries={entries}
           selected={row.path === selection}
+          pinned={pinnedDirs.includes(row.path)}
           collapsed={!filtering && collapsed.has(row.path)}
           onClick={() => (row.kind === 'dir' ? toggleDir(row.path) : onSelect(row.path))}
+          onContextMenu={row.kind === 'dir'
+            ? event => {
+                event.preventDefault()
+                setMenu({ x: event.clientX, y: event.clientY, path: row.path })
+              }
+            : undefined}
         />
       ))}
+
+      {menu && (
+        <div className="fixed inset-0 z-40" onClick={() => setMenu(null)} onContextMenu={event => { event.preventDefault(); setMenu(null) }}>
+          <div
+            className="absolute w-52 overflow-hidden rounded-lg border border-line bg-raised py-1 shadow-2xl"
+            style={{ left: Math.min(menu.x, window.innerWidth - 220), top: Math.min(menu.y, window.innerHeight - 160) }}
+            onClick={event => event.stopPropagation()}
+          >
+            <MenuItem
+              label={pinnedDirs.includes(menu.path) ? 'Unpin' : 'Pin on top'}
+              onClick={() => { onTogglePin(menu.path); setMenu(null) }}
+            />
+            <MenuItem
+              label="Check this folder"
+              onClick={() => { onCheckFolder(menu.path); setMenu(null) }}
+            />
+            <MenuItem
+              label="Open in Finder"
+              onClick={() => { onOpenFolder(menu.path); setMenu(null) }}
+            />
+            {rootDirs.includes(menu.path) && (
+              <>
+                <div className="mx-2 my-1 h-px bg-line" />
+                <MenuItem
+                  label="Remove from tree"
+                  danger
+                  onClick={() => { onRemoveFolder(menu.path); setMenu(null) }}
+                />
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
+  )
+}
+
+function MenuItem({ label, onClick, danger }: { label: string, onClick(): void, danger?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`block w-full px-3 py-1.5 text-left text-[12px] hover:bg-panel ${danger ? 'text-conflict' : 'text-ink'}`}
+    >
+      {label}
+    </button>
   )
 }
 
@@ -92,11 +171,13 @@ interface RowProps {
   node: TreeNode
   entries: Map<string, FileEntry>
   selected: boolean
+  pinned: boolean
   collapsed: boolean
   onClick(): void
+  onContextMenu?(event: React.MouseEvent): void
 }
 
-function Row({ node, entries, selected, collapsed, onClick }: RowProps) {
+function Row({ node, entries, selected, pinned, collapsed, onClick, onContextMenu }: RowProps) {
   const indent = { paddingLeft: `${12 + node.depth * 14}px` }
 
   if (node.kind === 'dir') {
@@ -107,11 +188,13 @@ function Row({ node, entries, selected, collapsed, onClick }: RowProps) {
     return (
       <button
         onClick={onClick}
+        onContextMenu={onContextMenu}
         style={indent}
         className="flex w-full items-center gap-1.5 py-[3px] pr-3 text-left text-ink-dim hover:bg-panel"
       >
         <span className="w-3 text-center text-[9px] text-ink-faint">{collapsed ? '▸' : '▾'}</span>
         <span className="truncate">{node.name}</span>
+        {pinned && <span className="text-[9px] text-accent" title="Pinned on top">✦</span>}
         {attention > 0 && (
           <span className="ml-auto rounded-full bg-raised px-1.5 text-[10px] text-ahead">{attention}</span>
         )}

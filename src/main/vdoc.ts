@@ -3,10 +3,14 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 
+import { loadSettings } from './settings.ts'
+
 export const DOCS_ROOT = process.env.VDOC_APP_ROOT ?? join(homedir(), 'Projects/documentation/Vosker-doc')
 
-/** Confluence-published content dirs (4-Notes is local-only by choice). */
-export const CONTENT_DIRS = ['1-Backend', '2-DDA', '3-Projects']
+/** User-configured root folders (Settings → Folders). */
+export function getContentDirs(): string[] {
+  return loadSettings().contentDirs
+}
 
 const EXCLUDED_DIRS = new Set(['0-Archives', '0-Images', '0-Private', 'Temp', '_audit', 'Scripts', 'node_modules', 'dist'])
 
@@ -43,9 +47,15 @@ export function runVdoc(args: string[]): Promise<VdocRun> {
           NO_COLOR: '1',
           FORCE_COLOR: '0',
           // The vdoc shebang is `#!/usr/bin/env bun`; a Finder-launched .app has a
-          // minimal PATH, so make sure the binary's own directory (where bun also
-          // lives) is searchable.
-          PATH: `${process.env.PATH ?? ''}:${dirname(resolvedVdocBin())}`,
+          // minimal PATH, so append the vdoc dir plus the standard user bin dirs
+          // (bun itself may live in Homebrew, not next to the linked binary).
+          PATH: [
+            process.env.PATH,
+            dirname(resolvedVdocBin()),
+            join(homedir(), '.bun/bin'),
+            '/opt/homebrew/bin',
+            '/usr/local/bin',
+          ].filter(Boolean).join(':'),
         },
         maxBuffer: 64 * 1024 * 1024,
       },
@@ -93,7 +103,7 @@ export function gitDirtyFiles(): Set<string> {
   try {
     const output = execFileSync(
       'git',
-      ['status', '--porcelain=v1', '--untracked-files=all', '--', ...CONTENT_DIRS],
+      ['status', '--porcelain=v1', '--untracked-files=all', '--', ...getContentDirs()],
       { cwd: DOCS_ROOT, encoding: 'utf8' },
     )
     return new Set(
@@ -123,7 +133,7 @@ export function scanMarkdownFiles(): Array<{ path: string, tracked: boolean }> {
     }
   }
 
-  for (const dir of CONTENT_DIRS) walk(dir)
+  for (const dir of getContentDirs()) walk(dir)
   return files
 }
 

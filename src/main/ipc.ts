@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
-import { app, ipcMain, shell } from 'electron'
+import { join, relative } from 'node:path'
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 
 import type { AuthStatus, CheckFile, CommentEntry, CreateResult, DiffResult, LintFile, PullFile, PushFile, Settings, SettingsInfo, SyncFile, VersionEntry } from '../shared/types.ts'
 import { DOCS_ROOT, gitDirtyFiles, resolvedVdocBin, runVdoc, runVdocJson, scanMarkdownFiles, setVdocBin } from './vdoc.ts'
 import { loadSettings, saveSettings } from './settings.ts'
+import { watchDocs } from './watcher.ts'
 
 const CHECK_BATCH = 24
 
@@ -126,12 +127,34 @@ export function registerIpc(): void {
 
   ipcMain.handle('settings-get', () => settingsInfo())
 
-  ipcMain.handle('settings-set', (_event, patch: Partial<Settings>) => {
+  ipcMain.handle('settings-set', (event, patch: Partial<Settings>) => {
     const settings = { ...loadSettings(), ...patch }
     saveSettings(settings)
     setVdocBin(settings.vdocBin)
+    if (patch.contentDirs) {
+      const window = BrowserWindow.fromWebContents(event.sender)
+      if (window) watchDocs(window)
+    }
     return settingsInfo()
   })
+
+  ipcMain.handle('pick-folder', async event => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    if (!window) return null
+    const result = await dialog.showOpenDialog(window, {
+      defaultPath: DOCS_ROOT,
+      properties: ['openDirectory'],
+      message: 'Pick a folder inside the docs repository',
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    const rel = relative(DOCS_ROOT, result.filePaths[0])
+    if (rel === '' || rel.startsWith('..')) {
+      throw new Error('The folder must be inside the docs repository')
+    }
+    return rel
+  })
+
+  ipcMain.handle('open-folder', (_event, path: string) => shell.openPath(join(DOCS_ROOT, path)).then(() => undefined))
 
   ipcMain.handle('vdoc-version', () => probeVersion())
 }

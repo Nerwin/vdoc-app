@@ -12,6 +12,7 @@ import { Toast } from './components/Toast.tsx'
 import { Modal, ModalButton } from './components/Modal.tsx'
 import { applyMonacoTheme } from './components/monaco-setup.ts'
 import { useApp } from './useApp.ts'
+import logo from './assets/logo.png'
 
 /** Folder → Confluence space defaults, from the repo's space mapping. */
 const SPACE_BY_DIR: Record<string, string> = { '1-Backend': 'BACK', '2-DDA': 'BDA' }
@@ -77,8 +78,9 @@ export function App() {
         <button
           onClick={() => app.setSelection(null)}
           title="Dashboard — Esc"
-          className="select-none font-mono text-[13px] font-semibold tracking-[0.18em] text-ink hover:text-accent"
+          className="flex select-none items-center gap-2 font-mono text-[13px] font-semibold tracking-[0.18em] text-ink hover:text-accent"
         >
+          <img src={logo} alt="" className="h-[22px] w-[22px] rounded-[6px]" />
           V<span className="text-accent">-</span>DOC
         </button>
         <span className="truncate rounded-full border border-line px-2 py-0.5 font-mono text-[10px] text-ink-faint">
@@ -125,8 +127,14 @@ export function App() {
             selection={app.selection}
             filterText={app.filterText}
             stateFilter={app.stateFilter}
+            rootDirs={app.settings?.contentDirs ?? []}
+            pinnedDirs={app.settings?.pinnedDirs ?? []}
             onSelect={app.setSelection}
             onOpenDiff={path => void app.loadDiff(path, true)}
+            onCheckFolder={app.checkFolder}
+            onTogglePin={app.togglePin}
+            onOpenFolder={path => void app.openFolder(path)}
+            onRemoveFolder={app.removeFolder}
           />
         </aside>
         <main className="min-w-0 flex-1">
@@ -241,6 +249,8 @@ export function App() {
           onReloadVersion={app.reloadVersion}
           onSaveApiKey={(email, token) => void app.saveApiKey(email, token)}
           onSetAuthMethod={method => void app.setAuthMethod(method)}
+          onAddFolder={() => void app.addFolder()}
+          onRemoveFolder={app.removeFolder}
           onClose={() => setSettingsOpen(false)}
         />
       )}
