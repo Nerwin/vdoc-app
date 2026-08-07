@@ -23,15 +23,20 @@ monaco.editor.defineTheme('vdoc-dark', {
 monaco.editor.defineTheme('vdoc-light', {
   base: 'vs',
   inherit: true,
-  rules: [],
+  // Markdown token colours from the light column: key / value / heading.
+  rules: [
+    { token: 'keyword.md', foreground: '0f5fb0' },
+    { token: 'string.md', foreground: '8a4f22' },
+    { token: 'variable.md', foreground: '5c646d' },
+  ],
   colors: {
-    'editor.background': '#fafafc',
-    'editor.foreground': '#2a2e37',
+    'editor.background': '#fbfcfd',
+    'editor.foreground': '#3b4249',
     'diffEditor.insertedTextBackground': '#257a4e26',
     'diffEditor.removedTextBackground': '#c0443526',
     'diffEditor.insertedLineBackground': '#257a4e12',
     'diffEditor.removedLineBackground': '#c0443512',
-    'editorLineNumber.foreground': '#9aa1ad',
+    'editorLineNumber.foreground': '#6d747c',
   },
 })
 

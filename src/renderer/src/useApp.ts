@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import type { AuthStatus, CheckFile, DiffResult, DisplayState, PushFile, ScanFile, Settings, SettingsInfo, VersionEntry } from '../../shared/types.ts'
+import type { AuthStatus, CheckFile, DiffResult, PushFile, ScanFile, Settings, SettingsInfo, TriageFilter, VersionEntry } from '../../shared/types.ts'
 import { displayState, needsAttention, type FileEntry } from '../../shared/status.ts'
 import { STATE_META } from './state-meta.ts'
 
@@ -35,7 +35,7 @@ export function useApp() {
   const [entries, setEntries] = useState<Map<string, FileEntry>>(new Map())
   const [selection, setSelection] = useState<string | null>(null)
   const [filterText, setFilterText] = useState('')
-  const [stateFilter, setStateFilter] = useState<DisplayState | 'attention' | null>(null)
+  const [stateFilter, setStateFilter] = useState<TriageFilter>(null)
   const [auth, setAuth] = useState<AuthStatus | null>(null)
   const [checking, setChecking] = useState<{ done: number, total: number } | null>(null)
   const [lastChecked, setLastChecked] = useState<Date | null>(null)
@@ -114,7 +114,8 @@ export function useApp() {
     void api.spaceMappingGet().then(setSpaceMapping).catch(fail)
   }, [api, fail])
 
-  // Initial load: tree first (fast, local), then auth probe, then the full check.
+  // Initial load: tree first (fast, local), then the auth probe. Checking is never
+  // automatic — the first check is always a deliberate click (or ⌘⇧R).
   useEffect(() => {
     void (async () => {
       try {
@@ -127,10 +128,9 @@ export function useApp() {
       }
       const status = await api.authStatus()
       setAuth(status)
-      if (status.ok) void checkAll()
-      else setMessage({ kind: 'error', text: status.error ?? 'Confluence authentication failed' })
+      if (!status.ok) setMessage({ kind: 'error', text: status.error ?? 'Confluence authentication failed' })
     })()
-  }, [api, checkAll, fail, mergeScan])
+  }, [api, fail, mergeScan])
 
   useEffect(() => api.onCheckProgress(progress => {
     setChecking({ done: progress.done, total: progress.total })
@@ -153,16 +153,17 @@ export function useApp() {
     })()
   }), [api, applyChecks, fail, mergeScan])
 
-  // On window focus: full check when the last one is over an hour old, otherwise
-  // just refresh the files already needing attention (cheap, one API call each).
+  // On window focus: refresh what a manual check already established — a full re-check
+  // when that one is over an hour old, otherwise just the files needing attention.
+  // Before the first manual check there is nothing to refresh, so nothing runs.
   useEffect(() => {
     const onFocus = (): void => {
-      if (checkingRef.current || busyOp) return
+      if (checkingRef.current || busyOp || !lastChecked) return
       const now = Date.now()
       if (now - lastFocusCheckRef.current < FOCUS_THROTTLE_MS) return
       lastFocusCheckRef.current = now
 
-      if (!lastChecked || now - lastChecked.getTime() > FULL_CHECK_TTL_MS) {
+      if (now - lastChecked.getTime() > FULL_CHECK_TTL_MS) {
         void checkAll()
         return
       }
@@ -439,24 +440,29 @@ export function useApp() {
   const saveToken = useCallback((token: string) => runOp('save token', async () => {
     const status = await api.setToken(token)
     setAuth(status)
-    if (status.ok) {
-      setMessage({ kind: 'info', text: `Authenticated as ${status.displayName ?? 'unknown'}` })
-      if (!lastChecked) void checkAll()
-    } else {
-      setMessage({ kind: 'error', text: status.error ?? 'Token rejected' })
-    }
-  }), [api, checkAll, lastChecked, runOp])
+    setMessage(status.ok
+      ? { kind: 'info', text: `Authenticated as ${status.displayName ?? 'unknown'}` }
+      : { kind: 'error', text: status.error ?? 'Token rejected' })
+  }), [api, runOp])
 
   const counts = useMemo(() => {
-    const result = new Map<DisplayState, number>()
     let attention = 0
+    let behind = 0
+    let unverified = 0
+    let dirty = 0
     for (const entry of entries.values()) {
       const state = displayState(entry)
-      result.set(state, (result.get(state) ?? 0) + 1)
       if (needsAttention(state)) attention += 1
+      if (state === 'behind') behind += 1
+      if (state === 'unverified') unverified += 1
+      if (entry.gitDirty) dirty += 1
     }
-    return { byState: result, attention }
+    return { attention, behind, unverified, dirty }
   }, [entries])
+
+  const cancelCheck = useCallback(() => {
+    void api.checkCancel().catch(fail)
+  }, [api, fail])
 
   return {
     root,
@@ -498,9 +504,11 @@ export function useApp() {
     setAuthMethod,
     message,
     dismissMessage: () => setMessage(null),
+    notify: (text: string) => setMessage({ kind: 'info', text }),
     reportError: fail,
     counts,
     checkAll,
+    cancelCheck,
     loadDiff,
     requestPull,
     doPull,
@@ -513,6 +521,11 @@ export function useApp() {
     runLint,
     saveToken,
     openConfluence: (path: string) => api.openConfluence(path).catch(fail),
+    confluenceUrl: (path: string) => api.confluenceUrl(path).catch(error => {
+      fail(error)
+      return null
+    }),
+    quit: () => api.quit(),
     openEditor: (path: string) => api.openEditor(path).catch(fail),
     revealFinder: (path: string) => api.revealFinder(path).catch(fail),
   }

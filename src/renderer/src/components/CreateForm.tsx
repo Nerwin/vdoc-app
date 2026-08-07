@@ -37,7 +37,7 @@ export function CreateForm({ path, defaultSpace, busy, onSubmit, onClose }: Prop
             onChange={event => setSpace(event.target.value.toUpperCase())}
             placeholder="BACK"
             spellCheck={false}
-            className="w-32 rounded-md border border-line bg-bg px-2 py-1.5 font-mono text-[12px] text-ink outline-none focus:border-accent"
+            className="w-32 rounded-md border border-control bg-raised px-2 py-1.5 font-mono text-[12px] text-ink outline-none"
           />
         </label>
         <label className="block">
@@ -48,7 +48,7 @@ export function CreateForm({ path, defaultSpace, busy, onSubmit, onClose }: Prop
             autoFocus
             placeholder="5013700642"
             spellCheck={false}
-            className="w-56 rounded-md border border-line bg-bg px-2 py-1.5 font-mono text-[12px] text-ink outline-none focus:border-accent"
+            className="w-56 rounded-md border border-control bg-raised px-2 py-1.5 font-mono text-[12px] text-ink outline-none"
           />
         </label>
       </div>

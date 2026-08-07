@@ -4,6 +4,7 @@ import { FileTree } from './components/FileTree.tsx'
 import { DetailPane } from './components/DetailPane.tsx'
 import { Dashboard } from './components/Dashboard.tsx'
 import { StatusBar } from './components/StatusBar.tsx'
+import { TopBar } from './components/TopBar.tsx'
 import { TokenPanel } from './components/TokenPanel.tsx'
 import { CommandPalette } from './components/CommandPalette.tsx'
 import { CreateForm } from './components/CreateForm.tsx'
@@ -11,31 +12,86 @@ import { SettingsModal } from './components/SettingsModal.tsx'
 import { Toast } from './components/Toast.tsx'
 import { Modal, ModalButton } from './components/Modal.tsx'
 import { applyMonacoTheme } from './components/monaco-setup.ts'
+import { commandFor, selectionState, type CommandContext, type ViewMode } from './commands.ts'
 import { useApp } from './useApp.ts'
-import logo from './assets/logo.png'
+
+const SIDEBAR_MIN = 240
+const SIDEBAR_MAX = 480
+const clampSidebar = (width: number): number => Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, width))
+
+/** Resolves `system` against the OS appearance, and follows it while it is selected. */
+function useResolvedTheme(preference: 'dark' | 'light' | 'system'): 'dark' | 'light' {
+  const [systemDark, setSystemDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches)
+  useEffect(() => {
+    const query = window.matchMedia('(prefers-color-scheme: dark)')
+    const onChange = (event: MediaQueryListEvent): void => setSystemDark(event.matches)
+    query.addEventListener('change', onChange)
+    return () => query.removeEventListener('change', onChange)
+  }, [])
+  return preference === 'system' ? (systemDark ? 'dark' : 'light') : preference
+}
 
 export function App() {
   const app = useApp()
   const [tokenOpen, setTokenOpen] = useState(false)
-  const [paletteOpen, setPaletteOpen] = useState(false)
+  const [palette, setPalette] = useState<'file' | 'command' | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [view, setView] = useState<ViewMode>('content')
+  const [reloadKey, setReloadKey] = useState(0)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const saved = Number(localStorage.getItem('sidebarWidth'))
+    return saved >= SIDEBAR_MIN && saved <= SIDEBAR_MAX ? saved : 306
+  })
   const filterRef = useRef<HTMLInputElement>(null)
 
-  const theme = app.settings?.theme ?? 'dark'
+  const theme = useResolvedTheme(app.settings?.theme ?? 'system')
   useEffect(() => {
     document.documentElement.dataset.theme = theme
     applyMonacoTheme(theme)
   }, [theme])
 
-  const behindCount = app.counts.byState.get('behind') ?? 0
   const totals = useMemo(() => ({
     files: app.entries.size,
     tracked: [...app.entries.values()].filter(entry => entry.tracked).length,
   }), [app.entries])
   const selected = app.selection ? app.entries.get(app.selection) ?? null : null
+  const taskRunning = app.checking !== null || app.busyOp !== null
+  const connected = app.auth?.ok === true
+
+  // A new selection starts on Content; a freshly loaded diff takes the stage (see DetailPane).
+  useEffect(() => setView('content'), [app.selection])
+
+  const openDiff = (): void => {
+    if (!app.selection) return
+    if (app.diff?.path === app.selection) setView('diff')
+    else void app.loadDiff(app.selection, true)
+  }
+
+  const ctx: CommandContext = {
+    app,
+    selection: app.selection,
+    entry: selected,
+    state: selectionState(selected),
+    theme,
+    checking: app.checking !== null,
+    busy: app.busyOp !== null,
+    connected,
+    openPalette: mode => setPalette(mode),
+    openSettings: () => setSettingsOpen(true),
+    openToken: () => setTokenOpen(true),
+    focusFilter: () => filterRef.current?.focus(),
+    setView,
+    openDiff,
+    toggleSidebar: () => setSidebarOpen(open => !open),
+    toggleTheme: () => app.updateSettings({ theme: theme === 'dark' ? 'light' : 'dark' }),
+    reloadFile: () => setReloadKey(key => key + 1),
+  }
+  const ctxRef = useRef(ctx)
+  ctxRef.current = ctx
 
   // Global shortcuts stand down while any dialog is open — each dialog owns its keys.
-  const dialogOpen = paletteOpen || tokenOpen || settingsOpen
+  const dialogOpen = palette !== null || tokenOpen || settingsOpen
     || app.pushPreview !== null || app.pullConfirm !== null || app.createForm !== null
 
   useEffect(() => {
@@ -43,98 +99,87 @@ export function App() {
     const onKey = (event: KeyboardEvent): void => {
       const target = event.target as HTMLElement | null
       const inField = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement
+      // Every binding comes from the registry; a command only fires when it is available.
+      if (!inField || event.metaKey) {
+        const command = commandFor(event, ctxRef.current)
+        if (command) {
+          event.preventDefault()
+          command.run(ctxRef.current)
+          return
+        }
+      }
       if (event.key === 'Escape' && !inField) {
-        app.setSelection(null)
-        return
-      }
-      if (!event.metaKey) return
-      if (event.key === 'r') {
-        event.preventDefault()
-        void app.checkAll()
-      }
-      if (event.key === 'f') {
-        event.preventDefault()
-        filterRef.current?.focus()
-      }
-      if (event.key === 'p') {
-        event.preventDefault()
-        setPaletteOpen(true)
-      }
-      if (event.key === ',') {
-        event.preventDefault()
-        setSettingsOpen(true)
+        // Esc clears the active filter first; a second Esc returns to the dashboard.
+        const store = ctxRef.current.app
+        if (store.filterText !== '' || store.stateFilter !== null) {
+          store.setFilterText('')
+          store.setStateFilter(null)
+        } else {
+          store.setSelection(null)
+        }
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [app.checkAll, dialogOpen])
+  }, [dialogOpen])
+
+  const startSidebarResize = (event: React.MouseEvent): void => {
+    event.preventDefault()
+    const startX = event.clientX
+    const startWidth = sidebarWidth
+    const widthAt = (clientX: number): number => clampSidebar(startWidth + clientX - startX)
+    const onMove = (move: MouseEvent): void => setSidebarWidth(widthAt(move.clientX))
+    const onUp = (up: MouseEvent): void => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      localStorage.setItem('sidebarWidth', String(widthAt(up.clientX)))
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
 
   return (
-    <div className="flex h-screen flex-col bg-bg font-sans text-[13px] text-ink">
-      <header className="drag-region flex h-11 shrink-0 items-center gap-3 border-b border-line bg-panel pl-20 pr-3">
-        <button
-          onClick={() => app.setSelection(null)}
-          title="Dashboard — Esc"
-          className="flex select-none items-center gap-2 font-mono text-[13px] font-semibold tracking-[0.18em] text-ink hover:text-accent"
-        >
-          <img src={logo} alt="" className="h-[22px] w-[22px] rounded-[6px]" />
-          V<span className="text-accent">-</span>DOC
-        </button>
-        <span className="truncate rounded-full border border-line px-2 py-0.5 font-mono text-[10px] text-ink-faint">
-          {app.root.split('/').slice(-1)[0]}
-        </span>
-        <input
-          ref={filterRef}
-          value={app.filterText}
-          onChange={event => app.setFilterText(event.target.value)}
-          onKeyDown={event => event.key === 'Escape' && app.setFilterText('')}
-          placeholder="Filter files… ⌘F"
-          spellCheck={false}
-          className="mx-auto w-64 rounded-md border border-line bg-bg px-2.5 py-1 font-mono text-[11px] text-ink placeholder-ink-faint outline-none focus:border-accent"
-        />
-        {behindCount > 0 && (
-          <button
-            onClick={app.pullAllBehind}
-            disabled={app.busyOp !== null}
-            className="rounded-md border border-behind/40 px-2.5 py-1 text-[12px] text-behind hover:bg-behind/10 disabled:opacity-40"
-          >
-            Pull behind ({behindCount})
-          </button>
-        )}
-        <button
-          onClick={() => void app.checkAll()}
-          disabled={app.checking !== null}
-          className="rounded-md border border-line bg-raised px-2.5 py-1 text-[12px] text-ink hover:bg-line disabled:opacity-40"
-        >
-          {app.checking ? 'Checking…' : 'Check all'}
-        </button>
-        <button
-          onClick={() => setSettingsOpen(true)}
-          title="Settings — ⌘,"
-          className="rounded-md border border-line bg-panel px-2 py-1 text-[12px] text-ink-dim hover:bg-raised hover:text-ink"
-        >
-          ⚙
-        </button>
-      </header>
+    <div className="flex h-screen flex-col bg-bg font-mono text-[12.5px] text-ink-body">
+      <TopBar
+        theme={theme}
+        filterText={app.filterText}
+        behindCount={app.counts.behind}
+        unverifiedCount={app.counts.unverified}
+        busy={taskRunning}
+        connected={connected}
+        filterRef={filterRef}
+        onFilterText={app.setFilterText}
+        onPullBehind={app.pullAllBehind}
+        onVerifyAll={app.verifyAllUnverified}
+        onCheckAll={() => void app.checkAll()}
+        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenPalette={() => setPalette('command')}
+        onOpenDashboard={() => app.setSelection(null)}
+      />
 
       <div className="flex min-h-0 flex-1">
-        <aside className="w-72 shrink-0 border-r border-line bg-panel/50">
-          <FileTree
-            entries={app.entries}
-            selection={app.selection}
-            filterText={app.filterText}
-            stateFilter={app.stateFilter}
-            rootDirs={app.settings?.contentDirs ?? []}
-            pinnedDirs={app.settings?.pinnedDirs ?? []}
-            onSelect={app.setSelection}
-            onOpenDiff={path => void app.loadDiff(path, true)}
-            onCheckFolder={app.checkFolder}
-            onTogglePin={app.togglePin}
-            onOpenFolder={path => void app.openFolder(path)}
-            onRemoveFolder={app.removeFolder}
-          />
-        </aside>
-        <main className="min-w-0 flex-1">
+        {sidebarOpen && (
+          <aside style={{ width: sidebarWidth }} className="relative shrink-0 border-r border-line bg-sidebar">
+            <FileTree
+              entries={app.entries}
+              selection={app.selection}
+              filterText={app.filterText}
+              stateFilter={app.stateFilter}
+              counts={app.counts}
+              rootDirs={app.settings?.contentDirs ?? []}
+              pinnedDirs={app.settings?.pinnedDirs ?? []}
+              onSelect={app.setSelection}
+              onFilterState={app.setStateFilter}
+              onOpenDiff={path => void app.loadDiff(path, true)}
+              onCheckFolder={app.checkFolder}
+              onTogglePin={app.togglePin}
+              onOpenFolder={path => void app.openFolder(path)}
+              onRemoveFolder={app.removeFolder}
+            />
+            <div onMouseDown={startSidebarResize} className="absolute inset-y-0 -right-0.5 z-10 w-1 cursor-col-resize" />
+          </aside>
+        )}
+        <main className="@container min-w-0 flex-1 bg-content">
           {selected
             ? (
                 <DetailPane
@@ -143,6 +188,10 @@ export function App() {
                   diffLoading={app.diffLoading}
                   busyOp={app.busyOp}
                   theme={theme}
+                  connected={connected}
+                  view={view}
+                  reloadKey={reloadKey}
+                  onView={setView}
                   onError={app.reportError}
                   onDiff={path => void app.loadDiff(path, true)}
                   onCheck={path => void app.checkOne(path)}
@@ -162,7 +211,7 @@ export function App() {
                   entries={app.entries}
                   authors={app.authors}
                   totals={totals}
-                  unverifiedCount={app.counts.byState.get('unverified') ?? 0}
+                  unverifiedCount={app.counts.unverified}
                   busy={app.busyOp !== null}
                   loadAuthors={app.loadAuthors}
                   onSelect={app.setSelection}
@@ -182,18 +231,25 @@ export function App() {
         stateFilter={app.stateFilter}
         onFilterState={app.setStateFilter}
         onOpenToken={() => setTokenOpen(true)}
+        onCancelCheck={app.cancelCheck}
       />
 
       {app.message && <Toast message={app.message} onDismiss={app.dismissMessage} />}
 
-      {paletteOpen && (
+      {palette !== null && (
         <CommandPalette
+          ctx={ctx}
           entries={app.entries}
+          mode={palette}
           onPick={path => {
             app.setSelection(path)
-            setPaletteOpen(false)
+            setPalette(null)
           }}
-          onClose={() => setPaletteOpen(false)}
+          onRun={command => {
+            setPalette(null)
+            command.run(ctx)
+          }}
+          onClose={() => setPalette(null)}
         />
       )}
 
@@ -251,6 +307,10 @@ export function App() {
           onRemoveFolder={app.removeFolder}
           onSetSpaceMapping={app.setSpaceMappingEntry}
           onRevealConfig={() => void app.revealConfig()}
+          onRenewToken={() => {
+            setSettingsOpen(false)
+            setTokenOpen(true)
+          }}
           onClose={() => setSettingsOpen(false)}
         />
       )}
@@ -313,7 +373,7 @@ function DryRunSummary({ preview }: { preview: { pageId: string, version: number
       <p>Page <span className="text-ink">{preview.pageId}</span> — currently v{preview.version}, push writes v{preview.version + 1}</p>
       <p>{preview.resolvedLinks ?? 0} relative link(s) resolve to Confluence URLs</p>
       {(preview.unresolvedLinks ?? 0) > 0 && (
-        <p className="text-ahead">{preview.unresolvedLinks} link(s) cannot be resolved and stay as-is</p>
+        <p className="text-warn">{preview.unresolvedLinks} link(s) cannot be resolved and stay as-is</p>
       )}
       <p className="pt-1 text-ink-faint">Dry run verified against the live remote version. The source file is never rewritten — links resolve at push time only.</p>
     </div>

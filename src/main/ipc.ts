@@ -9,6 +9,8 @@ import { watchDocs } from './watcher.ts'
 
 const CHECK_BATCH = 24
 
+let checkCancelled = false
+
 export function registerIpc(): void {
   ipcMain.handle('scan', () => {
     const dirty = gitDirtyFiles()
@@ -17,9 +19,12 @@ export function registerIpc(): void {
   })
 
   ipcMain.handle('check-all', async event => {
+    checkCancelled = false
     const tracked = scanMarkdownFiles().filter(file => file.tracked).map(file => file.path)
     const results: CheckFile[] = []
     for (let i = 0; i < tracked.length; i += CHECK_BATCH) {
+      // ponytail: cancel lands between batches — a running batch of 24 finishes first.
+      if (checkCancelled) break
       const batch = tracked.slice(i, i + CHECK_BATCH)
       const { files } = await runVdocJson<{ files: CheckFile[] }>(['cf', 'check', ...batch])
       results.push(...files)
@@ -32,6 +37,10 @@ export function registerIpc(): void {
       }
     }
     return results
+  })
+
+  ipcMain.handle('check-cancel', () => {
+    checkCancelled = true
   })
 
   ipcMain.handle('check-files', async (_event, paths: string[]) => {
@@ -118,6 +127,11 @@ export function registerIpc(): void {
     await shell.openExternal(url)
   })
 
+  ipcMain.handle('confluence-url', async (_event, path: string) => {
+    const { url } = await runVdocJson<{ url: string }>(['cf', 'open', path, '--print'])
+    return url
+  })
+
   ipcMain.handle('open-editor', async (_event, path: string) => {
     const error = await shell.openPath(join(DOCS_ROOT, path))
     if (error) throw new Error(error)
@@ -173,6 +187,8 @@ export function registerIpc(): void {
   })
 
   ipcMain.handle('vdoc-version', () => probeVersion())
+
+  ipcMain.handle('quit', () => app.quit())
 }
 
 async function settingsInfo(): Promise<SettingsInfo> {

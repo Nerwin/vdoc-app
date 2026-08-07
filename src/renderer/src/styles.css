@@ -1,38 +1,176 @@
 @import "tailwindcss";
 
+/*
+ * Every colour in the app comes from one of these tokens — no component hardcodes a hex.
+ * `@theme` holds the dark column (what ships today, unchanged); `[data-theme="light"]`
+ * overrides it with the light column from design_handoff_light_theme/README.md.
+ */
 @theme {
-  --color-bg: #16171b;
-  --color-panel: #1d1f25;
-  --color-raised: #23262e;
-  --color-line: #2c2f38;
-  --color-ink: #d6d9e0;
-  --color-ink-dim: #8a909e;
-  --color-ink-faint: #565c69;
-  --color-accent: #5b8dd9;
-  --color-sync: #4e9e77;
-  --color-behind: #4e97d8;
-  --color-ahead: #d9a036;
-  --color-conflict: #d95f4e;
-  --color-unknown: #9a86cf;
+  /* Surfaces */
+  --color-bg: #101113;
+  --color-chrome: #1a1c1e;
+  --color-sidebar: #17181a;
+  --color-pane: #17181a;
+  --color-content: #131416;
+  --color-overlay: #1c1e21;
+
+  /* Borders */
+  --color-line: #2c2f33;
+  --color-line-subtle: #23262a;
+  --color-control: #2c2f33;
+  --color-divider: #23262a;
+  --color-line-menu: #383d42;
+  --color-line-active: #3a4046;
+
+  /* Text */
+  --color-ink: #e6e9ec;
+  --color-ink-body: #d7dadd;
+  --color-ink-mid: #b6bdc4;
+  --color-ink-dim: #9aa1a8;
+  --color-ink-mute: #8a9098;
+  --color-ink-label: #7f858c;
+  --color-ink-faint: #6a7076;
+  --color-ink-ghost: #5d6369;
+  --color-glyph: #4e545a;
+  --color-sep: #35393d;
+
+  /* States */
+  --color-sync: #6fbf8b;
+  --color-sync-text: #6fbf8b;
+  --color-behind: #5aa1e0;
+  --color-warn: #d8a44f;
+  --color-warn-text: #d8a44f;
+  --color-conflict: #d1707a;
+  --color-attention: #d9a2a7;
+  --color-dot-neutral: #3a3f44;
+  --color-accent: #5aa1e0;
+  --color-select-edge: #5aa1e0;
+  --color-match: #8cc0f0;
+
+  /* Composites */
+  --color-primary: #2f5b86;
+  --color-primary-edge: #3d6f9f;
+  --color-primary-hover: #36699a;
+  --color-primary-badge: #23486d;
+  --color-primary-ink: #eaf2fa;
+  --color-raised: #1f2123;
+  --color-row-hover: #1f2123;
+  --color-hover: #26292c;
+  --color-selected: #2c3136;
+  --color-selected-ink: #e6e9ec;
+  --color-track: #26292c;
+  --color-danger-bg: #2a1c1c;
+  --color-pill-bg: #2a2318;
+  --color-pill-edge: #4a3a1d;
+  --color-pill-ink: #d8a44f;
+  --color-banner-bg: #211d15;
+  --color-banner-edge: #4a3a1d;
+  --color-banner-ink: #c9b183;
+  --color-banner-glyph: #d8a44f;
+  --color-ok-bg: #18231c;
+  --color-ok-edge: #284a33;
+  --color-ok-ink: #6fbf8b;
+  --color-info-bg: #17222b;
+  --color-info-edge: #274257;
+  --color-info-ink: #5aa1e0;
+  --color-bad-bg: #231719;
+  --color-bad-edge: #5a2d31;
+  --color-bad-ink: #d9a2a7;
+  --color-keycap-bg: #26292c;
+  --color-keycap-edge: #3a3f44;
+  --color-keycap-ink: #d7dadd;
+
+  --shadow-menu: 0 14px 34px rgba(0, 0, 0, 0.55);
+  --shadow-modal: 0 18px 48px rgba(0, 0, 0, 0.5);
+  --shadow-palette: 0 20px 52px rgba(0, 0, 0, 0.5);
 
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
 }
 
+:root {
+  --focus-ring: 0 0 0 3px rgba(90, 161, 224, 0.22);
+  --scrim: rgba(0, 0, 0, 0.5);
+}
+
 :root[data-theme="light"] {
-  --color-bg: #f2f3f5;
-  --color-panel: #fafafc;
-  --color-raised: #e8eaee;
-  --color-line: #d8dbe2;
-  --color-ink: #2a2e37;
-  --color-ink-dim: #5d6470;
-  --color-ink-faint: #9aa1ad;
-  --color-accent: #3f6fb5;
-  --color-sync: #257a4e;
-  --color-behind: #2b72b8;
-  --color-ahead: #a06f10;
-  --color-conflict: #c04435;
-  --color-unknown: #6f57b0;
+  --color-bg: #f2f4f7;
+  --color-chrome: #f2f4f7;
+  --color-sidebar: #f8f9fb;
+  --color-pane: #ffffff;
+  --color-content: #fbfcfd;
+  --color-overlay: #ffffff;
+
+  --color-line: #d5d9df;
+  --color-line-subtle: #e2e5ea;
+  --color-control: #cdd2d9;
+  --color-divider: #eef0f3;
+  --color-line-menu: #c3c9d1;
+  --color-line-active: #b9d0ea;
+
+  --color-ink: #14171a;
+  --color-ink-body: #23272b;
+  --color-ink-mid: #3b4249;
+  --color-ink-dim: #5c646d;
+  --color-ink-mute: #6d747c;
+  --color-ink-label: #6d747c;
+  --color-ink-faint: #6d747c;
+  --color-ink-ghost: #767d86;
+  --color-glyph: #7b828a;
+  --color-sep: #b9bec5;
+
+  --color-sync: #1f8a4c;
+  /* The synced green is a dot/glyph colour (4.4:1); text needs one step darker. */
+  --color-sync-text: #17703d;
+  --color-behind: #1a6cc4;
+  --color-warn: #b07f12;
+  --color-warn-text: #8a6304;
+  --color-conflict: #b3261e;
+  --color-attention: #a32218;
+  --color-dot-neutral: #c2c7ce;
+  --color-accent: #0f5fb0;
+  --color-select-edge: #1a6cc4;
+  --color-match: #0f4d8f;
+
+  --color-primary: #1a6cc4;
+  --color-primary-edge: #145aa8;
+  --color-primary-hover: #1560b0;
+  --color-primary-badge: #10508f;
+  --color-primary-ink: #ffffff;
+  --color-raised: #ffffff;
+  --color-row-hover: #eceff3;
+  --color-hover: #e5e8ec;
+  --color-selected: #e3ecf8;
+  --color-selected-ink: #14406e;
+  --color-track: #dfe3e8;
+  --color-danger-bg: #f7e6e4;
+  --color-pill-bg: #fdf3dc;
+  --color-pill-edge: #e0c58a;
+  --color-pill-ink: #7a5405;
+  --color-banner-bg: #fdf7e8;
+  --color-banner-edge: #e8d6a8;
+  --color-banner-ink: #6d5518;
+  --color-banner-glyph: #a1720a;
+  --color-ok-bg: #e9f6ee;
+  --color-ok-edge: #b6dcc5;
+  --color-ok-ink: #14663a;
+  --color-info-bg: #e3ecf8;
+  --color-info-edge: #b9d0ea;
+  --color-info-ink: #14406e;
+  --color-bad-bg: #f7e6e4;
+  --color-bad-edge: #eab8b3;
+  --color-bad-ink: #a32218;
+  --color-keycap-bg: #ffffff;
+  --color-keycap-edge: #c3c9d1;
+  --color-keycap-ink: #23272b;
+
+  /* Elevation is light-only; dark keeps flat rgba(0,0,0,.5) shadows. */
+  --shadow-menu: 0 1px 2px rgba(16, 24, 40, 0.05), 0 8px 28px rgba(16, 24, 40, 0.07);
+  --shadow-modal: 0 18px 48px rgba(16, 24, 40, 0.16);
+  --shadow-palette: 0 20px 52px rgba(16, 24, 40, 0.18);
+
+  --focus-ring: 0 0 0 3px rgba(26, 108, 196, 0.18);
+  --scrim: rgba(16, 24, 40, 0.28);
 }
 
 html,
@@ -55,20 +193,67 @@ body {
   -webkit-app-region: no-drag;
 }
 
+/* Hover transitions: color only, 100ms — no motion on layout. */
+button,
+a {
+  transition: background-color 100ms ease, color 100ms ease;
+}
+
+/*
+ * One focus ring for everything focusable. It is a box-shadow, never an `outline`, so it
+ * follows border-radius instead of drawing a square around it. Buttons and links keep
+ * :focus-visible semantics (no ring on pointer clicks); fields ring on plain :focus.
+ */
+input:focus,
+textarea:focus,
+select:focus,
+button:focus-visible,
+a:focus-visible,
+[tabindex]:focus-visible {
+  outline: none;
+  border-color: var(--color-select-edge);
+  box-shadow: var(--focus-ring);
+}
+
+/* A field whose border lives on a wrapper: the wrapper rings, the input stays bare. */
+.field-ring:focus-within {
+  border-color: var(--color-select-edge);
+  box-shadow: var(--focus-ring);
+}
+
+.field-ring input:focus {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+/* Indeterminate task progress: 30%-wide fill sliding left↔right. */
+@keyframes indeterminate-slide {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(233%);
+  }
+}
+
+.indeterminate-fill {
+  animation: indeterminate-slide 1.4s ease-in-out infinite alternate;
+}
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-raised);
+  background: var(--color-line);
   border-radius: 5px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background-color: var(--color-line);
+  background-color: var(--color-line-active);
   background-clip: padding-box;
 }
 
@@ -143,13 +328,13 @@ body {
 .preview code {
   font-family: var(--font-mono);
   font-size: 12px;
-  background: var(--color-raised);
+  background: var(--color-hover);
   border-radius: 4px;
   padding: 0.1em 0.35em;
 }
 
 .preview .code-block {
-  background: var(--color-panel);
+  background: var(--color-sidebar);
   border: 1px solid var(--color-line);
   border-radius: 8px;
   padding: 12px;
@@ -182,7 +367,7 @@ body {
 }
 
 .preview th {
-  background: var(--color-panel);
+  background: var(--color-sidebar);
   font-weight: 600;
 }
 
@@ -209,7 +394,7 @@ body {
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--color-ink-faint);
-  background: var(--color-panel);
+  background: var(--color-sidebar);
   border: 1px dashed var(--color-line);
   border-radius: 8px;
   padding: 12px;

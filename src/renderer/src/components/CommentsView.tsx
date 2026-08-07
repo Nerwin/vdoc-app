@@ -42,12 +42,12 @@ export function CommentsView({ path, onError }: Props) {
         {comments?.length === 0 && <p className="text-[12px] text-ink-faint">No comments on this page.</p>}
         <ul className="space-y-3">
           {comments?.map(comment => (
-            <li key={comment.id} className="rounded-md border border-line bg-panel px-3.5 py-2.5">
+            <li key={comment.id} className="rounded-md border border-line-subtle bg-pane px-3.5 py-2.5">
               <div className="mb-1 flex items-baseline gap-2 font-mono text-[11px]">
                 <span className="text-ink">{comment.author}</span>
                 <span className="text-ink-faint">{comment.createdAt.slice(0, 10)}</span>
-                <span className={comment.kind === 'inline' ? 'text-unknown' : 'text-ink-faint'}>{comment.kind}</span>
-                {comment.resolutionStatus === 'resolved' && <span className="text-sync">resolved</span>}
+                <span className={comment.kind === 'inline' ? 'text-warn-text' : 'text-ink-faint'}>{comment.kind}</span>
+                {comment.resolutionStatus === 'resolved' && <span className="text-sync-text">resolved</span>}
               </div>
               {comment.selection && (
                 <blockquote className="mb-1.5 border-l-2 border-line pl-2 text-[11px] italic text-ink-faint">

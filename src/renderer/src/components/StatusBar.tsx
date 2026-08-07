@@ -1,100 +1,218 @@
 import { useEffect, useState } from 'react'
 
-import type { AuthStatus, DisplayState } from '../../../shared/types.ts'
-import { STATE_META } from '../state-meta.ts'
+import type { AuthStatus, TriageFilter } from '../../../shared/types.ts'
+import { StateDot } from './StateDot.tsx'
 
 interface Props {
   auth: AuthStatus | null
-  counts: { byState: Map<DisplayState, number>, attention: number }
+  counts: { attention: number, behind: number, unverified: number, dirty: number }
   checking: { done: number, total: number } | null
   lastChecked: Date | null
   busyOp: string | null
   appVersion: string | null
-  stateFilter: DisplayState | 'attention' | null
-  onFilterState(state: DisplayState | 'attention' | null): void
+  stateFilter: TriageFilter
+  onFilterState(filter: TriageFilter): void
   onOpenToken(): void
+  onCancelCheck(): void
 }
-
-const SUMMARY_STATES: DisplayState[] = ['behind', 'local-edits', 'ahead', 'conflict', 'not-found', 'unverified']
 
 export function StatusBar(props: Props) {
   const tick = useMinuteTick()
+  const offline = props.auth !== null && !props.auth.ok
 
   return (
-    <footer className="flex h-7 items-center gap-3 border-t border-line bg-panel px-3 font-mono text-[11px] text-ink-dim">
+    <footer className="flex h-8 shrink-0 items-center gap-3 border-t border-line bg-chrome px-3 font-mono text-[11.5px]">
       <AuthChip auth={props.auth} tick={tick} onClick={props.onOpenToken} />
 
-      <span className="h-3 w-px bg-line" />
+      <div className="h-4 w-px bg-line" />
 
-      {props.counts.attention > 0 && (
-        <button
-          onClick={() => props.onFilterState(props.stateFilter === 'attention' ? null : 'attention')}
-          className={`hover:text-ink ${props.stateFilter === 'attention' ? 'text-ink underline underline-offset-3' : ''}`}
-          title="Everything behind, ahead, in conflict, or with local edits — click to filter"
-        >
-          {props.counts.attention} attention
-        </button>
-      )}
-
-      {SUMMARY_STATES.map(state => {
-        const count = props.counts.byState.get(state) ?? 0
-        if (count === 0) return null
-        const meta = STATE_META[state]
-        const active = props.stateFilter === state
-        return (
-          <button
-            key={state}
-            onClick={() => props.onFilterState(active ? null : state)}
-            className={`flex items-center gap-1 hover:text-ink ${active ? 'text-ink underline underline-offset-3' : ''}`}
-            title={`${meta.label} — click to filter`}
-          >
-            <span className={meta.color}>{meta.glyph}</span>
-            {count}
-          </button>
-        )
-      })}
-      {props.counts.attention === 0 && props.lastChecked && <span className="text-sync">all in sync</span>}
-
-      <span className="flex-1" />
-
-      {props.busyOp && <span className="text-accent">{props.busyOp}…</span>}
-      {props.checking
+      {offline
         ? (
-            <span className="flex items-center gap-2 text-accent">
-              checking {props.checking.done}/{props.checking.total || '…'}
-              <span className="h-1 w-24 overflow-hidden rounded bg-raised">
-                <span
-                  className="block h-full bg-accent transition-all"
-                  style={{ width: props.checking.total ? `${(props.checking.done / props.checking.total) * 100}%` : '0%' }}
-                />
-              </span>
-            </span>
+            <button onClick={props.onOpenToken} className="whitespace-nowrap rounded-[5px] px-2 py-[3px] text-conflict hover:bg-hover">
+              Not connected — reconnect
+            </button>
           )
-        : props.lastChecked && <span>checked {timeAgo(props.lastChecked, tick)}</span>}
-      {props.appVersion && <span className="text-ink-faint">v{props.appVersion}</span>}
+        : (
+            <div className="flex min-w-0 items-center gap-1">
+              {props.counts.attention > 0 && (
+                <Counter
+                  active={props.stateFilter === 'attention'}
+                  title="Filter tree: needs attention"
+                  tone="text-attention"
+                  onClick={() => props.onFilterState(props.stateFilter === 'attention' ? null : 'attention')}
+                >
+                  <span>⚠</span>
+                  <span>{props.counts.attention}<span className="hidden min-[1100px]:inline"> needs attention</span></span>
+                </Counter>
+              )}
+              {props.counts.behind > 0 && (
+                <Counter
+                  active={props.stateFilter === 'behind'}
+                  title="Filter tree: behind remote"
+                  tone="text-ink-dim"
+                  onClick={() => props.onFilterState(props.stateFilter === 'behind' ? null : 'behind')}
+                >
+                  <span className="text-behind">↓</span>
+                  <span>{props.counts.behind}<span className="hidden min-[1100px]:inline"> behind</span></span>
+                </Counter>
+              )}
+              {props.counts.unverified > 0 && (
+                <Counter
+                  active={props.stateFilter === 'unverified'}
+                  title="Filter tree: unverified"
+                  tone="text-ink-dim"
+                  onClick={() => props.onFilterState(props.stateFilter === 'unverified' ? null : 'unverified')}
+                >
+                  <StateDot state="unverified" />
+                  <span>{props.counts.unverified}<span className="hidden min-[1100px]:inline"> unverified</span></span>
+                </Counter>
+              )}
+              {props.counts.attention === 0 && props.counts.behind === 0 && props.counts.unverified === 0 && props.lastChecked && (
+                <span className="flex items-center gap-1.5 whitespace-nowrap px-2 text-sync-text">
+                  <StateDot state="in-sync" />
+                  All tracked files in sync
+                </span>
+              )}
+            </div>
+          )}
+
+      <div className="flex-1" />
+
+      <TaskSlot
+        checking={props.checking}
+        busyOp={props.busyOp}
+        lastChecked={props.lastChecked}
+        tick={tick}
+        onCancelCheck={props.onCancelCheck}
+      />
+
+      {props.appVersion && (
+        <>
+          <div className="h-4 w-px bg-line" />
+          <span title="Up to date" className="whitespace-nowrap text-ink-ghost">v{props.appVersion}</span>
+        </>
+      )}
     </footer>
   )
 }
 
+function Counter({ active, title, tone, onClick, children }: {
+  active: boolean
+  title: string
+  tone: string
+  onClick(): void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className={`flex items-center gap-1.5 whitespace-nowrap rounded-[5px] px-2 py-[3px] ${tone} ${active ? 'bg-hover' : 'hover:bg-hover hover:text-ink'}`}
+    >
+      {children}
+    </button>
+  )
+}
+
+/** Only ever one task in the slot; idle shows the last-checked time — never blank. */
+function TaskSlot({ checking, busyOp, lastChecked, tick, onCancelCheck }: {
+  checking: { done: number, total: number } | null
+  busyOp: string | null
+  lastChecked: Date | null
+  tick: number
+  onCancelCheck(): void
+}) {
+  if (checking) {
+    return (
+      <div className="flex shrink-0 items-center gap-2.5">
+        <span className="whitespace-nowrap text-ink-dim">Checking files</span>
+        <span className="whitespace-nowrap text-ink-faint">{checking.done} / {checking.total || '…'}</span>
+        <ProgressTrack>
+          <div
+            className="h-full rounded-full bg-accent transition-[width] duration-200 ease-linear"
+            style={{ width: checking.total ? `${(checking.done / checking.total) * 100}%` : '0%' }}
+          />
+        </ProgressTrack>
+        <button
+          onClick={onCancelCheck}
+          title="Cancel"
+          className="flex h-[18px] w-[18px] items-center justify-center rounded text-[10px] text-ink-faint hover:bg-hover hover:text-ink"
+        >
+          ✕
+        </button>
+      </div>
+    )
+  }
+  if (busyOp) {
+    return (
+      <div className="flex shrink-0 items-center gap-2.5">
+        <span className="whitespace-nowrap text-ink-dim">{taskLabel(busyOp)}</span>
+        <ProgressTrack>
+          <div className="indeterminate-fill h-full w-[30%] rounded-full bg-accent" />
+        </ProgressTrack>
+      </div>
+    )
+  }
+  if (lastChecked) {
+    return <span className="whitespace-nowrap text-ink-faint">last checked {timeAgo(lastChecked, tick)}</span>
+  }
+  return null
+}
+
+function ProgressTrack({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="h-1 w-[132px] overflow-hidden rounded-full bg-track max-[960px]:w-[72px]">
+      {children}
+    </div>
+  )
+}
+
+const TASK_LABELS: Record<string, string> = {
+  'pull': 'Pulling',
+  'push': 'Pushing',
+  'push preview': 'Preparing push',
+  'check': 'Checking',
+  'check folder': 'Checking folder',
+  'sync': 'Finding page',
+  'create': 'Creating page',
+  'lint': 'Linting',
+  'verify': 'Verifying',
+  'save token': 'Saving token',
+  'save API key': 'Saving API key',
+  'switch auth': 'Switching auth',
+}
+
+function taskLabel(op: string): string {
+  if (op.startsWith('verify ')) return `Verifying ${op.slice('verify '.length)}`
+  return TASK_LABELS[op] ?? op
+}
+
 function AuthChip({ auth, tick, onClick }: { auth: AuthStatus | null, tick: number, onClick(): void }) {
   void tick
-  if (!auth) return <button onClick={onClick} className="text-ink-faint">auth…</button>
+  if (!auth) return <button onClick={onClick} className="text-ink-ghost">auth…</button>
 
-  const expiry = auth.tokenExp ? auth.tokenExp * 1000 - Date.now() : null
-  const expiringSoon = expiry !== null && expiry < 24 * 3600 * 1000
-  const dot = !auth.ok ? 'text-conflict' : expiringSoon ? 'text-ahead' : 'text-sync'
-  const label = !auth.ok
-    ? 'not authenticated'
-    : auth.method === 'api-token'
-      ? auth.displayName
-      : expiry !== null
-        ? `${auth.displayName} · token ${expiry <= 0 ? 'expired' : formatDuration(expiry)}`
-        : auth.displayName
+  const expiryMs = auth.tokenExp ? auth.tokenExp * 1000 - Date.now() : null
+  const expired = expiryMs !== null && expiryMs <= 0
+  const expiringSoon = expiryMs !== null && !expired && expiryMs < 24 * 3600 * 1000
+  const dot = !auth.ok || expired ? 'bg-conflict' : expiringSoon ? 'bg-warn' : 'bg-sync'
+  const title = !auth.ok
+    ? (auth.error ?? 'Not authenticated — click to update credentials')
+    : auth.tokenExp
+      ? `Authenticated — token expires ${new Date(auth.tokenExp * 1000).toLocaleString()}`
+      : 'Authenticated'
 
   return (
-    <button onClick={onClick} className="flex items-center gap-1.5 hover:text-ink" title="Confluence authentication — click to update the token">
-      <span className={dot}>●</span>
-      {label}
+    <button onClick={onClick} title={title} className="flex shrink-0 items-center gap-2 whitespace-nowrap">
+      <span className={`h-[7px] w-[7px] rounded-full ${dot}`} />
+      <span className="text-ink-mid">{auth.displayName ?? (auth.ok ? 'authenticated' : 'not authenticated')}</span>
+      {auth.ok && expiryMs !== null && (
+        <span className="hidden items-center gap-2 min-[1000px]:flex">
+          <span className="text-sep">·</span>
+          <span className={expired ? 'text-conflict' : expiringSoon ? 'text-warn' : 'text-ink-label'}>
+            {expired ? 'token expired' : `token ${humanTtl(expiryMs)}${expiringSoon ? ' ⚠' : ''}`}
+          </span>
+        </span>
+      )}
     </button>
   )
 }
@@ -108,10 +226,12 @@ function useMinuteTick(): number {
   return tick
 }
 
-function formatDuration(ms: number): string {
+/** Humanised TTL: ≥24h → `6d 2h`, ≥1h → `14h`, else minutes. */
+function humanTtl(ms: number): string {
   const hours = Math.floor(ms / 3_600_000)
-  const minutes = Math.floor((ms % 3_600_000) / 60_000)
-  return hours > 0 ? `${hours}h${String(minutes).padStart(2, '0')}` : `${minutes}m`
+  if (hours >= 24) return `${Math.floor(hours / 24)}d ${hours % 24}h`
+  if (hours >= 1) return `${hours}h`
+  return `${Math.max(1, Math.floor(ms / 60_000))}m`
 }
 
 function timeAgo(date: Date, tick: number): string {

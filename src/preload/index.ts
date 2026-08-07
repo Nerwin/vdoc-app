@@ -12,6 +12,7 @@ const subscribe = <T>(channel: string, cb: (payload: T) => void): (() => void) =
 const api: VdocApi = {
   scan: () => ipcRenderer.invoke('scan'),
   checkAll: () => ipcRenderer.invoke('check-all'),
+  checkCancel: () => ipcRenderer.invoke('check-cancel'),
   checkFiles: paths => ipcRenderer.invoke('check-files', paths),
   readFile: path => ipcRenderer.invoke('read-file', path),
   diff: path => ipcRenderer.invoke('diff', path),
@@ -29,6 +30,7 @@ const api: VdocApi = {
   saveApiKey: (email, apiToken) => ipcRenderer.invoke('save-api-key', email, apiToken),
   setAuthMethod: method => ipcRenderer.invoke('set-auth-method', method),
   openConfluence: path => ipcRenderer.invoke('open-confluence', path),
+  confluenceUrl: path => ipcRenderer.invoke('confluence-url', path),
   openEditor: path => ipcRenderer.invoke('open-editor', path),
   revealFinder: path => ipcRenderer.invoke('reveal-finder', path),
   settingsGet: () => ipcRenderer.invoke('settings-get'),
@@ -39,6 +41,7 @@ const api: VdocApi = {
   spaceMappingGet: () => ipcRenderer.invoke('space-mapping-get'),
   spaceMappingSet: (dir, space) => ipcRenderer.invoke('space-mapping-set', dir, space),
   revealConfig: () => ipcRenderer.invoke('reveal-config'),
+  quit: () => ipcRenderer.invoke('quit'),
   onFilesChanged: cb => subscribe<string[]>('files-changed', cb),
   onCheckProgress: cb => subscribe<CheckProgress>('check-progress', cb),
 }

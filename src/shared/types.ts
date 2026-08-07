@@ -13,6 +13,9 @@ export type SyncState =
 /** UI-level state: CLI states plus two app-derived ones. */
 export type DisplayState = SyncState | 'unverified' | 'unchecked'
 
+/** One shared tree filter driving the sidebar chips and the status-bar counters. */
+export type TriageFilter = 'attention' | 'behind' | 'unverified' | 'dirty' | null
+
 export interface CheckFile {
   file: string
   state: SyncState
@@ -135,7 +138,8 @@ export interface CheckProgress {
 }
 
 export interface Settings {
-  theme: 'dark' | 'light'
+  /** `system` follows the OS appearance; light/dark pin it. */
+  theme: 'dark' | 'light' | 'system'
   /** Explicit vdoc binary path; null = auto-detect (~/.bun/bin/vdoc, then PATH). */
   vdocBin: string | null
   /** Root folders (relative to the docs repo) shown in the tree. Only .md files are ever listed. */
@@ -157,6 +161,8 @@ export interface SettingsInfo extends Settings {
 export interface VdocApi {
   scan(): Promise<ScanResult>
   checkAll(): Promise<CheckFile[]>
+  /** Stop the running check-all after the current batch; checkAll resolves with partial results. */
+  checkCancel(): Promise<void>
   checkFiles(paths: string[]): Promise<CheckFile[]>
   readFile(path: string): Promise<string>
   diff(path: string): Promise<DiffResult>
@@ -174,6 +180,8 @@ export interface VdocApi {
   saveApiKey(email: string, apiToken: string): Promise<AuthStatus>
   setAuthMethod(method: 'api-token' | 'session-token'): Promise<AuthStatus>
   openConfluence(path: string): Promise<void>
+  /** The page's Confluence URL, for copying (never opens anything). */
+  confluenceUrl(path: string): Promise<string>
   openEditor(path: string): Promise<void>
   revealFinder(path: string): Promise<void>
   settingsGet(): Promise<SettingsInfo>
@@ -187,6 +195,7 @@ export interface VdocApi {
   /** Set (or delete with null) one mapping entry; returns the fresh mapping. */
   spaceMappingSet(dir: string, space: string | null): Promise<Record<string, string>>
   revealConfig(): Promise<void>
+  quit(): Promise<void>
   onFilesChanged(cb: (paths: string[]) => void): () => void
   onCheckProgress(cb: (progress: CheckProgress) => void): () => void
 }

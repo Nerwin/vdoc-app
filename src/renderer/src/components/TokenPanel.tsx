@@ -43,7 +43,7 @@ export function TokenPanel({ auth, busy, onSave, onClose }: Props) {
           autoFocus
           spellCheck={false}
           placeholder="eyJraWQiOi…"
-          className="w-full resize-none rounded-md border border-line bg-bg p-2 font-mono text-[11px] text-ink outline-none focus:border-accent"
+          className="w-full resize-none rounded-md border border-control bg-raised p-2 font-mono text-[11px] text-ink outline-none"
         />
       </div>
     </Modal>

@@ -5,7 +5,7 @@ import { app } from 'electron'
 import type { Settings } from '../shared/types.ts'
 
 const DEFAULTS: Settings = {
-  theme: 'dark',
+  theme: 'system',
   vdocBin: null,
   contentDirs: ['1-Backend', '2-DDA', '3-Projects'],
   pinnedDirs: [],

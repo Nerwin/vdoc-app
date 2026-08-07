@@ -3,6 +3,7 @@ import { useEffect, useMemo } from 'react'
 import type { DisplayState, VersionEntry } from '../../../shared/types.ts'
 import { displayState, needsAttention, type FileEntry } from '../../../shared/status.ts'
 import { STATE_META } from '../state-meta.ts'
+import { StateDot } from './StateDot.tsx'
 
 interface Props {
   entries: Map<string, FileEntry>
@@ -65,9 +66,9 @@ export function Dashboard(props: Props) {
             <li key={entry.path}>
               <button
                 onClick={() => props.onSelect(entry.path)}
-                className="flex w-full items-baseline gap-3 rounded-md border border-line bg-panel px-3 py-2 text-left hover:bg-raised"
+                className="flex w-full items-baseline gap-3 rounded-md border border-line bg-pane px-3 py-2 text-left hover:bg-row-hover"
               >
-                <span className={`w-4 text-center font-mono ${meta.color}`}>{meta.glyph}</span>
+                <span className="flex w-4 justify-center self-center"><StateDot state={state} /></span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-mono text-[12px] text-ink">{entry.path.split('/').at(-1)}</span>
                   <span className="block truncate font-mono text-[10px] text-ink-faint">{entry.path}</span>
@@ -92,13 +93,13 @@ export function Dashboard(props: Props) {
       {props.unverifiedCount > 0 && (
         <footer className="mt-6 border-t border-line pt-4">
           <p className="mb-2 text-[12px] text-ink-dim">
-            <span className="text-unknown">◌</span> {props.unverifiedCount} tracked file(s) have no local-edit baseline —
+            <span className="text-warn">◌</span> {props.unverifiedCount} tracked file(s) have no local-edit baseline —
             content is compared against Confluence and, when identical, the baseline is recorded so they can turn green.
           </p>
           <button
             onClick={props.onVerifyAll}
             disabled={props.busy}
-            className="rounded-md border border-unknown/50 px-2.5 py-1 text-[12px] text-unknown hover:bg-unknown/10 disabled:opacity-40"
+            className="rounded-md border border-pill-edge bg-pill-bg px-2.5 py-1 text-[12px] text-pill-ink hover:opacity-90 disabled:opacity-40"
           >
             Verify all unverified ({props.unverifiedCount})
           </button>
