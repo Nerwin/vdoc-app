@@ -197,7 +197,7 @@ export const COMMANDS: Command[] = [
   {
     id: 'sync.baseline',
     group: 'Sync',
-    label: 'Accept remote as baseline',
+    label: 'Verify against Confluence',
     icon: '✓',
     reason: all(linked, ctx => (ctx.state === 'unverified' ? undefined : 'file already has a baseline'), idle, online),
     run: ctx => void ctx.app.markVerified(ctx.selection!),
