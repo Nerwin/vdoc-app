@@ -34,6 +34,8 @@ export function useApp() {
   const [root, setRoot] = useState('')
   const [entries, setEntries] = useState<Map<string, FileEntry>>(new Map())
   const [selection, setSelection] = useState<string | null>(null)
+  /** Files navigated away from, oldest first — Back pops from the end. */
+  const [history, setHistory] = useState<string[]>([])
   const [filterText, setFilterText] = useState('')
   const [stateFilter, setStateFilter] = useState<TriageFilter>(null)
   const [auth, setAuth] = useState<AuthStatus | null>(null)
@@ -53,6 +55,22 @@ export function useApp() {
 
   const checkingRef = useRef(false)
   const lastFocusCheckRef = useRef(0)
+
+  /** Every navigation (tree, palette, dashboard, links) records the file it leaves. */
+  const select = useCallback((path: string | null) => {
+    if (path !== selection && selection !== null) setHistory(stack => [...stack.slice(-19), selection])
+    setSelection(path)
+  }, [selection])
+
+  const goBack = useCallback(() => {
+    // Pop entries whose file has since left the tree.
+    const stack = [...history]
+    let target: string | undefined
+    while ((target = stack.pop()) !== undefined && !entries.has(target)) continue
+    setHistory(stack)
+    // Going back is not a new visit — bypass the recording wrapper.
+    if (target !== undefined) setSelection(target)
+  }, [entries, history])
 
   const fail = useCallback((error: unknown) => {
     setMessage({ kind: 'error', text: error instanceof Error ? error.message : String(error) })
@@ -468,7 +486,9 @@ export function useApp() {
     root,
     entries,
     selection,
-    setSelection,
+    setSelection: select,
+    goBack,
+    canGoBack: history.length > 0,
     filterText,
     setFilterText,
     stateFilter,

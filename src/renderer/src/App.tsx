@@ -147,7 +147,9 @@ export function App() {
         unverifiedCount={app.counts.unverified}
         busy={taskRunning}
         connected={connected}
+        canGoBack={app.canGoBack}
         filterRef={filterRef}
+        onBack={app.goBack}
         onFilterText={app.setFilterText}
         onPullBehind={app.pullAllBehind}
         onVerifyAll={app.verifyAllUnverified}

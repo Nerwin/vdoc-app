@@ -213,6 +213,15 @@ export const COMMANDS: Command[] = [
   },
 
   {
+    id: 'file.back',
+    group: 'File',
+    label: 'Back to previous file',
+    icon: '‹',
+    keys: { key: '[', meta: true },
+    reason: ctx => (ctx.app.canGoBack ? undefined : 'no previous file'),
+    run: ctx => ctx.app.goBack(),
+  },
+  {
     id: 'file.goto',
     group: 'File',
     label: 'Go to file…',

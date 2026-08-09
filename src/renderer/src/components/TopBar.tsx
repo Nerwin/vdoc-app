@@ -12,7 +12,9 @@ interface Props {
   /** A task is running — the global primary is disabled (progress lives in the status bar). */
   busy: boolean
   connected: boolean
+  canGoBack: boolean
   filterRef: RefObject<HTMLInputElement | null>
+  onBack(): void
   onFilterText(text: string): void
   onPullBehind(): void
   onVerifyAll(): void
@@ -84,6 +86,7 @@ export function TopBar(props: Props) {
           </button>
         )}
         <div className="mx-0.5 h-5 w-px bg-line" />
+        <ChromeButton title={`Back to previous file — ${shortcutLabel('file.back')}`} onClick={props.onBack} disabled={!props.canGoBack}>‹</ChromeButton>
         <ChromeButton title="Dashboard — overview of everything needing attention" onClick={props.onOpenDashboard}>⌂</ChromeButton>
         <ChromeButton title={`Command palette — ${shortcutLabel('app.palette')}`} onClick={props.onOpenPalette}>⌘</ChromeButton>
         <ChromeButton title={`Settings — ${shortcutLabel('app.settings')}`} onClick={props.onOpenSettings}>⚙</ChromeButton>
@@ -92,12 +95,13 @@ export function TopBar(props: Props) {
   )
 }
 
-function ChromeButton({ title, onClick, children }: { title: string, onClick(): void, children: React.ReactNode }) {
+function ChromeButton({ title, onClick, disabled, children }: { title: string, onClick(): void, disabled?: boolean, children: React.ReactNode }) {
   return (
     <button
       onClick={onClick}
       title={title}
-      className="flex h-[26px] w-[26px] items-center justify-center rounded-md text-[15px] text-ink-label hover:bg-hover hover:text-ink"
+      disabled={disabled}
+      className="flex h-[26px] w-[26px] items-center justify-center rounded-md text-[15px] text-ink-label hover:bg-hover hover:text-ink disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-ink-label"
     >
       {children}
     </button>
