@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { DiffResult } from '../../../shared/types.ts'
+import { resolveRelative } from '../../../shared/links.ts'
 import { displayState, type FileEntry } from '../../../shared/status.ts'
 import { shortcutLabel, type ViewMode } from '../commands.ts'
 import { STATE_META } from '../state-meta.ts'
@@ -22,6 +23,8 @@ interface Props {
   reloadKey: number
   onView(view: ViewMode): void
   onError(error: unknown): void
+  /** Navigate to another file in the tree (backlink row, local link in the preview). */
+  onSelect(path: string): void
   onDiff(path: string): void
   onCheck(path: string): void
   onMarkVerified(path: string): void
@@ -124,6 +127,29 @@ export function DetailPane(props: Props) {
       setContent(text)
     }).catch(() => undefined)
   }), [path])
+
+  const [backlinks, setBacklinks] = useState<string[]>([])
+  useEffect(() => {
+    setBacklinks([])
+    let live = true
+    void window.vdoc.backlinks(path)
+      .then(links => live && setBacklinks(links))
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [path, props.reloadKey])
+
+  const { onSelect } = props
+  /** Preview link clicks: local .md files open in-app, http(s) in the browser. */
+  const openLink = useCallback((href: string) => {
+    if (/^https?:\/\//i.test(href)) {
+      void window.vdoc.openExternal(href).catch(onError)
+      return
+    }
+    const resolved = resolveRelative(path, href)
+    if (resolved?.endsWith('.md')) onSelect(resolved)
+  }, [onError, onSelect, path])
 
   // A loaded diff for this file (via the Diff tab or ⏎ in the tree) takes the stage.
   const diffReady = props.diff?.path === path
@@ -285,6 +311,7 @@ export function DetailPane(props: Props) {
         />
         <Tab label="Comments" active={view === 'comments'} disabled={!entry.tracked} onClick={() => onView('comments')} />
         <div className="flex-1" />
+        {backlinks.length > 0 && <BacklinksButton links={backlinks} onPick={onSelect} />}
         <button
           onClick={() => props.onLint(path)}
           disabled={busy}
@@ -298,7 +325,7 @@ export function DetailPane(props: Props) {
         {view === 'comments'
           ? <CommentsView path={path} onError={props.onError} />
           : view === 'preview' && content !== null
-            ? <PreviewView content={content} theme={props.theme} />
+            ? <PreviewView content={content} theme={props.theme} onOpenLink={openLink} />
             : showDiff && props.diff
           ? (
               props.diff.result.identical
@@ -439,6 +466,60 @@ function ActionsMenu({ entry, primaryLabel, canPull, pushMode, busy, connected, 
           <div className="px-2.5 pb-1 pt-[7px] text-[10.5px] tracking-[0.12em] text-ink-ghost">OPEN</div>
           <ActionItem label="Confluence page ↗" onClick={item(onOpenConfluence)} />
         </>
+      )}
+    </div>
+  )
+}
+
+/** Docs linking to this one — click a row to open it. Same popover idiom as ActionsMenu. */
+function BacklinksButton({ links, onPick }: { links: string[], onPick(path: string): void }) {
+  const [open, setOpen] = useState(false)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        event.stopPropagation()
+        setOpen(false)
+      }
+    }
+    const onClick = (event: MouseEvent): void => {
+      if (!wrapperRef.current?.contains(event.target as Node)) setOpen(false)
+    }
+    window.addEventListener('keydown', onKey, true)
+    window.addEventListener('mousedown', onClick)
+    return () => {
+      window.removeEventListener('keydown', onKey, true)
+      window.removeEventListener('mousedown', onClick)
+    }
+  }, [open])
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <button
+        onClick={() => setOpen(current => !current)}
+        title={`${links.length} doc(s) link to this file`}
+        className={`px-3 py-2 text-[12px] hover:text-ink ${open ? 'text-ink' : 'text-ink-label'}`}
+      >
+        ⭠ {links.length} linked from
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full z-30 mt-1 max-h-80 w-[300px] overflow-y-auto rounded-lg border border-line-menu bg-overlay p-1.5 shadow-menu">
+          {links.map(link => (
+            <button
+              key={link}
+              onClick={() => {
+                setOpen(false)
+                onPick(link)
+              }}
+              className="flex w-full flex-col items-start rounded px-2.5 py-1.5 text-left hover:bg-selected"
+            >
+              <span className="w-full truncate text-[12.5px] text-ink-body">{link.split('/').at(-1)}</span>
+              <span className="w-full truncate text-[10.5px] text-ink-ghost">{link.split('/').slice(0, -1).join('/')}</span>
+            </button>
+          ))}
+        </div>
       )}
     </div>
   )

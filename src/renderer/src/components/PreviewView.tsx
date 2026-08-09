@@ -24,11 +24,23 @@ const stripFrontmatter = (content: string): string => content.replace(/^---\r?\n
 interface Props {
   content: string
   theme: 'dark' | 'light'
+  /** Intercepted `<a>` clicks — receives the href as written in the markdown. */
+  onOpenLink?(href: string): void
 }
 
-export function PreviewView({ content, theme }: Props) {
+export function PreviewView({ content, theme, onOpenLink }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [html, setHtml] = useState('')
+
+  // Never let a link navigate the window — local .md links open in-app,
+  // everything else goes through the handler (external browser) or nowhere.
+  const handleClick = (event: React.MouseEvent): void => {
+    const anchor = (event.target as HTMLElement).closest('a')
+    const href = anchor?.getAttribute('href')
+    if (!href) return
+    event.preventDefault()
+    onOpenLink?.(href)
+  }
 
   useEffect(() => {
     setHtml(marked.parse(stripFrontmatter(content), { async: false }))
@@ -66,7 +78,7 @@ export function PreviewView({ content, theme }: Props) {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div ref={containerRef} className="preview mx-auto max-w-3xl px-8 py-6" dangerouslySetInnerHTML={{ __html: html }} />
+      <div ref={containerRef} onClick={handleClick} className="preview mx-auto max-w-3xl px-8 py-6" dangerouslySetInnerHTML={{ __html: html }} />
     </div>
   )
 }

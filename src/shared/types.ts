@@ -167,6 +167,10 @@ export interface VdocApi {
   readFile(path: string): Promise<string>
   /** Overwrite a file inside the docs root — the in-app editor's save. */
   writeFile(path: string, content: string): Promise<void>
+  /** Docs in the tree whose markdown links resolve to this file. */
+  backlinks(path: string): Promise<string[]>
+  /** Open an http(s) URL in the default browser. */
+  openExternal(url: string): Promise<void>
   diff(path: string): Promise<DiffResult>
   recordBaseline(path: string): Promise<DiffResult>
   lastVersion(path: string): Promise<VersionEntry | null>

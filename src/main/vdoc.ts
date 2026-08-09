@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 
+import { mdLinkTargets, resolveRelative } from '../shared/links.ts'
 import { loadSettings } from './settings.ts'
 
 export const DOCS_ROOT = process.env.VDOC_APP_ROOT ?? join(homedir(), 'Projects/documentation/Vosker-doc')
@@ -135,6 +136,22 @@ export function scanMarkdownFiles(): Array<{ path: string, tracked: boolean }> {
 
   for (const dir of getContentDirs()) walk(dir)
   return files
+}
+
+/** Docs under the content dirs whose markdown links resolve to `target`. */
+// ponytail: full rescan per call, no index — the corpus is a few hundred small files.
+export function backlinksTo(target: string): string[] {
+  const result: string[] = []
+  for (const { path } of scanMarkdownFiles()) {
+    if (path === target) continue
+    try {
+      const text = readFileSync(join(DOCS_ROOT, path), 'utf8')
+      if (mdLinkTargets(text).some(href => resolveRelative(path, href) === target)) result.push(path)
+    } catch {
+      // Unreadable file: not a backlink.
+    }
+  }
+  return result
 }
 
 // ponytail: frontmatter regex approximates the CLI's parsePublishDoc; the CLI

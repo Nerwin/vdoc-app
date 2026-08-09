@@ -3,7 +3,7 @@ import { join, relative } from 'node:path'
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 
 import type { AuthStatus, CheckFile, CommentEntry, CreateResult, DiffResult, LintFile, PullFile, PushFile, Settings, SettingsInfo, SyncFile, VersionEntry } from '../shared/types.ts'
-import { DOCS_ROOT, gitDirtyFiles, resolvedVdocBin, runVdoc, runVdocJson, scanMarkdownFiles, setVdocBin } from './vdoc.ts'
+import { backlinksTo, DOCS_ROOT, gitDirtyFiles, resolvedVdocBin, runVdoc, runVdocJson, scanMarkdownFiles, setVdocBin } from './vdoc.ts'
 import { loadSettings, saveSettings } from './settings.ts'
 import { watchDocs } from './watcher.ts'
 
@@ -50,6 +50,13 @@ export function registerIpc(): void {
   })
 
   ipcMain.handle('read-file', (_event, path: string) => readFileSync(join(DOCS_ROOT, path), 'utf8'))
+
+  ipcMain.handle('backlinks', (_event, path: string) => backlinksTo(path))
+
+  ipcMain.handle('open-external', (_event, url: string) => {
+    if (!/^https?:\/\//i.test(url)) throw new Error(`Refusing to open non-http URL: ${url}`)
+    return shell.openExternal(url)
+  })
 
   ipcMain.handle('write-file', (_event, path: string, content: string) => {
     const abs = join(DOCS_ROOT, path)

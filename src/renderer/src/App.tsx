@@ -193,6 +193,10 @@ export function App() {
                   reloadKey={reloadKey}
                   onView={setView}
                   onError={app.reportError}
+                  onSelect={path => {
+                    if (app.entries.has(path)) app.setSelection(path)
+                    else app.notify(`${path} is not in the tree`)
+                  }}
                   onDiff={path => void app.loadDiff(path, true)}
                   onCheck={path => void app.checkOne(path)}
                   onMarkVerified={path => void app.markVerified(path)}
