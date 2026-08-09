@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 
@@ -50,6 +50,12 @@ export function registerIpc(): void {
   })
 
   ipcMain.handle('read-file', (_event, path: string) => readFileSync(join(DOCS_ROOT, path), 'utf8'))
+
+  ipcMain.handle('write-file', (_event, path: string, content: string) => {
+    const abs = join(DOCS_ROOT, path)
+    if (relative(DOCS_ROOT, abs).startsWith('..')) throw new Error(`Refusing to write outside the docs root: ${path}`)
+    writeFileSync(abs, content, 'utf8')
+  })
 
   ipcMain.handle('diff', (_event, path: string) => runVdocJson<DiffResult>(['cf', 'diff', path]))
 

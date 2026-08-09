@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { DiffResult } from '../../../shared/types.ts'
 import { displayState, type FileEntry } from '../../../shared/status.ts'
@@ -45,24 +45,85 @@ function pushModeFor(state: ReturnType<typeof displayState>): PushMode {
 }
 
 export function DetailPane(props: Props) {
-  const { entry, view } = props
+  const { entry, view, onError } = props
   const [content, setContent] = useState<string | null>(null)
+  const [readFailed, setReadFailed] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const actionsRef = useRef<HTMLButtonElement>(null)
 
   const path = entry.path
 
+  // In-app editing: `content` is the draft, `diskRef` the disk truth for the file
+  // it names (last read or successful write). A debounced flush writes the draft,
+  // guarded by a re-read so an edit made outside the app is never clobbered.
+  const diskRef = useRef<{ path: string, text: string } | null>(null)
+  const pendingRef = useRef<{ path: string, text: string } | null>(null)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  const flush = useCallback(() => {
+    clearTimeout(timerRef.current)
+    const pending = pendingRef.current
+    pendingRef.current = null
+    if (!pending) return
+    const disk = diskRef.current
+    const expected = disk?.path === pending.path ? disk.text : null
+    if (expected === pending.text) return
+    void window.vdoc.readFile(pending.path)
+      .then(onDisk => {
+        if (expected === null || onDisk !== expected) {
+          throw new Error(`${pending.path.split('/').at(-1)} changed on disk while editing — draft not saved. Reload from disk (⌘⌥R) and redo the edit.`)
+        }
+        return window.vdoc.writeFile(pending.path, pending.text).then(() => {
+          if (diskRef.current?.path === pending.path) diskRef.current = pending
+        })
+      })
+      .catch(onError)
+  }, [onError])
+
+  const handleEdit = useCallback((text: string) => {
+    setContent(text)
+    pendingRef.current = { path, text }
+    clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(flush, 800)
+  }, [flush, path])
+
+  // Flush the draft before switching files and on unmount.
+  useEffect(() => flush, [path, flush])
+
   useEffect(() => {
+    // Reload (⌘⌥R) is an explicit "take the disk version": drop any pending draft.
+    pendingRef.current = null
+    clearTimeout(timerRef.current)
     setContent(null)
+    setReadFailed(false)
     setMenuOpen(false)
     let live = true
     window.vdoc.readFile(path)
-      .then(text => live && setContent(text))
-      .catch(() => live && setContent('Could not read this file.'))
+      .then(text => {
+        if (!live) return
+        diskRef.current = { path, text }
+        setContent(text)
+      })
+      .catch(() => {
+        if (!live) return
+        setReadFailed(true)
+        setContent('Could not read this file.')
+      })
     return () => {
       live = false
     }
   }, [path, props.reloadKey])
+
+  // Disk changed under us (external editor, pull, own save echo): refresh the
+  // buffer when there is no active draft to protect.
+  useEffect(() => window.vdoc.onFilesChanged(changed => {
+    if (!changed.includes(path) || pendingRef.current) return
+    void window.vdoc.readFile(path).then(text => {
+      if (pendingRef.current || diskRef.current?.path !== path || text === diskRef.current.text) return
+      diskRef.current = { path, text }
+      setContent(text)
+    }).catch(() => undefined)
+  }), [path])
 
   // A loaded diff for this file (via the Diff tab or ⏎ in the tree) takes the stage.
   const diffReady = props.diff?.path === path
@@ -94,7 +155,9 @@ export function DetailPane(props: Props) {
         ? { label: 'Push', run: () => props.onPush(path, false) }
         : state === 'conflict'
           ? { label: 'Diff', run: openDiffTab }
-          : { label: 'Check', run: () => props.onCheck(path) }
+          : state === 'unverified'
+            ? { label: 'Verify', run: () => props.onMarkVerified(path) }
+            : { label: 'Check', run: () => props.onCheck(path) }
 
   const notes: Array<{ text: string, error: boolean }> = []
   if (meta.hint && (state === 'unverified' || state === 'no-version' || state === 'conflict' || state === 'not-found')) {
@@ -247,9 +310,9 @@ export function DetailPane(props: Props) {
                           onClick={() => props.onMarkVerified(path)}
                           disabled={busy}
                           className="rounded-md border border-ok-edge px-3 py-1.5 text-[12px] text-sync-text hover:bg-ok-bg disabled:opacity-40"
-                          title="Record the local-edit baseline so this file shows Synced"
+                          title="Content is identical — record the local-edit baseline so this file shows Synced"
                         >
-                          Mark verified
+                          Verify
                         </button>
                       )}
                     </div>
@@ -268,7 +331,7 @@ export function DetailPane(props: Props) {
             )
           : content === null
             ? <CenterNote text="Loading…" tone="text-ink-faint" />
-            : <CodeView content={content} />}
+            : <CodeView content={content} onChange={readFailed ? undefined : handleEdit} onSave={flush} />}
       </div>
     </div>
   )

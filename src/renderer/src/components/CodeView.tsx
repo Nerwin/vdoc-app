@@ -2,9 +2,20 @@ import { useEffect, useRef } from 'react'
 
 import { EDITOR_FONT, monaco } from './monaco-setup.ts'
 
-export function CodeView({ content }: { content: string }) {
+export function CodeView({ content, onChange, onSave }: {
+  content: string
+  /** Present = editable; called with the full text after every edit. */
+  onChange?: (text: string) => void
+  /** ⌘S — flush pending edits to disk immediately. */
+  onSave?: () => void
+}) {
   const containerRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
+  const onChangeRef = useRef(onChange)
+  const onSaveRef = useRef(onSave)
+  onChangeRef.current = onChange
+  onSaveRef.current = onSave
+  const editable = Boolean(onChange)
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -23,13 +34,22 @@ export function CodeView({ content }: { content: string }) {
       renderLineHighlight: 'none',
       occurrencesHighlight: 'off',
     })
+    editor.onDidChangeModelContent(() => onChangeRef.current?.(editor.getValue()))
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => onSaveRef.current?.())
     editorRef.current = editor
     // The editor owns the implicit model created from `value` and disposes it itself.
     return () => editor.dispose()
   }, [])
 
   useEffect(() => {
-    editorRef.current?.setValue(content)
+    editorRef.current?.updateOptions({ readOnly: !editable })
+  }, [editable])
+
+  // Only push external content in — echoing the editor's own value back via
+  // setValue would reset the cursor on every keystroke.
+  useEffect(() => {
+    const editor = editorRef.current
+    if (editor && editor.getValue() !== content) editor.setValue(content)
   }, [content])
 
   return <div ref={containerRef} className="h-full w-full" />

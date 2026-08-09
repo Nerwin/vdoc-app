@@ -15,6 +15,7 @@ const api: VdocApi = {
   checkCancel: () => ipcRenderer.invoke('check-cancel'),
   checkFiles: paths => ipcRenderer.invoke('check-files', paths),
   readFile: path => ipcRenderer.invoke('read-file', path),
+  writeFile: (path, content) => ipcRenderer.invoke('write-file', path, content),
   diff: path => ipcRenderer.invoke('diff', path),
   recordBaseline: path => ipcRenderer.invoke('record-baseline', path),
   lastVersion: path => ipcRenderer.invoke('last-version', path),

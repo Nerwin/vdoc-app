@@ -165,6 +165,8 @@ export interface VdocApi {
   checkCancel(): Promise<void>
   checkFiles(paths: string[]): Promise<CheckFile[]>
   readFile(path: string): Promise<string>
+  /** Overwrite a file inside the docs root — the in-app editor's save. */
+  writeFile(path: string, content: string): Promise<void>
   diff(path: string): Promise<DiffResult>
   recordBaseline(path: string): Promise<DiffResult>
   lastVersion(path: string): Promise<VersionEntry | null>
