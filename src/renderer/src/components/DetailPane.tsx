@@ -140,6 +140,9 @@ export function DetailPane(props: Props) {
     }
   }, [path, props.reloadKey])
 
+  /** The split view's preview trails typing by 300ms — mermaid re-renders are not free. */
+  const previewContent = useDebouncedContent(content, 300)
+
   const { onSelect } = props
   /** Preview link clicks: local .md files open in-app, http(s) in the browser. */
   const openLink = useCallback((href: string) => {
@@ -303,6 +306,7 @@ export function DetailPane(props: Props) {
       <div className="flex items-center gap-1 border-b border-line px-[18px]">
         <Tab label="Content" active={view === 'content' || (view === 'diff' && !showDiff)} onClick={() => onView('content')} />
         <Tab label="Preview" active={view === 'preview'} disabled={content === null} onClick={() => onView('preview')} />
+        <Tab label="Split" active={view === 'split'} disabled={content === null} onClick={() => onView('split')} />
         <Tab
           label={loadingDiff ? 'Diff…' : 'Diff'}
           active={Boolean(showDiff)}
@@ -326,6 +330,18 @@ export function DetailPane(props: Props) {
           ? <CommentsView path={path} onError={props.onError} />
           : view === 'preview' && content !== null
             ? <PreviewView content={content} theme={props.theme} onOpenLink={openLink} />
+            : view === 'split' && content !== null
+              ? (
+                  <div className="flex h-full">
+                    <div className="min-w-0 flex-1">
+                      <CodeView content={content} onChange={readFailed ? undefined : handleEdit} onSave={flush} />
+                    </div>
+                    <div className="w-px shrink-0 bg-line" />
+                    <div className="min-w-0 flex-1">
+                      {previewContent !== null && <PreviewView content={previewContent} theme={props.theme} onOpenLink={openLink} />}
+                    </div>
+                  </div>
+                )
             : showDiff && props.diff
           ? (
               props.diff.result.identical
@@ -362,6 +378,20 @@ export function DetailPane(props: Props) {
       </div>
     </div>
   )
+}
+
+/** Trailing debounce; null (file switch, loading) resets immediately. */
+function useDebouncedContent(value: string | null, ms: number): string | null {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    if (value === null) {
+      setDebounced(null)
+      return
+    }
+    const timer = setTimeout(() => setDebounced(value), ms)
+    return () => clearTimeout(timer)
+  }, [value, ms])
+  return debounced
 }
 
 /** = equal · → local behind remote · ← local ahead · ≠ diverged. */

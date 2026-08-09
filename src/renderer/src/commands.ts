@@ -17,7 +17,7 @@ export interface KeyBinding {
   alt?: boolean
 }
 
-export type ViewMode = 'content' | 'preview' | 'diff' | 'comments'
+export type ViewMode = 'content' | 'preview' | 'split' | 'diff' | 'comments'
 
 /** Everything a command needs to decide whether it can run, and to run. */
 export interface CommandContext {
@@ -96,7 +96,7 @@ const viewCommand = (view: ViewMode, label: string, digit: string): Command => (
   label,
   icon: '▤',
   keys: { key: digit, meta: true },
-  reason: view === 'content' ? noFile : all(noFile, ctx => (ctx.entry?.tracked || view === 'preview' ? undefined : 'file is not linked')),
+  reason: view === 'content' ? noFile : all(noFile, ctx => (ctx.entry?.tracked || view === 'preview' || view === 'split' ? undefined : 'file is not linked')),
   run: ctx => (view === 'diff' ? ctx.openDiff() : ctx.setView(view)),
 })
 
@@ -285,8 +285,9 @@ export const COMMANDS: Command[] = [
 
   viewCommand('content', 'Content', '1'),
   viewCommand('preview', 'Preview', '2'),
-  viewCommand('diff', 'Diff', '3'),
-  viewCommand('comments', 'Comments', '4'),
+  viewCommand('split', 'Split editor + preview', '3'),
+  viewCommand('diff', 'Diff', '4'),
+  viewCommand('comments', 'Comments', '5'),
   {
     id: 'view.dashboard',
     group: 'View',
