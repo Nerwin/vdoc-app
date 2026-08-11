@@ -96,6 +96,17 @@ export interface CreateResult {
   dryRun?: boolean
 }
 
+export interface GetPageResult {
+  pageId: string
+  title: string
+  version: number
+  /** Written path, relative to the docs root (the CLI runs with cwd there). */
+  file?: string
+  opaqueNodes: number
+  mermaidDiagrams: number
+  localizedLinks?: number
+}
+
 export interface LintIssue {
   rule: string
   severity: string
@@ -179,6 +190,10 @@ export interface VdocApi {
   pull(paths: string[], force?: boolean): Promise<PullFile[]>
   push(path: string, dryRun: boolean, force?: boolean): Promise<PushFile[]>
   create(path: string, space: string, parent?: string): Promise<CreateResult>
+  /** Download a page (URL or id) into `dir`; the CLI names the file after the page title. */
+  getPage(input: string, dir: string): Promise<GetPageResult>
+  /** Tracked file whose frontmatter already carries this confluencePageId, or null. */
+  fileForPageId(pageId: string): Promise<string | null>
   sync(path: string, space?: string): Promise<SyncFile[]>
   lint(path: string): Promise<LintFile[]>
   authStatus(): Promise<AuthStatus>

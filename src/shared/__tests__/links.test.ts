@@ -1,7 +1,22 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { mdLinkTargets, resolveRelative } from '../links.ts'
+import { confluencePageId, mdLinkTargets, resolveRelative } from '../links.ts'
+
+test('confluencePageId accepts a bare numeric id and page URLs', () => {
+  assert.equal(confluencePageId('5013700642'), '5013700642')
+  assert.equal(confluencePageId('https://example.atlassian.net/wiki/spaces/DOCS/pages/5013700642/Usage-Guide'), '5013700642')
+  assert.equal(confluencePageId('https://example.atlassian.net/wiki/spaces/DOCS/pages/5013700642'), '5013700642')
+  assert.equal(confluencePageId('https://example.atlassian.net/wiki/pages/viewpage.action?pageId=123456'), '123456')
+})
+
+test('confluencePageId rejects anything else', () => {
+  assert.equal(confluencePageId(''), null)
+  assert.equal(confluencePageId('12a34'), null)
+  assert.equal(confluencePageId('not a url'), null)
+  assert.equal(confluencePageId('https://example.atlassian.net/wiki/spaces/DOCS/overview'), null)
+  assert.equal(confluencePageId('https://example.atlassian.net/wiki/pages/viewpage.action?pageId=abc'), null)
+})
 
 test('mdLinkTargets extracts .md targets and strips fragments', () => {
   const md = [

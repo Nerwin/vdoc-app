@@ -154,6 +154,24 @@ export function backlinksTo(target: string): string[] {
   return result
 }
 
+/** Tracked file whose frontmatter carries this confluencePageId, or null. */
+// ponytail: full rescan per call, same trade as backlinksTo.
+export function fileForPageId(pageId: string): string | null {
+  if (!/^\d+$/.test(pageId)) return null
+  const idLine = new RegExp(`^confluencePageId\\s*:\\s*['"]?${pageId}['"]?\\s*$`, 'm')
+  for (const { path, tracked } of scanMarkdownFiles()) {
+    if (!tracked) continue
+    try {
+      const head = readFileSync(join(DOCS_ROOT, path), 'utf8').slice(0, 2048)
+      const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(head)
+      if (frontmatter && idLine.test(frontmatter[1])) return path
+    } catch {
+      // Unreadable file: not a match.
+    }
+  }
+  return null
+}
+
 // ponytail: frontmatter regex approximates the CLI's parsePublishDoc; the CLI
 // re-verifies on every command, so a miss only costs a stale badge.
 function isTracked(absPath: string): boolean {

@@ -2,8 +2,8 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 
-import type { AuthStatus, CheckFile, CommentEntry, CreateResult, DiffResult, LintFile, PullFile, PushFile, Settings, SettingsInfo, SyncFile, VersionEntry } from '../shared/types.ts'
-import { backlinksTo, DOCS_ROOT, gitDirtyFiles, resolvedVdocBin, runVdoc, runVdocJson, scanMarkdownFiles, setVdocBin } from './vdoc.ts'
+import type { AuthStatus, CheckFile, CommentEntry, CreateResult, DiffResult, GetPageResult, LintFile, PullFile, PushFile, Settings, SettingsInfo, SyncFile, VersionEntry } from '../shared/types.ts'
+import { backlinksTo, DOCS_ROOT, fileForPageId, gitDirtyFiles, resolvedVdocBin, runVdoc, runVdocJson, scanMarkdownFiles, setVdocBin } from './vdoc.ts'
 import { loadSettings, saveSettings } from './settings.ts'
 import { watchDocs } from './watcher.ts'
 
@@ -103,6 +103,13 @@ export function registerIpc(): void {
     if (parent) args.push('--parent', parent)
     return runVdocJson<CreateResult>(args)
   })
+
+  ipcMain.handle('get-page', (_event, input: string, dir: string) => {
+    if (relative(DOCS_ROOT, join(DOCS_ROOT, dir)).startsWith('..')) throw new Error(`Refusing to write outside the docs root: ${dir}`)
+    return runVdocJson<GetPageResult>(['cf', 'get', input, '--out', dir])
+  })
+
+  ipcMain.handle('file-for-page-id', (_event, pageId: string) => fileForPageId(pageId))
 
   ipcMain.handle('sync', async (_event, path: string, space?: string) => {
     const args = ['cf', 'sync', path]

@@ -47,6 +47,7 @@ export function useApp() {
   const [pushPreview, setPushPreview] = useState<PushPreview | null>(null)
   const [pullConfirm, setPullConfirm] = useState<PullConfirm | null>(null)
   const [createForm, setCreateForm] = useState<{ path: string } | null>(null)
+  const [getForm, setGetForm] = useState(false)
   const [settings, setSettings] = useState<SettingsInfo | null>(null)
   const [spaceMapping, setSpaceMapping] = useState<Record<string, string>>({})
   /** Latest remote version info per file, keyed `path@vN` so a new version refetches. */
@@ -310,6 +311,21 @@ export function useApp() {
     })
   }, [api, createForm, recheck, runOp])
 
+  const submitGet = useCallback((input: string, dir: string) => runOp('get', async () => {
+    const result = await api.getPage(input.trim(), dir)
+    setGetForm(false)
+    // The watcher also fires, but rescan now so the new file can be selected immediately.
+    const scan = await api.scan()
+    setRoot(scan.root)
+    mergeScan(scan.files)
+    const path = normalize(result.file ?? '')
+    setMessage({ kind: 'info', text: `Fetched "${result.title}" (v${result.version}) → ${path}` })
+    if (scan.files.some(file => file.path === path)) {
+      select(path)
+      await recheck([path])
+    }
+  }), [api, mergeScan, recheck, runOp, select])
+
   const runLint = useCallback((path: string) => runOp('lint', async () => {
     const files = await api.lint(path)
     const issues = files.flatMap(file => file.issues)
@@ -505,6 +521,13 @@ export function useApp() {
     setPullConfirm,
     createForm,
     setCreateForm,
+    getForm,
+    setGetForm,
+    submitGet,
+    fileForPageId: (pageId: string) => api.fileForPageId(pageId).catch(error => {
+      fail(error)
+      return null
+    }),
     settings,
     updateSettings,
     reloadVersion,

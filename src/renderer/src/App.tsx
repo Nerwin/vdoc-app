@@ -8,6 +8,7 @@ import { TopBar } from './components/TopBar.tsx'
 import { TokenPanel } from './components/TokenPanel.tsx'
 import { CommandPalette } from './components/CommandPalette.tsx'
 import { CreateForm } from './components/CreateForm.tsx'
+import { GetForm } from './components/GetForm.tsx'
 import { SettingsModal } from './components/SettingsModal.tsx'
 import { Toast } from './components/Toast.tsx'
 import { Modal, ModalButton } from './components/Modal.tsx'
@@ -92,7 +93,7 @@ export function App() {
 
   // Global shortcuts stand down while any dialog is open — each dialog owns its keys.
   const dialogOpen = palette !== null || tokenOpen || settingsOpen
-    || app.pushPreview !== null || app.pullConfirm !== null || app.createForm !== null
+    || app.pushPreview !== null || app.pullConfirm !== null || app.createForm !== null || app.getForm
 
   useEffect(() => {
     if (dialogOpen) return
@@ -328,6 +329,20 @@ export function App() {
           busy={app.busyOp !== null}
           onSubmit={app.submitCreate}
           onClose={() => app.setCreateForm(null)}
+        />
+      )}
+
+      {app.getForm && (
+        <GetForm
+          folders={app.settings?.contentDirs ?? []}
+          busy={app.busyOp !== null}
+          findExisting={app.fileForPageId}
+          onOpenExisting={path => {
+            app.setGetForm(false)
+            app.setSelection(path)
+          }}
+          onSubmit={app.submitGet}
+          onClose={() => app.setGetForm(false)}
         />
       )}
 

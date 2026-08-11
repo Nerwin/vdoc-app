@@ -187,6 +187,19 @@ export const COMMANDS: Command[] = [
     run: ctx => ctx.app.setCreateForm({ path: ctx.selection! }),
   },
   {
+    id: 'sync.get',
+    group: 'Sync',
+    label: 'Get page from Confluence…',
+    icon: '⇣',
+    tint: 'pull',
+    reason: all(
+      ctx => ((ctx.app.settings?.contentDirs.length ?? 0) > 0 ? undefined : 'no folders in the tree — add one in Settings'),
+      idle,
+      online,
+    ),
+    run: ctx => ctx.app.setGetForm(true),
+  },
+  {
     id: 'sync.link',
     group: 'Sync',
     label: 'Link to existing page…',
