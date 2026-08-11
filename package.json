@@ -11,10 +11,12 @@
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "npm run typecheck && node --experimental-strip-types --test src/shared/__tests__/*.test.ts",
     "pack": "electron-vite build && electron-builder --dir",
-    "release": "electron-vite build && electron-builder --mac --win --linux",
-    "release:mac": "electron-vite build && electron-builder --mac",
-    "release:win": "electron-vite build && electron-builder --win",
-    "release:linux": "electron-vite build && electron-builder --linux"
+    "dist": "electron-vite build && electron-builder --mac --win --linux",
+    "dist:mac": "electron-vite build && electron-builder --mac",
+    "dist:win": "electron-vite build && electron-builder --win",
+    "dist:linux": "electron-vite build && electron-builder --linux",
+    "release": "commit-and-tag-version && npm run dist",
+    "release:mac": "commit-and-tag-version && npm run dist:mac"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
@@ -22,6 +24,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^5.2.0",
+    "commit-and-tag-version": "^13.1.2",
     "electron": "^43.2.0",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
