@@ -11,8 +11,9 @@ npm run dev            # launch in dev mode
 npm test               # typecheck + unit tests
 npm run build          # production bundle to out/
 npm run pack           # quick unsigned V-DOC.app into release/mac-arm64/
-npm run release        # dmg+zip (mac), nsis+portable (win), AppImage+deb (linux)
-npm run release:mac    # or per-platform: release:win / release:linux
+npm run release        # bump version + changelog + tag, then build all binaries
+npm run release:mac    # same bump, mac binaries only
+npm run dist           # rebuild binaries without bumping: dist / dist:mac / dist:win / dist:linux
 ```
 
 Builds target the host arch (arm64 here); add `-- --x64` to an electron-builder script for Intel
@@ -27,15 +28,35 @@ Requires the `vdoc` binary (auto-detected at `~/.bun/bin/vdoc`, then PATH — ov
 Settings). Spawns extend PATH with `~/.bun/bin`, `/opt/homebrew/bin`, and `/usr/local/bin` so the
 CLI's `#!/usr/bin/env bun` shebang resolves even from a Finder-launched app.
 
+## Releases
+
+`npm run release` is fully automated, driven by the conventional-commit history
+([commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version)):
+
+1. Computes the semver bump from the commits since the last tag — `fix:` → patch, `feat:` → minor,
+   `feat!:` / `BREAKING CHANGE` → major.
+2. Bumps `package.json` + `package-lock.json` and prepends the notes to `CHANGELOG.md`
+   (sections configured in `.versionrc.json`; `chore`/`test` commits are hidden).
+3. Commits those three files as `chore(release): X.Y.Z` and tags `vX.Y.Z`.
+4. Builds the binaries from the freshly bumped version.
+
+Day-to-day commits never touch the version — releasing is a deliberate act, not a git hook.
+Preview what a release would do with `npx commit-and-tag-version --dry-run`. To tag the current
+version as-is (no bump), use `npx commit-and-tag-version --first-release && npm run dist`.
+
 ## Shortcuts
 
-| Keys | Action |
-|------|--------|
-| ⌘P | Go to file (command palette) |
-| ⌘F | Focus the filter field |
-| ⌘R | Check all files |
-| ⌘, | Settings |
-| ↑↓ / ⏎ | Browse the tree / load the diff |
+| Keys     | Action                                      |
+| -------- | ------------------------------------------- |
+| ⌘P       | Go to file                                  |
+| ⌘⇧P      | Command palette — every action lives here   |
+| ⌘F       | Focus the filter field                      |
+| ⌘R / ⌘⇧R | Check this file / check all files           |
+| ⌘1…⌘5    | Content · Preview · Split · Diff · Comments |
+| ⌘[       | Back to the previous file                   |
+| ⌘E       | Open in the default editor                  |
+| ⌘,       | Settings                                    |
+| ↑↓ / ⏎   | Browse the tree / load the diff             |
 
 ## Settings (⌘,)
 
@@ -69,7 +90,7 @@ Everything goes through `vdoc … --json` spawned from the main process (`src/ma
 never reads or writes `.vdoc/state.json`, `confluencePageVersion`, or Confluence itself. Sync states
 come from `cf check`; two extra app-side states exist: `unverified` (version match but no local-edit
 baseline in state.json — deliberately not shown green) and `unchecked`. Unverified files can be
-promoted with "Mark verified" (or the dashboard's bulk button), which runs `cf diff --record`:
+promoted with **Verify** (or the dashboard's bulk button), which runs `cf diff --record`:
 the baseline is only written when the content is proven identical to Confluence.
 
 With no file selected, the main pane is a dashboard listing everything needing attention, including
@@ -79,10 +100,22 @@ re-checks attention files (throttled to once a minute) and runs a full check at 
 Per-file commands: Check, Pull, Push, Lint, plus Sync (link by exact title match) and Create (new page
 under a chosen parent) for files without a `confluencePageId`.
 
-The detail pane has four views: **Content** (raw markdown), **Preview** (rendered markdown with lazy-loaded
-Mermaid diagrams — approximates GitHub-style rendering, not Confluence's), **Diff** (side-by-side vs the
-live page), and **Comments** (footer + inline comments via `cf comments`, with a composer that posts
-footer comments through `cf comment`).
+**Get page from Confluence…** (palette) downloads a page that has no local file yet: pick one of the
+tree's root folders, paste a page URL or ID, and the file is created there, named after the page
+title (`cf get --out <folder>`). If a local file already tracks that page, the form offers to open
+it instead of fetching a duplicate.
+
+The detail pane has five views: **Content** (Monaco editor — edits auto-save after 800 ms, ⌘S flushes
+immediately, and a read-before-write guard refuses to clobber a file changed outside the app),
+**Preview** (rendered markdown with lazy-loaded Mermaid diagrams — approximates GitHub-style rendering,
+not Confluence's; links to local `.md` files navigate in-app, `http(s)` links open in the browser),
+**Split** (editor and live preview side by side), **Diff** (side-by-side vs the live page), and
+**Comments** (footer + inline comments via `cf comments`, with a composer that posts footer comments
+through `cf comment`).
+
+The tab row shows a **backlinks** popover — every doc in the tree whose markdown links resolve to the
+open file. All navigation (tree, palette, preview links, dashboard) records history; ⌘[ or the ‹
+button goes back, up to 20 files deep.
 
 A dim `±` marker flags files with uncommitted git changes — display-only, independent from the
 Confluence sync states.
