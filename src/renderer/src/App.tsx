@@ -37,7 +37,7 @@ export function App() {
   const [tokenOpen, setTokenOpen] = useState(false)
   const [palette, setPalette] = useState<'file' | 'command' | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [view, setView] = useState<ViewMode>('content')
+  const [view, setView] = useState<ViewMode>('preview')
   const [reloadKey, setReloadKey] = useState(0)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -60,8 +60,9 @@ export function App() {
   const taskRunning = app.checking !== null || app.busyOp !== null
   const connected = app.auth?.ok === true
 
-  // A new selection starts on Content; a freshly loaded diff takes the stage (see DetailPane).
-  useEffect(() => setView('content'), [app.selection])
+  // A new selection starts on Preview — reading is the common case; ⌘1 drops into
+  // the editor. A freshly loaded diff takes the stage (see DetailPane).
+  useEffect(() => setView('preview'), [app.selection])
 
   const openDiff = (): void => {
     if (!app.selection) return
@@ -220,9 +221,17 @@ export function App() {
                   totals={totals}
                   unverifiedCount={app.counts.unverified}
                   busy={app.busyOp !== null}
+                  lastChecked={app.lastChecked}
+                  recents={app.recents}
+                  activity={app.activity}
+                  rootDirs={app.settings?.contentDirs ?? []}
                   loadAuthors={app.loadAuthors}
                   onSelect={app.setSelection}
                   onVerifyAll={app.verifyAllUnverified}
+                  onOpenFilePalette={() => setPalette('file')}
+                  onOpenCommandPalette={() => setPalette('command')}
+                  onOpenGetForm={() => app.setGetForm(true)}
+                  onFilterFolder={dir => app.setFilterText(`${dir}/`)}
                 />
               )}
         </main>

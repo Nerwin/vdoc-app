@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Marked } from 'marked'
+
+import { parseFrontmatter } from '../../../shared/frontmatter.ts'
 
 /** Body-only markdown → HTML. Raw HTML in the source is escaped, never executed. */
 const marked = new Marked({
@@ -21,6 +23,30 @@ function escapeHtml(text: string): string {
 
 const stripFrontmatter = (content: string): string => content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '')
 
+const formatDate = (iso: string): string => {
+  const date = new Date(iso)
+  return Number.isNaN(date.getTime())
+    ? iso
+    : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+/** The frontmatter rendered as a quiet meta line, injected right under the doc's H1. */
+function metaLine(content: string): string {
+  const fm = parseFrontmatter(content)
+  const parts: string[] = []
+  if (fm.status) parts.push(`<span class="doc-meta-status" data-status="${escapeHtml(fm.status)}">${escapeHtml(fm.status)}</span>`)
+  if (fm.updated) parts.push(`<span>updated ${escapeHtml(formatDate(fm.updated))}</span>`)
+  if (fm.tags?.length) parts.push(`<span>${fm.tags.map(escapeHtml).join(' · ')}</span>`)
+  if (parts.length === 0) return ''
+  return `<div class="doc-meta">${parts.join('<span class="doc-meta-sep">·</span>')}</div>`
+}
+
+interface TocItem {
+  id: string
+  text: string
+  sub: boolean
+}
+
 interface Props {
   content: string
   theme: 'dark' | 'light'
@@ -29,8 +55,11 @@ interface Props {
 }
 
 export function PreviewView({ content, theme, onOpenLink }: Props) {
+  const scrollRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [html, setHtml] = useState('')
+  const [toc, setToc] = useState<TocItem[]>([])
+  const [activeId, setActiveId] = useState<string | null>(null)
 
   // Never let a link navigate the window — local .md links open in-app,
   // everything else goes through the handler (external browser) or nowhere.
@@ -42,9 +71,45 @@ export function PreviewView({ content, theme, onOpenLink }: Props) {
     onOpenLink?.(href)
   }
 
+  const meta = useMemo(() => metaLine(content), [content])
+
   useEffect(() => {
-    setHtml(marked.parse(stripFrontmatter(content), { async: false }))
-  }, [content])
+    let body = marked.parse(stripFrontmatter(content), { async: false })
+    // The meta line sits under the H1; a doc without one gets it at the top.
+    if (meta) body = body.includes('</h1>') ? body.replace('</h1>', `</h1>${meta}`) : meta + body
+    setHtml(body)
+  }, [content, meta])
+
+  // The "On this page" rail: ids are assigned to the rendered h2/h3 nodes.
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+    const headings = [...container.querySelectorAll<HTMLHeadingElement>('h2, h3')]
+    headings.forEach((el, index) => {
+      el.id = `sec-${index}`
+    })
+    setToc(headings.map((el, index) => ({ id: `sec-${index}`, text: el.textContent ?? '', sub: el.tagName === 'H3' })))
+    setActiveId(current => (current && headings.some(el => el.id === current) ? current : headings[0]?.id ?? null))
+  }, [html])
+
+  /** Scroll-spy: the active section is the last heading above the reading line. */
+  const onScroll = (): void => {
+    const scroller = scrollRef.current
+    const container = containerRef.current
+    if (!scroller || !container || toc.length < 2) return
+    const top = scroller.getBoundingClientRect().top
+    let current: string | null = null
+    for (const el of container.querySelectorAll('h2, h3')) {
+      if (el.getBoundingClientRect().top - top <= 96) current = el.id
+      else break
+    }
+    setActiveId(current ?? toc[0]?.id ?? null)
+  }
+
+  const jumpTo = (id: string): void => {
+    containerRef.current?.querySelector(`#${CSS.escape(id)}`)?.scrollIntoView()
+    setActiveId(id)
+  }
 
   // Mermaid only loads (once) when a diagram is actually on screen.
   useEffect(() => {
@@ -77,8 +142,26 @@ export function PreviewView({ content, theme, onOpenLink }: Props) {
   }, [html, theme])
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div ref={containerRef} onClick={handleClick} className="preview mx-auto max-w-3xl px-8 py-6" dangerouslySetInnerHTML={{ __html: html }} />
+    <div ref={scrollRef} onScroll={onScroll} className="h-full overflow-y-auto scroll-smooth motion-reduce:scroll-auto">
+      <div className="mx-auto flex max-w-[1080px] justify-center gap-14 px-10 pb-16 pt-12">
+        <div ref={containerRef} onClick={handleClick} className="preview min-w-0 max-w-[680px] flex-1" dangerouslySetInnerHTML={{ __html: html }} />
+        {toc.length >= 2 && (
+          <nav aria-label="On this page" className="sticky top-6 hidden max-h-[75vh] w-[200px] shrink-0 self-start overflow-y-auto @min-[960px]:block">
+            <p className="mb-3 font-mono text-[10.5px] uppercase tracking-[0.12em] text-ink-ghost">On this page</p>
+            {toc.map(item => (
+              <button
+                key={item.id}
+                onClick={() => jumpTo(item.id)}
+                className={`block w-full border-l-2 py-[5px] pr-2 text-left font-sans text-[12.5px] leading-[1.4] ${
+                  item.id === activeId ? 'border-select-edge text-ink' : 'border-line-subtle text-ink-dim hover:text-ink'
+                } ${item.sub ? 'pl-6' : 'pl-3'}`}
+              >
+                {item.text}
+              </button>
+            ))}
+          </nav>
+        )}
+      </div>
     </div>
   )
 }

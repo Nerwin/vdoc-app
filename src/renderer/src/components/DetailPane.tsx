@@ -328,21 +328,7 @@ export function DetailPane(props: Props) {
       <div className="min-h-0 flex-1 bg-content">
         {view === 'comments'
           ? <CommentsView path={path} onError={props.onError} />
-          : view === 'preview' && content !== null
-            ? <PreviewView content={content} theme={props.theme} onOpenLink={openLink} />
-            : view === 'split' && content !== null
-              ? (
-                  <div className="flex h-full">
-                    <div className="min-w-0 flex-1">
-                      <CodeView content={content} onChange={readFailed ? undefined : handleEdit} onSave={flush} />
-                    </div>
-                    <div className="w-px shrink-0 bg-line" />
-                    <div className="min-w-0 flex-1">
-                      {previewContent !== null && <PreviewView content={previewContent} theme={props.theme} onOpenLink={openLink} />}
-                    </div>
-                  </div>
-                )
-            : showDiff && props.diff
+          : showDiff && props.diff
           ? (
               props.diff.result.identical
                 ? (
@@ -374,18 +360,40 @@ export function DetailPane(props: Props) {
             )
           : content === null
             ? <CenterNote text="Loading…" tone="text-ink-faint" />
-            : <CodeView content={content} onChange={readFailed ? undefined : handleEdit} onSave={flush} />}
+            : (
+                // Editor and preview stay mounted across tab switches so Monaco state
+                // and the reading scroll position survive Content ⇄ Preview ⇄ Split.
+                <div className="flex h-full">
+                  <div className={`min-w-0 ${view === 'split' ? 'flex-1' : view === 'preview' ? 'hidden' : 'flex-1'}`}>
+                    <CodeView content={content} onChange={readFailed ? undefined : handleEdit} onSave={flush} />
+                  </div>
+                  {view === 'split' && <div className="w-px shrink-0 bg-line" />}
+                  <div className={`min-w-0 ${view === 'split' ? 'flex-1' : view === 'preview' ? 'flex-1' : 'hidden'}`}>
+                    {previewContent !== null && <PreviewView content={previewContent} theme={props.theme} onOpenLink={openLink} />}
+                  </div>
+                </div>
+              )}
       </div>
     </div>
   )
 }
 
-/** Trailing debounce; null (file switch, loading) resets immediately. */
+/**
+ * Trailing debounce; null (file switch, loading) resets immediately, and the first
+ * value after a reset lands immediately too — the preview opens without a blank beat.
+ */
 function useDebouncedContent(value: string | null, ms: number): string | null {
   const [debounced, setDebounced] = useState(value)
+  const settleRef = useRef(true)
   useEffect(() => {
     if (value === null) {
+      settleRef.current = true
       setDebounced(null)
+      return
+    }
+    if (settleRef.current) {
+      settleRef.current = false
+      setDebounced(value)
       return
     }
     const timer = setTimeout(() => setDebounced(value), ms)

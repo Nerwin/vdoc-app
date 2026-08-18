@@ -19,6 +19,25 @@ const EXCLUDED_DIRS = new Set(['0-Archives', '0-Images', '0-Private', 'Temp', '_
 // Finder launches would need a login-shell PATH probe.
 const defaultBin = (): string => (existsSync(join(homedir(), '.bun/bin/vdoc')) ? join(homedir(), '.bun/bin/vdoc') : 'vdoc')
 
+/**
+ * Finder-launched apps get launchd's minimal environment, not the shell's, so
+ * exports like VDOC_ENCRYPTION_KEY never reach the spawned CLI. Import the
+ * login-shell environment once at startup; existing vars are never overridden.
+ */
+export function importLoginShellEnv(): void {
+  if (process.env.VDOC_ENCRYPTION_KEY) return // launched from a shell — env already complete
+  try {
+    // -i so ~/.zshrc (where user exports live) is sourced.
+    const output = execFileSync('/bin/zsh', ['-ilc', 'printenv'], { encoding: 'utf8', timeout: 5000 })
+    for (const line of output.split('\n')) {
+      const eq = line.indexOf('=')
+      if (eq > 0 && !(line.slice(0, eq) in process.env)) process.env[line.slice(0, eq)] = line.slice(eq + 1)
+    }
+  } catch {
+    // No zsh or probe timed out: keep the launchd env; runVdoc's PATH fallback still applies.
+  }
+}
+
 let configuredBin: string | null = null
 
 /** Override the vdoc binary (null = auto-detect). Set from settings at startup and on change. */
@@ -84,6 +103,12 @@ export async function runVdocJson<T>(args: string[]): Promise<T> {
     parsed = JSON.parse(stdout)
   } catch {
     throw new Error(vdocFailureMessage(args, stderr, stdout))
+  }
+
+  // oclif --json failures print {"error": {"name", "message", "code"}} with a non-zero exit.
+  if (exitCode !== 0 && parsed && typeof parsed === 'object' && 'error' in parsed) {
+    const { message } = (parsed as { error: { message?: unknown } }).error ?? {}
+    throw new Error(typeof message === 'string' ? message : vdocFailureMessage(args, stderr, stdout))
   }
 
   // oclif error JSON always carries a stack; data payloads never do.

@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { app, BrowserWindow, Menu, nativeTheme } from 'electron'
 
 import type { Settings } from '../shared/types.ts'
-import { setVdocBin } from './vdoc.ts'
+import { importLoginShellEnv, setVdocBin } from './vdoc.ts'
 import { loadSettings } from './settings.ts'
 import { registerIpc } from './ipc.ts'
 import { watchDocs } from './watcher.ts'
@@ -47,6 +47,7 @@ if (!app.requestSingleInstanceLock()) {
   })
 
   app.whenReady().then(() => {
+    importLoginShellEnv()
     const settings = loadSettings()
     setVdocBin(settings.vdocBin)
 

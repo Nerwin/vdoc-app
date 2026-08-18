@@ -21,7 +21,26 @@ export interface PullConfirm {
   force: boolean
 }
 
+export interface Visit {
+  path: string
+  at: number
+}
+
+export interface SyncEvent {
+  op: 'pulled' | 'pushed' | 'fetched'
+  path: string
+  at: number
+}
+
 const normalize = (path: string): string => path.replace(/^\.\//, '')
+
+function loadJson<T>(key: string, fallback: T): T {
+  try {
+    return JSON.parse(localStorage.getItem(key) ?? '') as T
+  } catch {
+    return fallback
+  }
+}
 
 /** A full re-check runs at most once per hour on window focus. */
 const FULL_CHECK_TTL_MS = 60 * 60 * 1000
@@ -54,12 +73,34 @@ export function useApp() {
   const [authors, setAuthors] = useState<Map<string, VersionEntry | null>>(new Map())
   const [message, setMessage] = useState<Message | null>(null)
 
+  /** Recently opened files, newest first — feeds the dashboard's Continue reading. */
+  const [recents, setRecents] = useState<Visit[]>(() => loadJson('recentFiles', []))
+  /** Last few pulls / pushes / gets — the dashboard's sync-activity card. */
+  const [activity, setActivity] = useState<SyncEvent[]>(() => loadJson('syncActivity', []))
+
   const checkingRef = useRef(false)
   const lastFocusCheckRef = useRef(0)
+
+  const recordActivity = useCallback((op: SyncEvent['op'], paths: string[]) => {
+    if (paths.length === 0) return
+    setActivity(prev => {
+      const at = Date.now()
+      const next = [...paths.map(path => ({ op, path, at })), ...prev].slice(0, 6)
+      localStorage.setItem('syncActivity', JSON.stringify(next))
+      return next
+    })
+  }, [])
 
   /** Every navigation (tree, palette, dashboard, links) records the file it leaves. */
   const select = useCallback((path: string | null) => {
     if (path !== selection && selection !== null) setHistory(stack => [...stack.slice(-19), selection])
+    if (path !== null) {
+      setRecents(prev => {
+        const next = [{ path, at: Date.now() }, ...prev.filter(visit => visit.path !== path)].slice(0, 8)
+        localStorage.setItem('recentFiles', JSON.stringify(next))
+        return next
+      })
+    }
     setSelection(path)
   }, [selection])
 
@@ -74,8 +115,18 @@ export function useApp() {
   }, [entries, history])
 
   const fail = useCallback((error: unknown) => {
-    setMessage({ kind: 'error', text: error instanceof Error ? error.message : String(error) })
+    const raw = error instanceof Error ? error.message : String(error)
+    // Electron wraps IPC rejections: "Error invoking remote method 'x': Error: <real message>"
+    const text = raw.replace(/^Error invoking remote method '[^']+': (?:\w*Error: )?/, '')
+    setMessage({ kind: 'error', text })
   }, [])
+
+  // Anything that escapes the per-action catches still surfaces as a toast.
+  useEffect(() => {
+    const onRejection = (event: PromiseRejectionEvent): void => fail(event.reason)
+    window.addEventListener('unhandledrejection', onRejection)
+    return () => window.removeEventListener('unhandledrejection', onRejection)
+  }, [fail])
 
   const applyChecks = useCallback((results: CheckFile[]) => {
     setEntries(prev => {
@@ -141,13 +192,12 @@ export function useApp() {
         const scan = await api.scan()
         setRoot(scan.root)
         mergeScan(scan.files)
+        const status = await api.authStatus()
+        setAuth(status)
+        if (!status.ok) setMessage({ kind: 'error', text: status.error ?? 'Confluence authentication failed' })
       } catch (error) {
         fail(error)
-        return
       }
-      const status = await api.authStatus()
-      setAuth(status)
-      if (!status.ok) setMessage({ kind: 'error', text: status.error ?? 'Confluence authentication failed' })
     })()
   }, [api, fail, mergeScan])
 
@@ -229,11 +279,12 @@ export function useApp() {
   const doPull = useCallback((paths: string[], force: boolean) => runOp('pull', async () => {
     const results = await api.pull(paths, force)
     setPullConfirm(null)
-    const pulled = results.filter(result => result.status === 'pulled' || result.status === 'updated').length
-    setMessage({ kind: 'info', text: `Pull: ${pulled}/${results.length} file(s) updated` })
+    const pulled = results.filter(result => result.status === 'pulled' || result.status === 'updated')
+    setMessage({ kind: 'info', text: `Pull: ${pulled.length}/${results.length} file(s) updated` })
+    recordActivity('pulled', pulled.map(result => normalize(result.file)))
     setDiff(current => (current && paths.includes(current.path) ? null : current))
     await recheck(paths)
-  }), [api, recheck, runOp])
+  }), [api, recheck, recordActivity, runOp])
 
   const requestPull = useCallback((path: string) => {
     const entry = entries.get(path)
@@ -261,11 +312,12 @@ export function useApp() {
     void runOp('push', async () => {
       const [result] = await api.push(path, false, force)
       setPushPreview(null)
+      recordActivity('pushed', [path])
       setMessage({ kind: 'info', text: `${force ? 'Force pushed' : 'Pushed'} ${path} to v${result.version}` })
       setDiff(current => (current?.path === path ? null : current))
       await recheck([path])
     })
-  }, [api, pushPreview, recheck, runOp])
+  }, [api, pushPreview, recheck, recordActivity, runOp])
 
   const checkOne = useCallback((path: string) => runOp('check', async () => {
     const results = await api.checkFiles([path])
@@ -321,10 +373,11 @@ export function useApp() {
     const path = normalize(result.file ?? '')
     setMessage({ kind: 'info', text: `Fetched "${result.title}" (v${result.version}) → ${path}` })
     if (scan.files.some(file => file.path === path)) {
+      recordActivity('fetched', [path])
       select(path)
       await recheck([path])
     }
-  }), [api, mergeScan, recheck, runOp, select])
+  }), [api, mergeScan, recheck, recordActivity, runOp, select])
 
   const runLint = useCallback((path: string) => runOp('lint', async () => {
     const files = await api.lint(path)
@@ -503,6 +556,8 @@ export function useApp() {
     entries,
     selection,
     setSelection: select,
+    recents,
+    activity,
     goBack,
     canGoBack: history.length > 0,
     filterText,
