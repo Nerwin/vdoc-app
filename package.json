@@ -4,6 +4,9 @@
   "private": true,
   "description": "macOS GUI over the vdoc CLI for the Vosker-doc repository",
   "main": "out/main/index.js",
+  "productName": "V-DOC",
+  "author": "Nerwin",
+  "homepage": "https://github.com/nerwin/vdoc-app",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
@@ -37,8 +40,6 @@
     "typescript": "^7.0.2",
     "vite": "^7.3.6"
   },
-  "productName": "V-DOC",
-  "author": "Nerwin <anthropic@nerwin.dev>",
   "build": {
     "appId": "dev.nerwin.vdoc",
     "productName": "V-DOC",
@@ -79,6 +80,5 @@
     "portable": {
       "artifactName": "${productName}-${version}-portable-${arch}.${ext}"
     }
-  },
-  "homepage": "https://github.com/nerwin/vdoc-app"
+  }
 }

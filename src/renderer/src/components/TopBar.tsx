@@ -13,8 +13,10 @@ interface Props {
   busy: boolean
   connected: boolean
   canGoBack: boolean
+  canGoForward: boolean
   filterRef: RefObject<HTMLInputElement | null>
   onBack(): void
+  onForward(): void
   onFilterText(text: string): void
   onPullBehind(): void
   onVerifyAll(): void
@@ -87,6 +89,7 @@ export function TopBar(props: Props) {
         )}
         <div className="mx-0.5 h-5 w-px bg-line" />
         <ChromeButton title={`Back to previous file — ${shortcutLabel('file.back')}`} onClick={props.onBack} disabled={!props.canGoBack}>‹</ChromeButton>
+        <ChromeButton title={`Forward to next file — ${shortcutLabel('file.forward')}`} onClick={props.onForward} disabled={!props.canGoForward}>›</ChromeButton>
         <ChromeButton title="Dashboard — overview of everything needing attention" onClick={props.onOpenDashboard}>⌂</ChromeButton>
         <ChromeButton title={`Command palette — ${shortcutLabel('app.palette')}`} onClick={props.onOpenPalette}>⌘</ChromeButton>
         <ChromeButton title={`Settings — ${shortcutLabel('app.settings')}`} onClick={props.onOpenSettings}>⚙</ChromeButton>

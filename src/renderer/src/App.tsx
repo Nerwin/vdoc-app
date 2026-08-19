@@ -35,7 +35,7 @@ function useResolvedTheme(preference: 'dark' | 'light' | 'system'): 'dark' | 'li
 export function App() {
   const app = useApp()
   const [tokenOpen, setTokenOpen] = useState(false)
-  const [palette, setPalette] = useState<'file' | 'command' | null>(null)
+  const [palette, setPalette] = useState<'file' | 'command' | 'recent' | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [view, setView] = useState<ViewMode>('preview')
   const [reloadKey, setReloadKey] = useState(0)
@@ -150,8 +150,10 @@ export function App() {
         busy={taskRunning}
         connected={connected}
         canGoBack={app.canGoBack}
+        canGoForward={app.canGoForward}
         filterRef={filterRef}
         onBack={app.goBack}
+        onForward={app.goForward}
         onFilterText={app.setFilterText}
         onPullBehind={app.pullAllBehind}
         onVerifyAll={app.verifyAllUnverified}
@@ -257,6 +259,7 @@ export function App() {
           ctx={ctx}
           entries={app.entries}
           mode={palette}
+          recents={app.recents.map(visit => visit.path).filter(path => app.entries.has(path))}
           onPick={path => {
             app.setSelection(path)
             setPalette(null)

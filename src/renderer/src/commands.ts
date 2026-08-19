@@ -29,7 +29,7 @@ export interface CommandContext {
   checking: boolean
   busy: boolean
   connected: boolean
-  openPalette(mode: 'file' | 'command'): void
+  openPalette(mode: 'file' | 'command' | 'recent'): void
   openSettings(): void
   openToken(): void
   focusFilter(): void
@@ -235,12 +235,29 @@ export const COMMANDS: Command[] = [
     run: ctx => ctx.app.goBack(),
   },
   {
+    id: 'file.forward',
+    group: 'File',
+    label: 'Forward to next file',
+    icon: '›',
+    keys: { key: ']', meta: true },
+    reason: ctx => (ctx.app.canGoForward ? undefined : 'no next file'),
+    run: ctx => ctx.app.goForward(),
+  },
+  {
     id: 'file.goto',
     group: 'File',
     label: 'Go to file…',
     icon: '⌕',
     keys: { key: 'p', meta: true },
     run: ctx => ctx.openPalette('file'),
+  },
+  {
+    id: 'file.recent',
+    group: 'File',
+    label: 'Recent files…',
+    icon: '◷',
+    reason: ctx => (ctx.app.recents.length > 0 ? undefined : 'no files opened yet'),
+    run: ctx => ctx.openPalette('recent'),
   },
   {
     id: 'file.editor',

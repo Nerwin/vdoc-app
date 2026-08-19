@@ -9,7 +9,9 @@ interface Props {
   ctx: CommandContext
   entries: Map<string, FileEntry>
   /** `command` opens pre-seeded with `> `; deleting it drops back to file mode. */
-  mode: 'file' | 'command'
+  mode: 'file' | 'command' | 'recent'
+  /** Recently opened paths, newest first — the pool in `recent` mode. */
+  recents: string[]
   onPick(path: string): void
   onRun(command: Command): void
   onClose(): void
@@ -72,7 +74,7 @@ interface Row {
   disabled?: string
 }
 
-export function CommandPalette({ ctx, entries, mode, onPick, onRun, onClose }: Props) {
+export function CommandPalette({ ctx, entries, mode, recents, onPick, onRun, onClose }: Props) {
   const [query, setQuery] = useState(mode === 'command' ? '> ' : '')
   const [index, setIndex] = useState(0)
   const listRef = useRef<HTMLUListElement>(null)
@@ -89,7 +91,10 @@ export function CommandPalette({ ctx, entries, mode, onPick, onRun, onClose }: P
 
   const rows = useMemo<Row[]>(() => {
     if (!commandMode) {
-      return fuzzyRank(search, [...entries.keys()], FILE_LIMIT).map(path => ({ key: path, group: 'FILES', path }))
+      // Recent mode: rank within the recents pool, keeping recency order on an empty query.
+      const pool = mode === 'recent' ? recents : [...entries.keys()]
+      const ranked = mode === 'recent' && search === '' ? pool.slice(0, FILE_LIMIT) : fuzzyRank(search, pool, FILE_LIMIT)
+      return ranked.map(path => ({ key: path, group: 'FILES', path }))
     }
     const ranked = COMMANDS
       .map(command => ({ command, score: fuzzyScore(search, fullLabel(command)) }))
@@ -110,7 +115,7 @@ export function CommandPalette({ ctx, entries, mode, onPick, onRun, onClose }: P
       ...rest.filter(item => item.command.group === 'File').map(item => row(item.command, 'FILE')),
       ...rest.filter(item => item.command.group === 'View' || item.command.group === 'App').map(item => row(item.command, 'VIEW & APP')),
     ]
-  }, [commandMode, search, entries, ctx])
+  }, [commandMode, search, entries, ctx, mode, recents])
 
   useEffect(() => setIndex(0), [deferred])
 
@@ -144,9 +149,11 @@ export function CommandPalette({ ctx, entries, mode, onPick, onRun, onClose }: P
     }
   }
 
+  const poolSize = mode === 'recent' ? recents.length : entries.size
+  const noun = mode === 'recent' ? 'recent' : 'files'
   const counter = commandMode
     ? (search === '' ? `${COMMANDS.length} commands` : `${rows.length} of ${COMMANDS.length}`)
-    : (search === '' ? `${entries.size} files` : `${rows.length} of ${entries.size}`)
+    : (search === '' ? `${poolSize} ${noun}` : `${rows.length} of ${poolSize}`)
 
   return (
     <div className="fixed inset-0 z-50 bg-[var(--scrim)]" onClick={onClose}>
@@ -167,7 +174,7 @@ export function CommandPalette({ ctx, entries, mode, onPick, onRun, onClose }: P
               if (event.key === 'Backspace' && commandMode && query.replace(/^>\s*/, '') === '') setQuery('')
               onKeyDown(event)
             }}
-            placeholder={commandMode ? 'Type a command…' : 'Go to file…'}
+            placeholder={commandMode ? 'Type a command…' : mode === 'recent' ? 'Recent files…' : 'Go to file…'}
             spellCheck={false}
             className="min-w-0 flex-1 border-none bg-transparent font-mono text-[13px] text-ink placeholder-ink-faint outline-none focus:shadow-none"
           />

@@ -55,6 +55,8 @@ export function useApp() {
   const [selection, setSelection] = useState<string | null>(null)
   /** Files navigated away from, oldest first — Back pops from the end. */
   const [history, setHistory] = useState<string[]>([])
+  /** Files backed out of — Forward pops from the end; any new navigation clears it. */
+  const [forward, setForward] = useState<string[]>([])
   const [filterText, setFilterText] = useState('')
   const [stateFilter, setStateFilter] = useState<TriageFilter>(null)
   const [auth, setAuth] = useState<AuthStatus | null>(null)
@@ -95,8 +97,9 @@ export function useApp() {
   const select = useCallback((path: string | null) => {
     if (path !== selection && selection !== null) setHistory(stack => [...stack.slice(-19), selection])
     if (path !== null) {
+      if (path !== selection) setForward([])
       setRecents(prev => {
-        const next = [{ path, at: Date.now() }, ...prev.filter(visit => visit.path !== path)].slice(0, 8)
+        const next = [{ path, at: Date.now() }, ...prev.filter(visit => visit.path !== path)].slice(0, 20)
         localStorage.setItem('recentFiles', JSON.stringify(next))
         return next
       })
@@ -110,9 +113,23 @@ export function useApp() {
     let target: string | undefined
     while ((target = stack.pop()) !== undefined && !entries.has(target)) continue
     setHistory(stack)
-    // Going back is not a new visit — bypass the recording wrapper.
-    if (target !== undefined) setSelection(target)
-  }, [entries, history])
+    if (target !== undefined) {
+      if (selection !== null) setForward(next => [...next, selection])
+      // Going back is not a new visit — bypass the recording wrapper.
+      setSelection(target)
+    }
+  }, [entries, history, selection])
+
+  const goForward = useCallback(() => {
+    const stack = [...forward]
+    let target: string | undefined
+    while ((target = stack.pop()) !== undefined && !entries.has(target)) continue
+    setForward(stack)
+    if (target !== undefined) {
+      if (selection !== null) setHistory(prev => [...prev.slice(-19), selection])
+      setSelection(target)
+    }
+  }, [entries, forward, selection])
 
   const fail = useCallback((error: unknown) => {
     const raw = error instanceof Error ? error.message : String(error)
@@ -560,6 +577,8 @@ export function useApp() {
     activity,
     goBack,
     canGoBack: history.length > 0,
+    goForward,
+    canGoForward: forward.length > 0,
     filterText,
     setFilterText,
     stateFilter,
