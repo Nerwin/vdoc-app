@@ -140,6 +140,19 @@ export function DetailPane(props: Props) {
     }
   }, [path, props.reloadKey])
 
+  const [labels, setLabels] = useState<string[]>([])
+  useEffect(() => {
+    setLabels([])
+    if (!entry.tracked || !props.connected) return
+    let live = true
+    void window.vdoc.labels(path)
+      .then(names => live && setLabels(names))
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [path, entry.tracked, props.connected, props.reloadKey])
+
   /** The split view's preview trails typing by 300ms — mermaid re-renders are not free. */
   const previewContent = useDebouncedContent(content, 300)
 
@@ -315,6 +328,18 @@ export function DetailPane(props: Props) {
         />
         <Tab label="Comments" active={view === 'comments'} disabled={!entry.tracked} onClick={() => onView('comments')} />
         <div className="flex-1" />
+        {labels.length > 0 && (
+          <div className="hidden items-center gap-1 px-1 @min-[860px]:flex" title="Confluence labels">
+            {labels.map(label => (
+              <span
+                key={label}
+                className="whitespace-nowrap rounded-full border border-control bg-raised px-2 py-0.5 text-[10.5px] text-ink-dim"
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+        )}
         {backlinks.length > 0 && <BacklinksButton links={backlinks} onPick={onSelect} />}
         <button
           onClick={() => props.onLint(path)}

@@ -23,6 +23,7 @@ const api: VdocApi = {
   lastVersion: path => ipcRenderer.invoke('last-version', path),
   comments: path => ipcRenderer.invoke('comments', path),
   postComment: (path, text) => ipcRenderer.invoke('post-comment', path, text),
+  labels: path => ipcRenderer.invoke('labels', path),
   pull: (paths, force) => ipcRenderer.invoke('pull', paths, force),
   push: (path, dryRun, force) => ipcRenderer.invoke('push', path, dryRun, force),
   create: (path, space, parent) => ipcRenderer.invoke('create', path, space, parent),

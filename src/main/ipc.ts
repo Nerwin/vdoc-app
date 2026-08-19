@@ -83,6 +83,11 @@ export function registerIpc(): void {
     await runVdocJson(['cf', 'comment', path, text])
   })
 
+  ipcMain.handle('labels', async (_event, path: string) => {
+    const { labels } = await runVdocJson<{ labels: string[] }>(['cf', 'labels', path])
+    return labels
+  })
+
   ipcMain.handle('pull', async (_event, paths: string[], force?: boolean) => {
     const args = ['cf', 'pull', ...paths]
     if (force) args.push('--force')

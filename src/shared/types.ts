@@ -187,6 +187,8 @@ export interface VdocApi {
   lastVersion(path: string): Promise<VersionEntry | null>
   comments(path: string): Promise<CommentEntry[]>
   postComment(path: string, text: string): Promise<void>
+  /** Confluence label names on the page this tracked file maps to. */
+  labels(path: string): Promise<string[]>
   pull(paths: string[], force?: boolean): Promise<PullFile[]>
   push(path: string, dryRun: boolean, force?: boolean): Promise<PushFile[]>
   create(path: string, space: string, parent?: string): Promise<CreateResult>
