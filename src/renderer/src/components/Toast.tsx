@@ -29,7 +29,7 @@ export function Toast({ message, onDismiss }: { message: Message, onDismiss(): v
         <p className={`text-[12px] leading-[1.5] ${tone.accent}`}>{message.text}</p>
         {message.detail && (
           <ul className="mt-1.5 space-y-0.5 font-mono text-[11px] text-ink-dim">
-            {message.detail.map((line, index) => <li key={index} className="truncate" title={line}>{line}</li>)}
+            {message.detail.map((line, index) => <li key={index} className="break-words">{line}</li>)}
           </ul>
         )}
       </div>

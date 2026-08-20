@@ -200,13 +200,10 @@ a {
 }
 
 /*
- * One focus ring for everything focusable. It is a box-shadow, never an `outline`, so it
- * follows border-radius instead of drawing a square around it. Buttons and links keep
- * :focus-visible semantics (no ring on pointer clicks); fields ring on plain :focus.
+ * Keyboard focus ring for buttons and links — a box-shadow so it follows border-radius;
+ * :focus-visible keeps it off pointer clicks. Text fields show the caret instead:
+ * plain :focus only tints their border, no glow.
  */
-input:focus,
-textarea:focus,
-select:focus,
 button:focus-visible,
 a:focus-visible,
 [tabindex]:focus-visible {
@@ -215,15 +212,16 @@ a:focus-visible,
   box-shadow: var(--focus-ring);
 }
 
-/* A field whose border lives on a wrapper: the wrapper rings, the input stays bare. */
-.field-ring:focus-within {
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
   border-color: var(--color-select-edge);
-  box-shadow: var(--focus-ring);
 }
 
-.field-ring input:focus {
-  border-color: transparent;
-  box-shadow: none;
+/* A field whose border lives on a wrapper (top-bar filter): the wrapper tints instead. */
+.field-ring:focus-within {
+  border-color: var(--color-select-edge);
 }
 
 /* Indeterminate task progress: 30%-wide fill sliding left↔right. */

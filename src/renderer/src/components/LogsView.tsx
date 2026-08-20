@@ -3,29 +3,37 @@ import { useEffect, useState } from 'react'
 import { LOG_MAX, type VdocLogEntry } from '../../../shared/types.ts'
 
 /** Every CLI command the app spawned this session, newest first — the debugging trail. */
-export function LogsView({ onClose }: { onClose(): void }) {
+export function LogsView({ notify, onClose }: { notify(text: string): void, onClose(): void }) {
   const [entries, setEntries] = useState<VdocLogEntry[]>([])
   const [openId, setOpenId] = useState<number | null>(null)
   const [errorsOnly, setErrorsOnly] = useState(false)
+  const [menu, setMenu] = useState<{ x: number, y: number, entry: VdocLogEntry } | null>(null)
 
   useEffect(() => {
     void window.vdoc.logs().then(setEntries)
     return window.vdoc.onVdocLog(entry => setEntries(prev => [...prev.slice(-(LOG_MAX - 1)), entry]))
   }, [])
 
-  // Esc closes the page; capture keeps the global Esc handling (filter, dashboard) out of it.
+  // Esc closes the context menu first, then the page; capture keeps the global
+  // Esc handling (filter, dashboard) out of it.
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') {
         event.stopPropagation()
-        onClose()
+        if (menu) setMenu(null)
+        else onClose()
       }
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [onClose])
+  }, [menu, onClose])
 
   const shown = [...entries].reverse().filter(entry => !errorsOnly || entry.exitCode !== 0)
+
+  const copy = (text: string, what: string): void => {
+    setMenu(null)
+    void navigator.clipboard.writeText(text).then(() => notify(`${what} copied`)).catch(() => undefined)
+  }
 
   return (
     <div className="flex h-full min-w-0 flex-col bg-pane">
@@ -56,18 +64,48 @@ export function LogsView({ onClose }: { onClose(): void }) {
                 entry={entry}
                 open={openId === entry.id}
                 onToggle={() => setOpenId(current => (current === entry.id ? null : entry.id))}
+                onMenu={event => {
+                  event.preventDefault()
+                  setMenu({ x: event.clientX, y: event.clientY, entry })
+                }}
               />
             ))}
       </div>
+
+      {menu && (
+        <div className="fixed inset-0 z-40" onClick={() => setMenu(null)} onContextMenu={event => { event.preventDefault(); setMenu(null) }}>
+          <div
+            className="absolute w-48 overflow-hidden rounded-lg border border-line-menu bg-overlay py-1 shadow-menu"
+            style={{ left: Math.min(menu.x, window.innerWidth - 200), top: Math.min(menu.y, window.innerHeight - 130) }}
+            onClick={event => event.stopPropagation()}
+          >
+            <CopyItem label="Copy command" onClick={() => copy(`vdoc ${menu.entry.args.join(' ')}`, 'Command')} />
+            <CopyItem label="Copy stderr" disabled={menu.entry.stderr.trim() === ''} onClick={() => copy(menu.entry.stderr, 'stderr')} />
+            <CopyItem label="Copy stdout" disabled={menu.entry.stdout.trim() === ''} onClick={() => copy(menu.entry.stdout, 'stdout')} />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-function LogRow({ entry, open, onToggle }: { entry: VdocLogEntry, open: boolean, onToggle(): void }) {
+function CopyItem({ label, disabled, onClick }: { label: string, disabled?: boolean, onClick(): void }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="block w-full px-3 py-1.5 text-left text-[12.5px] text-ink-body hover:bg-row-hover disabled:text-ink-ghost disabled:hover:bg-transparent"
+    >
+      {label}
+    </button>
+  )
+}
+
+function LogRow({ entry, open, onToggle, onMenu }: { entry: VdocLogEntry, open: boolean, onToggle(): void, onMenu(event: React.MouseEvent): void }) {
   const failed = entry.exitCode !== 0
   return (
     <div className="border-b border-line">
-      <button onClick={onToggle} className="flex w-full items-center gap-3 px-[18px] py-2 text-left hover:bg-hover">
+      <button onClick={onToggle} onContextMenu={onMenu} className="flex w-full items-center gap-3 px-[18px] py-2 text-left hover:bg-hover">
         <span className="shrink-0 text-[11px] text-ink-faint">{new Date(entry.at).toLocaleTimeString()}</span>
         <span className={`w-14 shrink-0 text-[11px] ${failed ? 'text-conflict' : 'text-sync-text'}`}>
           {failed ? `exit ${entry.exitCode}` : 'ok'}

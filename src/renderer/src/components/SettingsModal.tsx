@@ -82,18 +82,7 @@ export function SettingsModal(props: Props) {
           </div>
         </div>
 
-        <footer className="flex shrink-0 items-center gap-2 border-t border-line-subtle bg-chrome px-[18px] py-3">
-          <span className="truncate font-mono text-[11px] text-ink-mute" title={props.settings.configPath ?? undefined}>
-            {props.settings.configPath ?? '.vdocrc not resolved'}
-          </span>
-          <button
-            onClick={props.onRevealConfig}
-            disabled={props.settings.configPath === null}
-            className="shrink-0 text-[11px] text-accent hover:underline disabled:opacity-40"
-          >
-            Show in folder
-          </button>
-          <span className="flex-1" />
+        <footer className="flex shrink-0 items-center justify-end gap-2 border-t border-line-subtle bg-chrome px-[18px] py-3">
           <ModalButton label="Cancel" onClick={props.onClose} />
           <ModalButton label="Done" primary onClick={props.onClose} />
         </footer>

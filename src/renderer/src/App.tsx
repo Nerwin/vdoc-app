@@ -200,7 +200,7 @@ export function App() {
         )}
         <main className="@container min-w-0 flex-1 bg-content">
           {logsOpen
-            ? <LogsView onClose={() => setLogsOpen(false)} />
+            ? <LogsView notify={app.notify} onClose={() => setLogsOpen(false)} />
             : selected
             ? (
                 <DetailPane
@@ -223,6 +223,7 @@ export function App() {
                   onCheck={path => void app.checkOne(path)}
                   onMarkVerified={path => void app.markVerified(path)}
                   onPull={app.requestPull}
+                  onForcePull={path => app.setPullConfirm({ paths: [path], force: true })}
                   onPush={(path, force) => void app.requestPush(path, force)}
                   onLint={path => void app.runLint(path)}
                   onSync={path => void app.syncFile(path)}

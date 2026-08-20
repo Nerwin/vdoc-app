@@ -47,8 +47,8 @@ const CHECKS_KEY = 'checkState'
 
 interface SavedChecks {
   root: string
-  /** Epoch ms of the full check that anchored this state — restored into “last checked”. */
-  at: number
+  /** Epoch ms of the last full check, when one ran — restored into “last checked”. */
+  at: number | null
   results: CheckFile[]
 }
 
@@ -227,7 +227,7 @@ export function useApp() {
           const results = saved.results.filter(result => tracked.has(normalize(result.file)))
           if (results.length > 0) {
             applyChecks(results)
-            setLastChecked(new Date(saved.at))
+            if (saved.at) setLastChecked(new Date(saved.at))
           }
         }
         const status = await api.authStatus()
@@ -239,12 +239,13 @@ export function useApp() {
     })()
   }, [api, applyChecks, fail, mergeScan])
 
-  // Persist check results once a full check (this session or a restored one) anchors
-  // their age — partial re-checks keep updating the same snapshot.
+  // Persist whatever check results exist — full checks, single files, folder checks.
+  // An empty result set never overwrites a saved snapshot (startup runs before restore).
   useEffect(() => {
-    if (!lastChecked || root === '') return
+    if (root === '') return
     const results = [...entries.values()].flatMap(entry => (entry.tracked && entry.check ? [entry.check] : []))
-    localStorage.setItem(CHECKS_KEY, JSON.stringify({ root, at: lastChecked.getTime(), results } satisfies SavedChecks))
+    if (results.length === 0) return
+    localStorage.setItem(CHECKS_KEY, JSON.stringify({ root, at: lastChecked?.getTime() ?? null, results } satisfies SavedChecks))
   }, [entries, lastChecked, root])
 
   useEffect(() => api.onCheckProgress(progress => {

@@ -31,6 +31,8 @@ interface Props {
   onCheck(path: string): void
   onMarkVerified(path: string): void
   onPull(path: string): void
+  /** Opens the red confirm — pull that overwrites local content. */
+  onForcePull(path: string): void
   onPush(path: string, force: boolean): void
   onLint(path: string): void
   onSync(path: string): void
@@ -294,6 +296,7 @@ export function DetailPane(props: Props) {
                   actionsRef.current?.focus()
                 }}
                 onPull={() => props.onPull(path)}
+                onForcePull={() => props.onForcePull(path)}
                 onPush={force => props.onPush(path, force)}
                 onSync={() => props.onSync(path)}
                 onCreate={() => props.onCreate(path)}
@@ -445,7 +448,7 @@ function relationGlyph(state: ReturnType<typeof displayState>): string {
   return '='
 }
 
-function ActionsMenu({ entry, primaryLabel, canPull, pushMode, busy, connected, onClose, onPull, onPush, onSync, onCreate, onOpenConfluence }: {
+function ActionsMenu({ entry, primaryLabel, canPull, pushMode, busy, connected, onClose, onPull, onForcePull, onPush, onSync, onCreate, onOpenConfluence }: {
   entry: FileEntry
   primaryLabel: string
   canPull: boolean
@@ -454,6 +457,7 @@ function ActionsMenu({ entry, primaryLabel, canPull, pushMode, busy, connected, 
   connected: boolean
   onClose(): void
   onPull(): void
+  onForcePull(): void
   onPush(force: boolean): void
   onSync(): void
   onCreate(): void
@@ -511,6 +515,11 @@ function ActionsMenu({ entry, primaryLabel, canPull, pushMode, busy, connected, 
           onClick={item(onPull)}
         />
       )}
+      <ActionItem
+        label="Force pull (overwrite local)"
+        disabled={!canPull || confluenceOff}
+        onClick={item(onForcePull)}
+      />
       {primaryLabel !== 'Push' && (
         <ActionItem
           label={`Push local${check?.localVersion ? ` v${check.localVersion}` : ''}`}

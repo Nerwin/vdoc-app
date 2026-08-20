@@ -203,7 +203,7 @@ export function FileTree(props: Props) {
         ))}
       </div>
 
-      <div className="flex items-center gap-2 border-t border-line-subtle px-3 py-[9px]">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-line-subtle px-3 py-[9px]">
         <span className="text-[11.5px] text-ink-label">Legend</span>
         <StateDot state="in-sync" />
         <span className="text-[11px] text-ink-faint">synced</span>
