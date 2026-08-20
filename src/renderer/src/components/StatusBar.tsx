@@ -13,6 +13,7 @@ interface Props {
   stateFilter: TriageFilter
   onFilterState(filter: TriageFilter): void
   onOpenToken(): void
+  onOpenLogs(): void
   onCancelCheck(): void
 }
 
@@ -85,6 +86,15 @@ export function StatusBar(props: Props) {
         tick={tick}
         onCancelCheck={props.onCancelCheck}
       />
+
+      <div className="h-4 w-px bg-line" />
+      <button
+        onClick={props.onOpenLogs}
+        title="Every CLI command this session, with its output"
+        className="whitespace-nowrap rounded-[5px] px-2 py-[3px] text-ink-ghost hover:bg-hover hover:text-ink"
+      >
+        Logs
+      </button>
 
       {props.appVersion && (
         <>

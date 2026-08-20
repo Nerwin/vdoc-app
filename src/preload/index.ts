@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcRendererEvent } from 'electron'
 
-import type { CheckProgress, VdocApi } from '../shared/types.ts'
+import type { CheckProgress, VdocApi, VdocLogEntry } from '../shared/types.ts'
 
 const subscribe = <T>(channel: string, cb: (payload: T) => void): (() => void) => {
   const handler = (_event: IpcRendererEvent, payload: T): void => cb(payload)
@@ -49,8 +49,10 @@ const api: VdocApi = {
   spaceMappingSet: (dir, space) => ipcRenderer.invoke('space-mapping-set', dir, space),
   revealConfig: () => ipcRenderer.invoke('reveal-config'),
   quit: () => ipcRenderer.invoke('quit'),
+  logs: () => ipcRenderer.invoke('vdoc-logs'),
   onFilesChanged: cb => subscribe<string[]>('files-changed', cb),
   onCheckProgress: cb => subscribe<CheckProgress>('check-progress', cb),
+  onVdocLog: cb => subscribe<VdocLogEntry>('vdoc-log', cb),
 }
 
 contextBridge.exposeInMainWorld('vdoc', api)

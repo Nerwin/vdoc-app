@@ -17,7 +17,7 @@ export interface TreeLeaf {
 
 export type TreeNode = TreeDir | TreeLeaf
 
-/** Build a nested tree from sorted relative paths ('1-Backend/components/foo.md'). */
+/** Build a nested tree from sorted relative paths ('dir/sub/foo.md'). */
 export function buildTree(paths: string[]): TreeNode[] {
   const roots: TreeNode[] = []
   const dirs = new Map<string, TreeDir>()

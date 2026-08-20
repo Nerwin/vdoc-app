@@ -2,23 +2,22 @@ import { execFile, execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
+import { BrowserWindow } from 'electron'
 
+import type { VdocLogEntry } from '../shared/types.ts'
 import { mdLinkTargets, resolveRelative } from '../shared/links.ts'
-import { loadSettings } from './settings.ts'
+import { DEFAULT_DOCS_ROOT, EXCLUDED_DIRS, loadSettings } from './settings.ts'
 
-const DEFAULT_ROOT = process.env.VDOC_APP_ROOT ?? join(homedir(), 'Projects', 'documentation', 'Vosker-doc')
-
-/** The docs repository root: Settings → VDOC_APP_ROOT → the historical default. */
+/** The docs repository root: Settings → $VDOC_APP_ROOT → home directory. */
+// env read at call time, not import time — importLoginShellEnv runs after module load.
 export function docsRoot(): string {
-  return loadSettings().docsRoot ?? DEFAULT_ROOT
+  return loadSettings().docsRoot ?? process.env.VDOC_APP_ROOT ?? DEFAULT_DOCS_ROOT
 }
 
 /** User-configured root folders (Settings → Folders). */
 export function getContentDirs(): string[] {
   return loadSettings().contentDirs
 }
-
-const EXCLUDED_DIRS = new Set(['0-Archives', '0-Images', '0-Private', 'Temp', '_audit', 'Scripts', 'node_modules', 'dist'])
 
 // Bun's global bin dir on every OS; on Windows bun writes vdoc.exe shims.
 const bunBin = join(homedir(), '.bun', 'bin')
@@ -29,10 +28,9 @@ const defaultBin = (): string => {
 }
 
 /**
- * GUI-launched apps (Finder, GNOME shell) get a minimal environment, not the
- * login shell's, so exports like VDOC_ENCRYPTION_KEY never reach the spawned
- * CLI. Import the login-shell environment once at startup; existing vars are
- * never overridden. Windows GUI apps inherit the user environment — skip.
+ * GUI-launched apps (Finder, GNOME shell) get a minimal environment, so exports like
+ * VDOC_ENCRYPTION_KEY never reach the spawned CLI — import the login shell's env once
+ * at startup (existing vars win). Windows GUI apps inherit the user env: skip.
  */
 export function importLoginShellEnv(): void {
   if (process.platform === 'win32') return
@@ -67,7 +65,34 @@ export interface VdocRun {
   stderr: string
 }
 
+const LOG_MAX = 200
+const OUTPUT_CLIP = 8192
+const logEntries: VdocLogEntry[] = []
+let logId = 0
+
+/** Every CLI invocation this session, oldest first — feeds the Logs view. */
+export function vdocLogs(): VdocLogEntry[] {
+  return logEntries
+}
+
+/** Credential values never reach the renderer: token args and decrypted config output are hidden. */
+function recordRun(args: string[], run: VdocRun, startedAt: number): void {
+  const entry: VdocLogEntry = {
+    id: ++logId,
+    at: startedAt,
+    args: args.map((arg, index) => (args[index - 1] === '--encrypt' ? '•••' : arg)),
+    exitCode: run.exitCode,
+    durationMs: Date.now() - startedAt,
+    stdout: args.includes('--decrypt') ? '(hidden — output contains credentials)' : run.stdout.slice(0, OUTPUT_CLIP),
+    stderr: run.stderr.slice(-OUTPUT_CLIP),
+  }
+  logEntries.push(entry)
+  if (logEntries.length > LOG_MAX) logEntries.shift()
+  for (const window of BrowserWindow.getAllWindows()) window.webContents.send('vdoc-log', entry)
+}
+
 export function runVdoc(args: string[]): Promise<VdocRun> {
+  const startedAt = Date.now()
   return new Promise(resolve => {
     execFile(
       resolvedVdocBin(),
@@ -92,7 +117,9 @@ export function runVdoc(args: string[]): Promise<VdocRun> {
       },
       (error, stdout, stderr) => {
         const exitCode = error ? ((error as NodeJS.ErrnoException & { code?: number | string }).code === 'ENOENT' ? -1 : (typeof (error as { code?: unknown }).code === 'number' ? (error as { code: number }).code : 1)) : 0
-        resolve({ exitCode, stdout, stderr })
+        const run = { exitCode, stdout, stderr }
+        recordRun(args, run, startedAt)
+        resolve(run)
       },
     )
   })

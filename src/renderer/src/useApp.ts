@@ -42,6 +42,16 @@ function loadJson<T>(key: string, fallback: T): T {
   }
 }
 
+/** Persisted check results — sync state survives restarts, keyed to the docs root. */
+const CHECKS_KEY = 'checkState'
+
+interface SavedChecks {
+  root: string
+  /** Epoch ms of the full check that anchored this state — restored into “last checked”. */
+  at: number
+  results: CheckFile[]
+}
+
 /** A full re-check runs at most once per hour on window focus. */
 const FULL_CHECK_TTL_MS = 60 * 60 * 1000
 /** Focus-triggered partial re-checks are throttled to once a minute. */
@@ -209,6 +219,17 @@ export function useApp() {
         const scan = await api.scan()
         setRoot(scan.root)
         mergeScan(scan.files)
+        // Restore the last session's check results (age shown as "last checked …";
+        // the focus refresh re-checks when they are over an hour old).
+        const saved = loadJson<SavedChecks | null>(CHECKS_KEY, null)
+        if (saved?.root === scan.root && Array.isArray(saved.results)) {
+          const tracked = new Set(scan.files.filter(file => file.tracked).map(file => file.path))
+          const results = saved.results.filter(result => tracked.has(normalize(result.file)))
+          if (results.length > 0) {
+            applyChecks(results)
+            setLastChecked(new Date(saved.at))
+          }
+        }
         const status = await api.authStatus()
         setAuth(status)
         if (!status.ok) setMessage({ kind: 'error', text: status.error ?? 'Confluence authentication failed' })
@@ -216,7 +237,15 @@ export function useApp() {
         fail(error)
       }
     })()
-  }, [api, fail, mergeScan])
+  }, [api, applyChecks, fail, mergeScan])
+
+  // Persist check results once a full check (this session or a restored one) anchors
+  // their age — partial re-checks keep updating the same snapshot.
+  useEffect(() => {
+    if (!lastChecked || root === '') return
+    const results = [...entries.values()].flatMap(entry => (entry.tracked && entry.check ? [entry.check] : []))
+    localStorage.setItem(CHECKS_KEY, JSON.stringify({ root, at: lastChecked.getTime(), results } satisfies SavedChecks))
+  }, [entries, lastChecked, root])
 
   useEffect(() => api.onCheckProgress(progress => {
     setChecking({ done: progress.done, total: progress.total })
@@ -239,9 +268,8 @@ export function useApp() {
     })()
   }), [api, applyChecks, fail, mergeScan])
 
-  // On window focus: refresh what a manual check already established — a full re-check
-  // when that one is over an hour old, otherwise just the files needing attention.
-  // Before the first manual check there is nothing to refresh, so nothing runs.
+  // On window focus: refresh what a check (this session or restored) already established —
+  // full re-check when over an hour old, otherwise just the files needing attention.
   useEffect(() => {
     const onFocus = (): void => {
       if (checkingRef.current || busyOp || !lastChecked) return
@@ -297,7 +325,11 @@ export function useApp() {
     const results = await api.pull(paths, force)
     setPullConfirm(null)
     const pulled = results.filter(result => result.status === 'pulled' || result.status === 'updated')
-    setMessage({ kind: 'info', text: `Pull: ${pulled.length}/${results.length} file(s) updated` })
+    // Files that did NOT update are the interesting part — say why, per file.
+    const skipped = results.filter(result => !pulled.includes(result))
+    const detail = skipped.slice(0, 5).map(result => `${normalize(result.file).split('/').at(-1)} — ${result.summary ?? result.status}`)
+    if (skipped.length > 5) detail.push(`… and ${skipped.length - 5} more`)
+    setMessage({ kind: 'info', text: `Pull: ${pulled.length}/${results.length} file(s) updated`, detail: detail.length > 0 ? detail : undefined })
     recordActivity('pulled', pulled.map(result => normalize(result.file)))
     setDiff(current => (current && paths.includes(current.path) ? null : current))
     await recheck(paths)
@@ -417,7 +449,7 @@ export function useApp() {
       await recheck([path])
     } else {
       setDiff({ path, result })
-      setMessage({ kind: 'error', text: `${name} differs from Confluence — baseline not recorded, review the diff` })
+      setMessage({ kind: 'error', text: `${name} has the same version but different content — no baseline recorded. Review the diff, then Pull (take Confluence) or Push (publish local).` })
     }
   }), [api, recheck, runOp])
 

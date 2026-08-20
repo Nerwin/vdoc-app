@@ -3,7 +3,7 @@ import { join, relative } from 'node:path'
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 
 import type { AuthStatus, CheckFile, CommentEntry, CreateResult, DiffResult, GetPageResult, LintFile, PullFile, PushFile, Settings, SettingsInfo, SyncFile, VersionEntry } from '../shared/types.ts'
-import { backlinksTo, docsRoot, fileForPageId, gitDirtyFiles, resolvedVdocBin, runVdoc, runVdocJson, scanMarkdownFiles, setVdocBin } from './vdoc.ts'
+import { backlinksTo, docsRoot, fileForPageId, gitDirtyFiles, resolvedVdocBin, runVdoc, runVdocJson, scanMarkdownFiles, setVdocBin, vdocLogs } from './vdoc.ts'
 import { loadSettings, saveSettings } from './settings.ts'
 import { watchDocs } from './watcher.ts'
 
@@ -222,6 +222,8 @@ export function registerIpc(): void {
     const { path } = await runVdocJson<{ path: string }>(['config', 'path'])
     shell.showItemInFolder(path)
   })
+
+  ipcMain.handle('vdoc-logs', () => vdocLogs())
 
   ipcMain.handle('vdoc-version', () => probeVersion())
 

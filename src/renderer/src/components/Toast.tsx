@@ -22,7 +22,7 @@ export function Toast({ message, onDismiss }: { message: Message, onDismiss(): v
     <div
       role="status"
       style={{ boxShadow: `inset 3px 0 0 ${tone.edge}, var(--shadow-menu)` }}
-      className={`fixed right-4 top-14 z-40 flex w-96 max-w-[80vw] items-start gap-2.5 rounded-lg border py-2.5 pl-3.5 pr-2 ${tone.surface}`}
+      className={`fixed bottom-11 right-4 z-40 flex w-96 max-w-[80vw] items-start gap-2.5 rounded-lg border py-2.5 pl-3.5 pr-2 ${tone.surface}`}
     >
       <span className={`shrink-0 pt-px text-[12px] ${tone.accent}`}>{tone.icon}</span>
       <div className="min-w-0 flex-1">

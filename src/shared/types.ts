@@ -148,6 +148,21 @@ export interface CheckProgress {
   results: CheckFile[]
 }
 
+/** One spawned CLI invocation, as recorded by the main process (secrets redacted). */
+export interface VdocLogEntry {
+  id: number
+  /** Epoch ms when the command started. */
+  at: number
+  /** argv after the binary — credential values are replaced with •••. */
+  args: string[]
+  exitCode: number
+  durationMs: number
+  /** First 8KB of stdout; hidden entirely for commands that print credentials. */
+  stdout: string
+  /** Last 8KB of stderr — the CLI's human log lines. */
+  stderr: string
+}
+
 export interface Settings {
   /** `system` follows the OS appearance; light/dark pin it. */
   theme: 'dark' | 'light' | 'system'
@@ -225,6 +240,9 @@ export interface VdocApi {
   spaceMappingSet(dir: string, space: string | null): Promise<Record<string, string>>
   revealConfig(): Promise<void>
   quit(): Promise<void>
+  /** All recorded CLI invocations, oldest first (ring buffer of the last 200). */
+  logs(): Promise<VdocLogEntry[]>
   onFilesChanged(cb: (paths: string[]) => void): () => void
   onCheckProgress(cb: (progress: CheckProgress) => void): () => void
+  onVdocLog(cb: (entry: VdocLogEntry) => void): () => void
 }

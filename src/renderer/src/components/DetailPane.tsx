@@ -23,6 +23,8 @@ interface Props {
   reloadKey: number
   onView(view: ViewMode): void
   onError(error: unknown): void
+  /** Open the sync-concepts help modal (the state banners link to it). */
+  onHelp(): void
   /** Navigate to another file in the tree (backlink row, local link in the preview). */
   onSelect(path: string): void
   onDiff(path: string): void
@@ -201,9 +203,9 @@ export function DetailPane(props: Props) {
             ? { label: 'Verify', run: () => props.onMarkVerified(path) }
             : { label: 'Check', run: () => props.onCheck(path) }
 
-  const notes: Array<{ text: string, error: boolean }> = []
+  const notes: Array<{ text: string, error: boolean, help?: boolean }> = []
   if (meta.hint && (state === 'unverified' || state === 'no-version' || state === 'conflict' || state === 'not-found')) {
-    notes.push({ text: meta.hint, error: state === 'conflict' || state === 'not-found' })
+    notes.push({ text: meta.hint, error: state === 'conflict' || state === 'not-found', help: true })
   }
   if (check?.titleMismatch) {
     notes.push({ text: 'Frontmatter title differs from the body H1 — pushes use the frontmatter title.', error: false })
@@ -313,6 +315,14 @@ export function DetailPane(props: Props) {
           <span className={`flex-1 text-[12px] leading-relaxed ${note.error ? 'text-bad-ink' : 'text-banner-ink'}`}>
             {note.text}
           </span>
+          {note.help && (
+            <button
+              onClick={props.onHelp}
+              className="shrink-0 whitespace-nowrap text-[12px] text-accent hover:underline"
+            >
+              What do these terms mean?
+            </button>
+          )}
         </div>
       ))}
 

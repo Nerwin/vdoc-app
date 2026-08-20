@@ -58,10 +58,8 @@ if (!app.requestSingleInstanceLock()) {
     const icon = join(__dirname, '../../build/icon.png')
     if (app.dock && existsSync(icon)) app.dock.setIcon(icon)
 
-    // macOS: only OS roles in the menu — the app's own shortcuts live in the renderer
-    // registry, and the default View menu would swallow ⌘R / ⌘⇧R / ⌥⌘I before the window
-    // ever sees them. Windows/Linux: no menu bar at all — clipboard shortcuts work natively
-    // there, and every action lives in the palette.
+    // macOS: only OS roles — the default View menu would swallow ⌘R / ⌘⇧R / ⌥⌘I before
+    // the window sees them. Windows/Linux: no menu bar; every action lives in the palette.
     if (process.platform === 'darwin') {
       Menu.setApplicationMenu(Menu.buildFromTemplate([
         { role: 'appMenu' as const },

@@ -78,7 +78,7 @@ export function CommandPalette({ ctx, entries, mode, recents, onPick, onRun, onC
   const [query, setQuery] = useState(mode === 'command' ? '> ' : '')
   const [index, setIndex] = useState(0)
   const listRef = useRef<HTMLUListElement>(null)
-  // 254 files re-rank on every keystroke — defer it so typing never stutters.
+  // The whole corpus re-ranks on every keystroke — defer it so typing never stutters.
   const deferred = useDeferredValue(query)
   const commandMode = deferred.startsWith('>')
   const search = commandMode ? deferred.slice(1).trim() : deferred

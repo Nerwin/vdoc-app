@@ -1,14 +1,22 @@
 import { readFileSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { app } from 'electron'
 
 import type { Settings } from '../shared/types.ts'
 
+/** Docs repo fallback when neither the docsRoot setting nor $VDOC_APP_ROOT is set. */
+export const DEFAULT_DOCS_ROOT = homedir()
+
+/** Directory names never scanned or watched, wherever they appear in the tree. */
+// ponytail: constant, not a Settings field — promote to Settings if another repo layout ever needs it.
+export const EXCLUDED_DIRS = new Set(['Images', 'Private', 'Temp', '_audit', 'Scripts', 'node_modules', 'dist'])
+
 const DEFAULTS: Settings = {
   theme: 'system',
   vdocBin: null,
   docsRoot: null,
-  contentDirs: ['1-Backend', '2-DDA', '3-Projects'],
+  contentDirs: [],
   pinnedDirs: [],
 }
 

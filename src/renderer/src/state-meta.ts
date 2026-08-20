@@ -29,6 +29,6 @@ export const STATE_META: Record<DisplayState, StateMeta> = {
   'no-version': { label: 'No version', dot: RING, color: 'text-warn-text', chip: CHIP_AMBER, hint: 'Tracked but never published by vdoc — push to publish it' },
   'not-found': { label: 'Not found', dot: 'bg-conflict', color: 'text-conflict', chip: CHIP_RED, glyph: '⚠', hint: 'The Confluence page is gone or not accessible' },
   'untracked': { label: 'Not linked', dot: 'bg-dot-neutral', color: 'text-ink-mute', chip: CHIP_GREY, hint: 'No confluencePageId — link it with Find matching page or publish with Create' },
-  'unverified': { label: 'Unverified', dot: RING, color: 'text-warn-text', chip: CHIP_AMBER, hint: 'Versions match but there is no local-edit baseline, so local edits cannot be detected. Verify compares the content with Confluence and records the baseline when identical' },
+  'unverified': { label: 'Unverified', dot: RING, color: 'text-warn-text', chip: CHIP_AMBER, hint: 'Versions match, but the content was never compared — edits on either side would go unnoticed. Verify fetches the page: identical content records a baseline and turns this Synced; different content opens the diff so you choose (Pull takes Confluence, Push publishes local)' },
   'unchecked': { label: 'Not checked', dot: 'bg-dot-neutral', color: 'text-ink-faint', chip: CHIP_GREY },
 }

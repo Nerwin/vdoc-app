@@ -10,6 +10,8 @@ import { CommandPalette } from './components/CommandPalette.tsx'
 import { CreateForm } from './components/CreateForm.tsx'
 import { GetForm } from './components/GetForm.tsx'
 import { SettingsModal } from './components/SettingsModal.tsx'
+import { LogsView } from './components/LogsView.tsx'
+import { HelpModal } from './components/HelpModal.tsx'
 import { Toast } from './components/Toast.tsx'
 import { Modal, ModalButton } from './components/Modal.tsx'
 import { applyMonacoTheme } from './components/monaco-setup.ts'
@@ -37,6 +39,8 @@ export function App() {
   const [tokenOpen, setTokenOpen] = useState(false)
   const [palette, setPalette] = useState<'file' | 'command' | 'recent' | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [logsOpen, setLogsOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
   const [view, setView] = useState<ViewMode>('preview')
   const [reloadKey, setReloadKey] = useState(0)
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -64,6 +68,10 @@ export function App() {
   // the editor. A freshly loaded diff takes the stage (see DetailPane).
   useEffect(() => setView('preview'), [app.selection])
 
+  useEffect(() => {
+    if (app.selection) setLogsOpen(false)
+  }, [app.selection])
+
   const openDiff = (): void => {
     if (!app.selection) return
     if (app.diff?.path === app.selection) setView('diff')
@@ -82,6 +90,8 @@ export function App() {
     openPalette: mode => setPalette(mode),
     openSettings: () => setSettingsOpen(true),
     openToken: () => setTokenOpen(true),
+    openLogs: () => setLogsOpen(true),
+    openHelp: () => setHelpOpen(true),
     focusFilter: () => filterRef.current?.focus(),
     setView,
     openDiff,
@@ -93,7 +103,7 @@ export function App() {
   ctxRef.current = ctx
 
   // Global shortcuts stand down while any dialog is open — each dialog owns its keys.
-  const dialogOpen = palette !== null || tokenOpen || settingsOpen
+  const dialogOpen = palette !== null || tokenOpen || settingsOpen || helpOpen
     || app.pushPreview !== null || app.pullConfirm !== null || app.createForm !== null || app.getForm
 
   useEffect(() => {
@@ -159,7 +169,10 @@ export function App() {
         onVerifyAll={app.verifyAllUnverified}
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenPalette={() => setPalette('command')}
-        onOpenDashboard={() => app.setSelection(null)}
+        onOpenDashboard={() => {
+          setLogsOpen(false)
+          app.setSelection(null)
+        }}
       />
 
       <div className="flex min-h-0 flex-1">
@@ -185,7 +198,9 @@ export function App() {
           </aside>
         )}
         <main className="@container min-w-0 flex-1 bg-content">
-          {selected
+          {logsOpen
+            ? <LogsView onClose={() => setLogsOpen(false)} />
+            : selected
             ? (
                 <DetailPane
                   entry={selected}
@@ -198,6 +213,7 @@ export function App() {
                   reloadKey={reloadKey}
                   onView={setView}
                   onError={app.reportError}
+                  onHelp={() => setHelpOpen(true)}
                   onSelect={path => {
                     if (app.entries.has(path)) app.setSelection(path)
                     else app.notify(`${path} is not in the tree`)
@@ -249,10 +265,13 @@ export function App() {
         stateFilter={app.stateFilter}
         onFilterState={app.setStateFilter}
         onOpenToken={() => setTokenOpen(true)}
+        onOpenLogs={() => setLogsOpen(open => !open)}
         onCancelCheck={app.cancelCheck}
       />
 
       {app.message && <Toast message={app.message} onDismiss={app.dismissMessage} />}
+
+      {helpOpen && <HelpModal onClose={() => setHelpOpen(false)} />}
 
       {palette !== null && (
         <CommandPalette

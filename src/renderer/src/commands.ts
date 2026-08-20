@@ -38,6 +38,8 @@ export interface CommandContext {
   openPalette(mode: 'file' | 'command' | 'recent'): void
   openSettings(): void
   openToken(): void
+  openLogs(): void
+  openHelp(): void
   focusFilter(): void
   setView(view: ViewMode): void
   openDiff(): void
@@ -383,6 +385,21 @@ export const COMMANDS: Command[] = [
     label: 'Renew session token…',
     icon: '⚿',
     run: ctx => ctx.openToken(),
+  },
+  {
+    id: 'app.logs',
+    group: 'App',
+    label: 'CLI logs',
+    icon: '≣',
+    run: ctx => ctx.openLogs(),
+  },
+  {
+    id: 'app.help',
+    group: 'App',
+    label: 'Sync concepts help',
+    icon: '?',
+    keys: { key: '/', meta: true },
+    run: ctx => ctx.openHelp(),
   },
   {
     id: 'app.revealConfig',

@@ -23,7 +23,7 @@ monaco.editor.defineTheme('vdoc-dark', {
 monaco.editor.defineTheme('vdoc-light', {
   base: 'vs',
   inherit: true,
-  // Markdown token colours from the light column: key / value / heading.
+  // Markdown token colours: key / value / heading.
   rules: [
     { token: 'keyword.md', foreground: '0f5fb0' },
     { token: 'string.md', foreground: '8a4f22' },
