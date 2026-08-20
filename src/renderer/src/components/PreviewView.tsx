@@ -54,6 +54,9 @@ interface Props {
   onOpenLink?(href: string): void
 }
 
+/** Unique mermaid render ids — an id colliding with an svg already in the DOM breaks the render. */
+let mermaidSeq = 0
+
 export function PreviewView({ content, theme, onOpenLink }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -73,12 +76,42 @@ export function PreviewView({ content, theme, onOpenLink }: Props) {
 
   const meta = useMemo(() => metaLine(content), [content])
 
+  // Mermaid diagrams are rendered into the html string itself, not patched into the
+  // container afterwards — React re-applies dangerouslySetInnerHTML on re-renders,
+  // which would silently wipe any DOM patched in behind its back. The plain body
+  // (diagram source as placeholder) shows immediately; the enriched html replaces it.
   useEffect(() => {
     let body = marked.parse(stripFrontmatter(content), { async: false })
     // The meta line sits under the H1; a doc without one gets it at the top.
     if (meta) body = body.includes('</h1>') ? body.replace('</h1>', `</h1>${meta}`) : meta + body
     setHtml(body)
-  }, [content, meta])
+    if (!body.includes('class="mermaid-source"')) return
+
+    let live = true
+    void (async () => {
+      const doc = new DOMParser().parseFromString(body, 'text/html')
+      const sources = [...doc.querySelectorAll<HTMLPreElement>('pre.mermaid-source')]
+      if (sources.length === 0) return
+      const { default: mermaid } = await import('mermaid')
+      mermaid.initialize({ startOnLoad: false, theme: theme === 'light' ? 'neutral' : 'dark', securityLevel: 'strict' })
+      for (const source of sources) {
+        if (!live) return
+        try {
+          const { svg } = await mermaid.render(`preview-mmd-${++mermaidSeq}`, source.textContent ?? '')
+          const wrapper = doc.createElement('div')
+          wrapper.className = 'mermaid-diagram'
+          wrapper.innerHTML = svg
+          source.replaceWith(wrapper)
+        } catch {
+          source.classList.add('mermaid-error')
+        }
+      }
+      if (live) setHtml(doc.body.innerHTML)
+    })()
+    return () => {
+      live = false
+    }
+  }, [content, meta, theme])
 
   // The "On this page" rail: ids are assigned to the rendered h2/h3 nodes.
   useEffect(() => {
@@ -110,36 +143,6 @@ export function PreviewView({ content, theme, onOpenLink }: Props) {
     containerRef.current?.querySelector(`#${CSS.escape(id)}`)?.scrollIntoView()
     setActiveId(id)
   }
-
-  // Mermaid only loads (once) when a diagram is actually on screen.
-  useEffect(() => {
-    const container = containerRef.current
-    if (!container) return
-    const sources = [...container.querySelectorAll<HTMLPreElement>('pre.mermaid-source')]
-    if (sources.length === 0) return
-
-    let live = true
-    void (async () => {
-      const { default: mermaid } = await import('mermaid')
-      mermaid.initialize({ startOnLoad: false, theme: theme === 'light' ? 'neutral' : 'dark', securityLevel: 'strict' })
-      for (const [index, source] of sources.entries()) {
-        if (!live) return
-        try {
-          const { svg } = await mermaid.render(`preview-mmd-${index}`, source.textContent ?? '')
-          if (!live) return
-          const wrapper = document.createElement('div')
-          wrapper.className = 'mermaid-diagram'
-          wrapper.innerHTML = svg
-          source.replaceWith(wrapper)
-        } catch {
-          source.classList.add('mermaid-error')
-        }
-      }
-    })()
-    return () => {
-      live = false
-    }
-  }, [html, theme])
 
   return (
     <div ref={scrollRef} onScroll={onScroll} className="h-full overflow-y-auto scroll-smooth motion-reduce:scroll-auto">

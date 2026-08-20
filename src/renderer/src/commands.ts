@@ -271,7 +271,7 @@ export const COMMANDS: Command[] = [
   {
     id: 'file.finder',
     group: 'File',
-    label: 'Reveal in Finder',
+    label: 'Show in folder',
     icon: '⊞',
     keys: { key: 'f', meta: true, shift: true },
     reason: noFile,
@@ -381,7 +381,7 @@ export const COMMANDS: Command[] = [
   {
     id: 'app.revealConfig',
     group: 'App',
-    label: 'Reveal .vdocrc in Finder',
+    label: 'Open config file',
     icon: '⊞',
     run: ctx => void ctx.app.revealConfig(),
   },

@@ -157,7 +157,6 @@ export function App() {
         onFilterText={app.setFilterText}
         onPullBehind={app.pullAllBehind}
         onVerifyAll={app.verifyAllUnverified}
-        onCheckAll={() => void app.checkAll()}
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenPalette={() => setPalette('command')}
         onOpenDashboard={() => app.setSelection(null)}
@@ -230,6 +229,7 @@ export function App() {
                   loadAuthors={app.loadAuthors}
                   onSelect={app.setSelection}
                   onVerifyAll={app.verifyAllUnverified}
+                  onCheckAll={() => void app.checkAll()}
                   onOpenFilePalette={() => setPalette('file')}
                   onOpenCommandPalette={() => setPalette('command')}
                   onOpenGetForm={() => app.setGetForm(true)}

@@ -232,7 +232,7 @@ export function FileTree(props: Props) {
               onClick={() => { props.onCheckFolder(menu.path); setMenu(null) }}
             />
             <MenuItem
-              label="Open in Finder"
+              label="Open folder"
               onClick={() => { props.onOpenFolder(menu.path); setMenu(null) }}
             />
             {props.rootDirs.includes(menu.path) && (

@@ -88,7 +88,7 @@ export function SettingsModal(props: Props) {
             disabled={props.settings.configPath === null}
             className="shrink-0 text-[11px] text-accent hover:underline disabled:opacity-40"
           >
-            Reveal in Finder
+            Show in folder
           </button>
           <span className="flex-1" />
           <Button label="Cancel" onClick={props.onClose} />
@@ -306,7 +306,7 @@ function Config({ settings, onRevealConfig }: Props) {
           >
             {settings.configPath ?? 'not resolved — is the CLI runnable?'}
           </span>
-          <Button label="Reveal in Finder" disabled={settings.configPath === null} onClick={onRevealConfig} />
+          <Button label="Show in folder" disabled={settings.configPath === null} onClick={onRevealConfig} />
         </div>
       </Field>
     </Section>

@@ -21,6 +21,7 @@ interface Props {
   loadAuthors(requests: Array<{ path: string, remoteVersion: number }>): void
   onSelect(path: string): void
   onVerifyAll(): void
+  onCheckAll(): void
   onOpenFilePalette(): void
   onOpenCommandPalette(): void
   onOpenGetForm(): void
@@ -155,6 +156,7 @@ export function Dashboard(props: Props) {
                   <section className="mb-7">
                     <h2 className={SECTION_LABEL}>Quick actions</h2>
                     <div className="space-y-1.5">
+                      <QuickAction label="Check all files" keycap={shortcutLabel('sync.checkAll')} onClick={props.onCheckAll} />
                       <QuickAction label="Jump to file" keycap={shortcutLabel('file.goto')} onClick={props.onOpenFilePalette} />
                       <QuickAction label="Get page from Confluence…" onClick={props.onOpenGetForm} />
                       <QuickAction label="Open command palette" keycap={shortcutLabel('app.palette')} onClick={props.onOpenCommandPalette} />

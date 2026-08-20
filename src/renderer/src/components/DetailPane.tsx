@@ -219,7 +219,7 @@ export function DetailPane(props: Props) {
           <h1 title={path} className="truncate text-[15px] font-medium text-ink">{name}</h1>
           <div className="flex shrink-0 gap-0.5">
             <IconButton title={`Open in editor — ${shortcutLabel('file.editor')}`} onClick={() => props.onOpenEditor(path)}>✎</IconButton>
-            <IconButton title={`Reveal in Finder — ${shortcutLabel('file.finder')}`} onClick={() => props.onRevealFinder(path)}>⊞</IconButton>
+            <IconButton title={`Show in folder — ${shortcutLabel('file.finder')}`} onClick={() => props.onRevealFinder(path)}>⊞</IconButton>
           </div>
         </div>
 

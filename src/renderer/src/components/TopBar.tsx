@@ -20,19 +20,19 @@ interface Props {
   onFilterText(text: string): void
   onPullBehind(): void
   onVerifyAll(): void
-  onCheckAll(): void
   onOpenSettings(): void
   onOpenPalette(): void
   onOpenDashboard(): void
 }
 
 export function TopBar(props: Props) {
-  // Global primary is contextual, one scope up from the pane: pull > verify > check.
+  // Global primary is contextual, one scope up from the pane: pull > verify.
+  // Check all lives in the dashboard's quick actions (and ⌘⇧R).
   const primary = props.behindCount > 0
     ? { label: 'Pull behind', count: props.behindCount, run: props.onPullBehind }
     : props.unverifiedCount > 0
       ? { label: 'Verify all', count: props.unverifiedCount, run: props.onVerifyAll }
-      : { label: 'Check all', count: 0, run: props.onCheckAll }
+      : null
 
   return (
     <header className="drag-region flex h-[46px] shrink-0 items-center gap-4 border-b border-line bg-chrome pl-28 pr-3.5">
@@ -42,7 +42,9 @@ export function TopBar(props: Props) {
         className="h-[22px] w-auto shrink-0"
       />
 
-      <div className="flex min-w-0 flex-1 justify-center">
+      <div className="flex min-w-0 flex-1 items-center justify-center gap-2">
+        <ChromeButton title={`Back to previous file — ${shortcutLabel('file.back')}`} onClick={props.onBack} disabled={!props.canGoBack}>‹</ChromeButton>
+        <ChromeButton title={`Forward to next file — ${shortcutLabel('file.forward')}`} onClick={props.onForward} disabled={!props.canGoForward}>›</ChromeButton>
         <div className="field-ring group flex w-[420px] max-w-full items-center gap-[9px] rounded-md border border-control bg-raised px-2.5 py-[5px]">
           <span className="text-[11px] text-ink-ghost">⌕</span>
           <input
@@ -68,28 +70,19 @@ export function TopBar(props: Props) {
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
-        <button
-          onClick={primary.run}
-          disabled={props.busy || !props.connected}
-          className="flex items-center gap-2 whitespace-nowrap rounded-md border border-primary-edge bg-primary px-3.5 py-1.5 text-[12.5px] text-primary-ink hover:bg-primary-hover disabled:opacity-40"
-        >
-          {primary.label}
-          {primary.count > 0 && (
-            <span className="rounded-full bg-primary-badge px-1.5 py-px text-[11px]">{primary.count}</span>
-          )}
-        </button>
-        {primary.label !== 'Check all' && (
-          <button
-            onClick={props.onCheckAll}
-            disabled={props.busy || !props.connected}
-            className="whitespace-nowrap rounded-md border border-control bg-raised px-[13px] py-1.5 text-[12.5px] text-ink-body hover:bg-hover disabled:opacity-40"
-          >
-            Check all
-          </button>
+        {primary && (
+          <>
+            <button
+              onClick={primary.run}
+              disabled={props.busy || !props.connected}
+              className="flex items-center gap-2 whitespace-nowrap rounded-md border border-primary-edge bg-primary px-3.5 py-1.5 text-[12.5px] text-primary-ink hover:bg-primary-hover disabled:opacity-40"
+            >
+              {primary.label}
+              <span className="rounded-full bg-primary-badge px-1.5 py-px text-[11px]">{primary.count}</span>
+            </button>
+            <div className="mx-0.5 h-5 w-px bg-line" />
+          </>
         )}
-        <div className="mx-0.5 h-5 w-px bg-line" />
-        <ChromeButton title={`Back to previous file — ${shortcutLabel('file.back')}`} onClick={props.onBack} disabled={!props.canGoBack}>‹</ChromeButton>
-        <ChromeButton title={`Forward to next file — ${shortcutLabel('file.forward')}`} onClick={props.onForward} disabled={!props.canGoForward}>›</ChromeButton>
         <ChromeButton title="Dashboard — overview of everything needing attention" onClick={props.onOpenDashboard}>⌂</ChromeButton>
         <ChromeButton title={`Command palette — ${shortcutLabel('app.palette')}`} onClick={props.onOpenPalette}>⌘</ChromeButton>
         <ChromeButton title={`Settings — ${shortcutLabel('app.settings')}`} onClick={props.onOpenSettings}>⚙</ChromeButton>
