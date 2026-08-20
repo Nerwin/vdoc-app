@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.5.1](///compare/v1.5.0...v1.5.1) (2026-08-20)
+
+### Refactoring
+
+* **renderer:** consolidate time helpers and fuzzy match indices f4f0df0
 ## [1.5.0](///compare/v1.4.0...v1.5.0) (2026-08-20)
 
 ### Features
