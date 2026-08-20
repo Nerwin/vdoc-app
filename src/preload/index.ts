@@ -43,6 +43,7 @@ const api: VdocApi = {
   settingsSet: patch => ipcRenderer.invoke('settings-set', patch),
   vdocVersion: () => ipcRenderer.invoke('vdoc-version'),
   pickFolder: () => ipcRenderer.invoke('pick-folder'),
+  pickDocsRoot: () => ipcRenderer.invoke('pick-docs-root'),
   openFolder: path => ipcRenderer.invoke('open-folder', path),
   spaceMappingGet: () => ipcRenderer.invoke('space-mapping-get'),
   spaceMappingSet: (dir, space) => ipcRenderer.invoke('space-mapping-set', dir, space),

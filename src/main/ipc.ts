@@ -3,7 +3,7 @@ import { join, relative } from 'node:path'
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 
 import type { AuthStatus, CheckFile, CommentEntry, CreateResult, DiffResult, GetPageResult, LintFile, PullFile, PushFile, Settings, SettingsInfo, SyncFile, VersionEntry } from '../shared/types.ts'
-import { backlinksTo, DOCS_ROOT, fileForPageId, gitDirtyFiles, resolvedVdocBin, runVdoc, runVdocJson, scanMarkdownFiles, setVdocBin } from './vdoc.ts'
+import { backlinksTo, docsRoot, fileForPageId, gitDirtyFiles, resolvedVdocBin, runVdoc, runVdocJson, scanMarkdownFiles, setVdocBin } from './vdoc.ts'
 import { loadSettings, saveSettings } from './settings.ts'
 import { watchDocs } from './watcher.ts'
 
@@ -15,7 +15,7 @@ export function registerIpc(): void {
   ipcMain.handle('scan', () => {
     const dirty = gitDirtyFiles()
     const files = scanMarkdownFiles().map(file => ({ ...file, gitDirty: dirty.has(file.path) }))
-    return { root: DOCS_ROOT, files }
+    return { root: docsRoot(), files }
   })
 
   ipcMain.handle('check-all', async event => {
@@ -49,7 +49,7 @@ export function registerIpc(): void {
     return files
   })
 
-  ipcMain.handle('read-file', (_event, path: string) => readFileSync(join(DOCS_ROOT, path), 'utf8'))
+  ipcMain.handle('read-file', (_event, path: string) => readFileSync(join(docsRoot(), path), 'utf8'))
 
   ipcMain.handle('backlinks', (_event, path: string) => backlinksTo(path))
 
@@ -59,8 +59,8 @@ export function registerIpc(): void {
   })
 
   ipcMain.handle('write-file', (_event, path: string, content: string) => {
-    const abs = join(DOCS_ROOT, path)
-    if (relative(DOCS_ROOT, abs).startsWith('..')) throw new Error(`Refusing to write outside the docs root: ${path}`)
+    const abs = join(docsRoot(), path)
+    if (relative(docsRoot(), abs).startsWith('..')) throw new Error(`Refusing to write outside the docs root: ${path}`)
     writeFileSync(abs, content, 'utf8')
   })
 
@@ -110,7 +110,7 @@ export function registerIpc(): void {
   })
 
   ipcMain.handle('get-page', (_event, input: string, dir: string) => {
-    if (relative(DOCS_ROOT, join(DOCS_ROOT, dir)).startsWith('..')) throw new Error(`Refusing to write outside the docs root: ${dir}`)
+    if (relative(docsRoot(), join(docsRoot(), dir)).startsWith('..')) throw new Error(`Refusing to write outside the docs root: ${dir}`)
     return runVdocJson<GetPageResult>(['cf', 'get', input, '--out', dir])
   })
 
@@ -158,12 +158,12 @@ export function registerIpc(): void {
   })
 
   ipcMain.handle('open-editor', async (_event, path: string) => {
-    const error = await shell.openPath(join(DOCS_ROOT, path))
+    const error = await shell.openPath(join(docsRoot(), path))
     if (error) throw new Error(error)
   })
 
   ipcMain.handle('reveal-finder', (_event, path: string) => {
-    shell.showItemInFolder(join(DOCS_ROOT, path))
+    shell.showItemInFolder(join(docsRoot(), path))
   })
 
   ipcMain.handle('settings-get', () => settingsInfo())
@@ -172,7 +172,7 @@ export function registerIpc(): void {
     const settings = { ...loadSettings(), ...patch }
     saveSettings(settings)
     setVdocBin(settings.vdocBin)
-    if (patch.contentDirs) {
+    if (patch.contentDirs || 'docsRoot' in patch) {
       const window = BrowserWindow.fromWebContents(event.sender)
       if (window) watchDocs(window)
     }
@@ -183,19 +183,31 @@ export function registerIpc(): void {
     const window = BrowserWindow.fromWebContents(event.sender)
     if (!window) return null
     const result = await dialog.showOpenDialog(window, {
-      defaultPath: DOCS_ROOT,
+      defaultPath: docsRoot(),
       properties: ['openDirectory'],
       message: 'Pick a folder inside the docs repository',
     })
     if (result.canceled || result.filePaths.length === 0) return null
-    const rel = relative(DOCS_ROOT, result.filePaths[0])
+    const rel = relative(docsRoot(), result.filePaths[0])
     if (rel === '' || rel.startsWith('..')) {
       throw new Error('The folder must be inside the docs repository')
     }
-    return rel
+    // App-internal paths always use forward slashes, whatever the OS.
+    return rel.replaceAll('\\', '/')
   })
 
-  ipcMain.handle('open-folder', (_event, path: string) => shell.openPath(join(DOCS_ROOT, path)).then(() => undefined))
+  ipcMain.handle('pick-docs-root', async event => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    if (!window) return null
+    const result = await dialog.showOpenDialog(window, {
+      defaultPath: docsRoot(),
+      properties: ['openDirectory'],
+      message: 'Pick the docs repository root',
+    })
+    return result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0]
+  })
+
+  ipcMain.handle('open-folder', (_event, path: string) => shell.openPath(join(docsRoot(), path)).then(() => undefined))
 
   ipcMain.handle('space-mapping-get', () => spaceMapping())
 
@@ -218,7 +230,7 @@ export function registerIpc(): void {
 
 async function settingsInfo(): Promise<SettingsInfo> {
   const configPath = await runVdocJson<{ path: string }>(['config', 'path']).then(r => r.path).catch(() => null)
-  return { ...loadSettings(), resolvedBin: resolvedVdocBin(), version: await probeVersion(), appVersion: app.getVersion(), configPath }
+  return { ...loadSettings(), resolvedBin: resolvedVdocBin(), resolvedRoot: docsRoot(), version: await probeVersion(), appVersion: app.getVersion(), configPath }
 }
 
 /** The shared .vdocrc's folder → space mapping ({} when absent). */

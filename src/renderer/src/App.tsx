@@ -13,7 +13,7 @@ import { SettingsModal } from './components/SettingsModal.tsx'
 import { Toast } from './components/Toast.tsx'
 import { Modal, ModalButton } from './components/Modal.tsx'
 import { applyMonacoTheme } from './components/monaco-setup.ts'
-import { commandFor, selectionState, type CommandContext, type ViewMode } from './commands.ts'
+import { commandFor, isMod, selectionState, type CommandContext, type ViewMode } from './commands.ts'
 import { useApp } from './useApp.ts'
 
 const SIDEBAR_MIN = 240
@@ -102,7 +102,7 @@ export function App() {
       const target = event.target as HTMLElement | null
       const inField = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement
       // Every binding comes from the registry; a command only fires when it is available.
-      if (!inField || event.metaKey) {
+      if (!inField || isMod(event)) {
         const command = commandFor(event, ctxRef.current)
         if (command) {
           event.preventDefault()
@@ -323,6 +323,7 @@ export function App() {
           onSaveApiKey={(email, token) => void app.saveApiKey(email, token)}
           onSetAuthMethod={method => void app.setAuthMethod(method)}
           onAddFolder={() => void app.addFolder()}
+          onPickDocsRoot={() => void app.pickDocsRoot()}
           onRemoveFolder={app.removeFolder}
           onSetSpaceMapping={app.setSpaceMappingEntry}
           onRevealConfig={() => void app.revealConfig()}

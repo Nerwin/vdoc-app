@@ -16,13 +16,16 @@ if (process.env.VDOC_DEBUG_PORT) {
 
 function createWindow(theme: Settings['theme']): BrowserWindow {
   const dark = theme === 'system' ? nativeTheme.shouldUseDarkColors : theme === 'dark'
+  const icon = join(__dirname, '../../build/icon.png')
   const window = new BrowserWindow({
     width: 1280,
     height: 800,
     minWidth: 980,
     minHeight: 600,
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 16, y: 14 },
+    // The traffic-light inset chrome is macOS-only; Windows/Linux keep the native frame.
+    ...(process.platform === 'darwin'
+      ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 16, y: 14 } }
+      : existsSync(icon) ? { icon } : {}),
     backgroundColor: dark ? '#101113' : '#f2f4f7',
     webPreferences: { preload: join(__dirname, '../preload/index.js') },
   })
@@ -55,13 +58,19 @@ if (!app.requestSingleInstanceLock()) {
     const icon = join(__dirname, '../../build/icon.png')
     if (app.dock && existsSync(icon)) app.dock.setIcon(icon)
 
-    // Only OS roles in the menu: the app's own shortcuts live in the renderer registry, and
-    // the default View menu would swallow ⌘R / ⌘⇧R / ⌥⌘I before the window ever sees them.
-    Menu.setApplicationMenu(Menu.buildFromTemplate([
-      ...(process.platform === 'darwin' ? [{ role: 'appMenu' as const }] : []),
-      { role: 'editMenu' as const },
-      { role: 'windowMenu' as const },
-    ]))
+    // macOS: only OS roles in the menu — the app's own shortcuts live in the renderer
+    // registry, and the default View menu would swallow ⌘R / ⌘⇧R / ⌥⌘I before the window
+    // ever sees them. Windows/Linux: no menu bar at all — clipboard shortcuts work natively
+    // there, and every action lives in the palette.
+    if (process.platform === 'darwin') {
+      Menu.setApplicationMenu(Menu.buildFromTemplate([
+        { role: 'appMenu' as const },
+        { role: 'editMenu' as const },
+        { role: 'windowMenu' as const },
+      ]))
+    } else {
+      Menu.setApplicationMenu(null)
+    }
 
     registerIpc()
     mainWindow = createWindow(settings.theme)

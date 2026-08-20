@@ -2,7 +2,7 @@ import { watch, type FSWatcher } from 'node:fs'
 import { join } from 'node:path'
 import type { BrowserWindow } from 'electron'
 
-import { DOCS_ROOT, getContentDirs } from './vdoc.ts'
+import { docsRoot, getContentDirs } from './vdoc.ts'
 
 let watchers: FSWatcher[] = []
 
@@ -26,10 +26,12 @@ export function watchDocs(window: BrowserWindow): void {
 
   for (const dir of getContentDirs()) {
     try {
-      const watcher = watch(join(DOCS_ROOT, dir), { recursive: true }, (_eventType, filename) => {
+      const watcher = watch(join(docsRoot(), dir), { recursive: true }, (_eventType, filename) => {
         if (!filename || !filename.endsWith('.md')) return
-        if (filename.split('/').some(segment => segment.startsWith('.'))) return
-        pending.add(`${dir}/${filename}`)
+        // App-internal paths always use forward slashes; Windows reports backslashes.
+        const rel = filename.replaceAll('\\', '/')
+        if (rel.split('/').some(segment => segment.startsWith('.'))) return
+        pending.add(`${dir}/${rel}`)
         clearTimeout(timer)
         timer = setTimeout(flush, 400)
       })

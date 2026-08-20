@@ -12,6 +12,7 @@ interface Props {
   onSaveApiKey(email: string, apiToken: string): void
   onSetAuthMethod(method: 'api-token' | 'session-token'): void
   onAddFolder(): void
+  onPickDocsRoot(): void
   onRemoveFolder(path: string): void
   onSetSpaceMapping(dir: string, space: string | null): void
   onRevealConfig(): void
@@ -103,7 +104,7 @@ function Appearance({ settings, onUpdate }: Props) {
   return (
     <Section
       title="Appearance"
-      description="System follows the macOS appearance and switches with it. Light and dark pin the theme for this app only."
+      description="System follows the OS appearance and switches with it. Light and dark pin the theme for this app only."
     >
       <Segmented
         options={[['light', 'Light'], ['dark', 'Dark'], ['system', 'System']]}
@@ -114,7 +115,7 @@ function Appearance({ settings, onUpdate }: Props) {
   )
 }
 
-function Folders({ settings, spaceMapping, busy, onAddFolder, onRemoveFolder, onSetSpaceMapping }: Props) {
+function Folders({ settings, spaceMapping, busy, onAddFolder, onPickDocsRoot, onRemoveFolder, onSetSpaceMapping }: Props) {
   const [mapDir, setMapDir] = useState('')
   const [mapSpace, setMapSpace] = useState('')
   const unmapped = settings.contentDirs.filter(dir => !(dir in spaceMapping))
@@ -124,6 +125,17 @@ function Folders({ settings, spaceMapping, busy, onAddFolder, onRemoveFolder, on
       title="Folders & spaces"
       description="Folders must live inside the docs repository — only Markdown files are listed. The space prefills Create and narrows Sync's title search."
     >
+      <Field label="DOCS REPOSITORY">
+        <div className="flex items-center gap-2">
+          <span
+            className="flex-1 truncate rounded-md border border-control bg-pane px-2.5 py-[7px] font-mono text-[12.5px] text-ink-dim"
+            title={settings.resolvedRoot}
+          >
+            {settings.resolvedRoot}
+          </span>
+          <Button label="Change…" disabled={busy} onClick={onPickDocsRoot} />
+        </div>
+      </Field>
       <div className="overflow-hidden rounded-md border border-control">
         <div className="grid grid-cols-[1fr_132px_30px] bg-sidebar text-[10.5px] tracking-[1px] text-ink-mute">
           <span className="px-2.5 py-[7px]">FOLDER</span>

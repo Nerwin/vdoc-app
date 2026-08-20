@@ -1,8 +1,22 @@
 # V-DOC
 
-macOS Electron GUI over the [vdoc CLI](../vdoc) for the Vosker-doc repository. Shows the doc tree with
-live Confluence sync states, side-by-side diffs, guarded pull/push, page linking/creation, and
-session-token renewal.
+Cross-platform (macOS, Windows, Linux) Electron GUI over the [vdoc CLI](../vdoc) for the Vosker-doc
+repository. Shows the doc tree with live Confluence sync states, side-by-side diffs, guarded
+pull/push, page linking/creation, and session-token renewal.
+
+## Install (for users)
+
+Grab the artifact for your OS from the latest GitHub release:
+
+- **macOS** — `V-DOC-x.y.z-mac-arm64.dmg` (Apple Silicon) or `…-mac-x64.dmg` (Intel). The app is
+  unsigned: on first launch right-click → Open, or clear the quarantine flag with
+  `xattr -cr /Applications/V-DOC.app`.
+- **Windows** — `V-DOC-x.y.z-win-x64.exe` (installer, per-user, no admin needed) or the
+  `…-portable-x64.exe`. SmartScreen will warn about an unsigned app — More info → Run anyway.
+- **Linux** — `V-DOC-x.y.z-linux-x64.AppImage` (`chmod +x`, run) or the `.deb`.
+
+Prerequisites on every OS: [bun](https://bun.sh) and the vdoc CLI (`bun link` in the vdoc repo).
+On first launch open Settings (⌘,/Ctrl+,) and point **Docs repository** at your clone of Vosker-doc.
 
 ## Run
 
@@ -10,23 +24,23 @@ session-token renewal.
 npm run dev            # launch in dev mode
 npm test               # typecheck + unit tests
 npm run build          # production bundle to out/
-npm run pack           # quick unsigned V-DOC.app into release/mac-arm64/
-npm run release        # bump version + changelog + tag, then build all binaries
-npm run release:mac    # same bump, mac binaries only
-npm run dist           # rebuild binaries without bumping: dist / dist:mac / dist:win / dist:linux
+npm run pack           # quick unsigned app for this OS into release/
+npm run release        # bump version + changelog + tag, then build this OS's binaries
+npm run dist           # rebuild binaries without bumping (host OS) — or dist:mac / dist:win / dist:linux
 ```
 
-Builds target the host arch (arm64 here); add `-- --x64` to an electron-builder script for Intel
-artifacts. All artifacts are unsigned. Version comes from `package.json` and stamps the bundle,
-the artifacts' names, and the status bar. The app icon lives in `build/icon.png` (1024×1024 —
+`dist` builds the host platform (macOS builds both arm64 and x64); the release workflow covers the
+rest. All artifacts are unsigned. Version comes from `package.json` and stamps the bundle, the
+artifacts' names, and the status bar. The app icon lives in `build/icon.png` (1024×1024 —
 electron-builder converts it per platform).
 
 Everything ships bundled by Vite, so all npm packages are devDependencies and the package contains
 `out/` only (33 MB asar) — no `node_modules`.
 
-Requires the `vdoc` binary (auto-detected at `~/.bun/bin/vdoc`, then PATH — overridable in
-Settings). Spawns extend PATH with `~/.bun/bin`, `/opt/homebrew/bin`, and `/usr/local/bin` so the
-CLI's `#!/usr/bin/env bun` shebang resolves even from a Finder-launched app.
+Requires the `vdoc` binary (auto-detected at `~/.bun/bin/vdoc` — `vdoc.exe` on Windows — then PATH;
+overridable in Settings). Spawns extend PATH with `~/.bun/bin` (plus `/opt/homebrew/bin` and
+`/usr/local/bin` on macOS/Linux) so the CLI's `#!/usr/bin/env bun` shebang resolves even from a
+GUI-launched app, which starts with a minimal environment.
 
 ## Releases
 
@@ -40,11 +54,17 @@ CLI's `#!/usr/bin/env bun` shebang resolves even from a Finder-launched app.
 3. Commits those three files as `chore(release): X.Y.Z` and tags `vX.Y.Z`.
 4. Builds the binaries from the freshly bumped version.
 
+Pushing the tag (`git push --follow-tags`) triggers `.github/workflows/release.yml`, which builds
+the installers on a real runner per OS (macOS, Windows, Linux) and attaches them all to the GitHub
+release for that tag — that release page is what you share with the company.
+
 Day-to-day commits never touch the version — releasing is a deliberate act, not a git hook.
 Preview what a release would do with `npx commit-and-tag-version --dry-run`. To tag the current
 version as-is (no bump), use `npx commit-and-tag-version --first-release && npm run dist`.
 
 ## Shortcuts
+
+⌘ is Ctrl (and ⌥ is Alt) on Windows and Linux — every keycap in the app renders the right one.
 
 | Keys     | Action                                      |
 | -------- | ------------------------------------------- |
@@ -60,13 +80,14 @@ version as-is (no bump), use `npx commit-and-tag-version --first-release && npm 
 
 ## Settings (⌘,)
 
-App-local preferences (theme, folders, pins, binary path) live in `settings.json` under Electron's
-`userData` directory. Everything Confluence-related — credentials, auth method, and the
+App-local preferences (theme, docs root, folders, pins, binary path) live in `settings.json` under
+Electron's `userData` directory. Everything Confluence-related — credentials, auth method, and the
 **space mapping** — lives in the shared `.vdocrc` written through `vdoc config set`, so the CLI and
-the app always agree; the resolved config path is shown in Settings with a "Reveal in Finder" button
+the app always agree; the resolved config path is shown in Settings with a "Show in folder" button
 (`vdoc config path`).
 
 - **Theme** — light or dark (applies to the UI and the Monaco editors).
+- **Docs repository** — the docs repo clone the whole app works in (native picker; `VDOC_APP_ROOT` is the fallback).
 - **Folders** — the tree's root folders (add via native picker, remove; also right-click a folder in the tree).
 - **Space mapping** — folder → Confluence space key; prefills Create's space and narrows Sync's title search.
 - **Confluence authentication** — session token or API key.
@@ -74,15 +95,15 @@ the app always agree; the resolved config path is shown in Settings with a "Reve
 
 ## Environment
 
-- `VDOC_APP_ROOT` — docs repo root (default `~/Projects/documentation/Vosker-doc`)
+- `VDOC_APP_ROOT` — docs repo root fallback when none is set in Settings (default `~/Projects/documentation/Vosker-doc`)
 - `VDOC_DEBUG_PORT` — expose Chrome DevTools Protocol on that port (automation/debugging)
 
 ## Scope
 
 The tree's root folders are user-configurable (Settings → Folders, defaults: `1-Backend`, `2-DDA`,
 `3-Projects`) and must live inside the docs repository; only Markdown files are ever listed.
-Right-click any folder for actions: pin on top, check only that folder, open in Finder, and — on
-root folders — remove from the tree.
+Right-click any folder for actions: pin on top, check only that folder, open in the file manager,
+and — on root folders — remove from the tree.
 
 ## How it talks to the CLI
 

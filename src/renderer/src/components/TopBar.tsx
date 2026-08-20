@@ -2,7 +2,7 @@ import type { RefObject } from 'react'
 
 import darkLogo from '../assets/dark-logo.png'
 import lightLogo from '../assets/light-logo.png'
-import { shortcutLabel } from '../commands.ts'
+import { IS_MAC, shortcutLabel } from '../commands.ts'
 
 interface Props {
   theme: 'dark' | 'light'
@@ -35,7 +35,7 @@ export function TopBar(props: Props) {
       : null
 
   return (
-    <header className="drag-region flex h-[46px] shrink-0 items-center gap-4 border-b border-line bg-chrome pl-28 pr-3.5">
+    <header className={`drag-region flex h-[46px] shrink-0 items-center gap-4 border-b border-line bg-chrome pr-3.5 ${IS_MAC ? 'pl-28' : 'pl-3.5'}`}>
       <img
         src={props.theme === 'dark' ? darkLogo : lightLogo}
         alt="VOSKER DOC"

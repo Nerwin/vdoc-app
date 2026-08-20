@@ -483,6 +483,18 @@ export function useApp() {
     }
   }, [api, fail, mergeScan])
 
+  const pickDocsRoot = useCallback(async () => {
+    try {
+      const picked = await api.pickDocsRoot()
+      if (!picked) return
+      setSelection(null)
+      await applyFolderSettings({ docsRoot: picked })
+      setMessage({ kind: 'info', text: `Docs repository is now ${picked}` })
+    } catch (error) {
+      fail(error)
+    }
+  }, [api, applyFolderSettings, fail])
+
   const addFolder = useCallback(async () => {
     try {
       const picked = await api.pickFolder()
@@ -606,6 +618,7 @@ export function useApp() {
     updateSettings,
     reloadVersion,
     addFolder,
+    pickDocsRoot,
     removeFolder,
     togglePin,
     checkFolder,

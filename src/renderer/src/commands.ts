@@ -9,9 +9,15 @@ import type { AppStore } from './useApp.ts'
 
 export type CommandGroup = 'Sync' | 'File' | 'View' | 'App'
 
+export const IS_MAC = navigator.platform.startsWith('Mac')
+
+/** The platform's primary modifier — ⌘ on macOS, Ctrl elsewhere. */
+export const isMod = (event: KeyboardEvent): boolean => (IS_MAC ? event.metaKey : event.ctrlKey)
+
 export interface KeyBinding {
   /** `event.key`, compared case-insensitively (`,` `1` `r` `Escape`). */
   key: string
+  /** The platform's primary modifier: ⌘ on macOS, Ctrl on Windows/Linux. */
   meta?: boolean
   shift?: boolean
   alt?: boolean
@@ -411,20 +417,26 @@ export function command(id: string): Command {
   return found
 }
 
-/** One cap per key — `⌘⇧R` renders as three caps. */
+/** One cap per key — `⌘⇧R` (mac) / `Ctrl` `Shift` `R` (elsewhere) renders as three caps. */
 export function keycaps(keys: KeyBinding | undefined): string[] {
   if (!keys) return []
   const caps: string[] = []
-  if (keys.alt) caps.push('⌥')
-  if (keys.meta) caps.push('⌘')
-  if (keys.shift) caps.push('⇧')
+  if (IS_MAC) {
+    if (keys.alt) caps.push('⌥')
+    if (keys.meta) caps.push('⌘')
+    if (keys.shift) caps.push('⇧')
+  } else {
+    if (keys.meta) caps.push('Ctrl')
+    if (keys.alt) caps.push('Alt')
+    if (keys.shift) caps.push('Shift')
+  }
   caps.push(keys.key === 'Escape' ? 'esc' : keys.key.length === 1 ? keys.key.toUpperCase() : keys.key)
   return caps
 }
 
-/** Flat form for tooltips and menu rows — `⌘⇧R`. */
+/** Flat form for tooltips and menu rows — `⌘⇧R` / `Ctrl+Shift+R`. */
 export function shortcutLabel(id: string): string {
-  return keycaps(command(id).keys).join('')
+  return keycaps(command(id).keys).join(IS_MAC ? '' : '+')
 }
 
 /** `Sync: Check this file` — the palette label, also used for fuzzy matching. */
@@ -433,11 +445,13 @@ export function fullLabel(cmd: Command): string {
 }
 
 function matches(keys: KeyBinding, event: KeyboardEvent): boolean {
+  // `meta` means the platform's primary modifier; the other one must stay unpressed.
+  const otherMod = IS_MAC ? event.ctrlKey : event.metaKey
   return event.key.toLowerCase() === keys.key.toLowerCase()
-    && event.metaKey === Boolean(keys.meta)
+    && isMod(event) === Boolean(keys.meta)
     && event.shiftKey === Boolean(keys.shift)
     && event.altKey === Boolean(keys.alt)
-    && !event.ctrlKey
+    && !otherMod
 }
 
 /** The bound, currently-available command for a key event — or undefined. */

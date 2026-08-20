@@ -7,20 +7,28 @@ import type { Settings } from '../shared/types.ts'
 const DEFAULTS: Settings = {
   theme: 'system',
   vdocBin: null,
+  docsRoot: null,
   contentDirs: ['1-Backend', '2-DDA', '3-Projects'],
   pinnedDirs: [],
 }
 
 const settingsFile = (): string => join(app.getPath('userData'), 'settings.json')
 
+// Settings only ever change through saveSettings in this process, so cache the
+// parse — loadSettings is on the scan hot path (once per walked file).
+let cache: Settings | null = null
+
 export function loadSettings(): Settings {
+  if (cache) return cache
   try {
-    return { ...DEFAULTS, ...JSON.parse(readFileSync(settingsFile(), 'utf8')) as Partial<Settings> }
+    cache = { ...DEFAULTS, ...JSON.parse(readFileSync(settingsFile(), 'utf8')) as Partial<Settings> }
   } catch {
-    return { ...DEFAULTS }
+    cache = { ...DEFAULTS }
   }
+  return cache
 }
 
 export function saveSettings(settings: Settings): void {
+  cache = settings
   writeFileSync(settingsFile(), JSON.stringify(settings, null, 2))
 }

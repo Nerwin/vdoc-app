@@ -153,6 +153,8 @@ export interface Settings {
   theme: 'dark' | 'light' | 'system'
   /** Explicit vdoc binary path; null = auto-detect (~/.bun/bin/vdoc, then PATH). */
   vdocBin: string | null
+  /** Absolute path of the docs repository; null = $VDOC_APP_ROOT, then the built-in default. */
+  docsRoot: string | null
   /** Root folders (relative to the docs repo) shown in the tree. Only .md files are ever listed. */
   contentDirs: string[]
   /** Folder paths pinned to the top of their parent's listing. */
@@ -161,6 +163,8 @@ export interface Settings {
 
 export interface SettingsInfo extends Settings {
   resolvedBin: string
+  /** The docs repository root actually in use. */
+  resolvedRoot: string
   /** `vdoc --version` output, null when the binary cannot be run. */
   version: string | null
   /** This app's own version (package.json / bundle). */
@@ -212,6 +216,8 @@ export interface VdocApi {
   vdocVersion(): Promise<string | null>
   /** Native folder picker rooted at the docs repo; returns a relative path or null. */
   pickFolder(): Promise<string | null>
+  /** Native folder picker for the docs repository itself; returns an absolute path or null. */
+  pickDocsRoot(): Promise<string | null>
   openFolder(path: string): Promise<void>
   /** Folder → Confluence space mapping, stored in the shared .vdocrc. */
   spaceMappingGet(): Promise<Record<string, string>>

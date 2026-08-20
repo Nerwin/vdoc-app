@@ -1,12 +1,17 @@
 import { execFile, execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { delimiter, dirname, join } from 'node:path'
 
 import { mdLinkTargets, resolveRelative } from '../shared/links.ts'
 import { loadSettings } from './settings.ts'
 
-export const DOCS_ROOT = process.env.VDOC_APP_ROOT ?? join(homedir(), 'Projects/documentation/Vosker-doc')
+const DEFAULT_ROOT = process.env.VDOC_APP_ROOT ?? join(homedir(), 'Projects', 'documentation', 'Vosker-doc')
+
+/** The docs repository root: Settings → VDOC_APP_ROOT → the historical default. */
+export function docsRoot(): string {
+  return loadSettings().docsRoot ?? DEFAULT_ROOT
+}
 
 /** User-configured root folders (Settings → Folders). */
 export function getContentDirs(): string[] {
@@ -15,26 +20,33 @@ export function getContentDirs(): string[] {
 
 const EXCLUDED_DIRS = new Set(['0-Archives', '0-Images', '0-Private', 'Temp', '_audit', 'Scripts', 'node_modules', 'dist'])
 
-// ponytail: PATH resolution only works when launched from a shell; packaged
-// Finder launches would need a login-shell PATH probe.
-const defaultBin = (): string => (existsSync(join(homedir(), '.bun/bin/vdoc')) ? join(homedir(), '.bun/bin/vdoc') : 'vdoc')
+// Bun's global bin dir on every OS; on Windows bun writes vdoc.exe shims.
+const bunBin = join(homedir(), '.bun', 'bin')
+
+const defaultBin = (): string => {
+  const candidate = join(bunBin, process.platform === 'win32' ? 'vdoc.exe' : 'vdoc')
+  return existsSync(candidate) ? candidate : 'vdoc'
+}
 
 /**
- * Finder-launched apps get launchd's minimal environment, not the shell's, so
- * exports like VDOC_ENCRYPTION_KEY never reach the spawned CLI. Import the
- * login-shell environment once at startup; existing vars are never overridden.
+ * GUI-launched apps (Finder, GNOME shell) get a minimal environment, not the
+ * login shell's, so exports like VDOC_ENCRYPTION_KEY never reach the spawned
+ * CLI. Import the login-shell environment once at startup; existing vars are
+ * never overridden. Windows GUI apps inherit the user environment — skip.
  */
 export function importLoginShellEnv(): void {
+  if (process.platform === 'win32') return
   if (process.env.VDOC_ENCRYPTION_KEY) return // launched from a shell — env already complete
+  const shell = process.env.SHELL ?? '/bin/zsh'
   try {
-    // -i so ~/.zshrc (where user exports live) is sourced.
-    const output = execFileSync('/bin/zsh', ['-ilc', 'printenv'], { encoding: 'utf8', timeout: 5000 })
+    // -i so rc files (where user exports live) are sourced.
+    const output = execFileSync(shell, ['-ilc', 'printenv'], { encoding: 'utf8', timeout: 5000 })
     for (const line of output.split('\n')) {
       const eq = line.indexOf('=')
       if (eq > 0 && !(line.slice(0, eq) in process.env)) process.env[line.slice(0, eq)] = line.slice(eq + 1)
     }
   } catch {
-    // No zsh or probe timed out: keep the launchd env; runVdoc's PATH fallback still applies.
+    // No usable shell or probe timed out: keep the env as-is; runVdoc's PATH fallback still applies.
   }
 }
 
@@ -61,21 +73,20 @@ export function runVdoc(args: string[]): Promise<VdocRun> {
       resolvedVdocBin(),
       args,
       {
-        cwd: DOCS_ROOT,
+        cwd: docsRoot(),
         env: {
           ...process.env,
           NO_COLOR: '1',
           FORCE_COLOR: '0',
-          // The vdoc shebang is `#!/usr/bin/env bun`; a Finder-launched .app has a
+          // The vdoc shebang is `#!/usr/bin/env bun`; a GUI-launched app has a
           // minimal PATH, so append the vdoc dir plus the standard user bin dirs
           // (bun itself may live in Homebrew, not next to the linked binary).
           PATH: [
             process.env.PATH,
             dirname(resolvedVdocBin()),
-            join(homedir(), '.bun/bin'),
-            '/opt/homebrew/bin',
-            '/usr/local/bin',
-          ].filter(Boolean).join(':'),
+            bunBin,
+            ...(process.platform === 'win32' ? [] : ['/opt/homebrew/bin', '/usr/local/bin']),
+          ].filter(Boolean).join(delimiter),
         },
         maxBuffer: 64 * 1024 * 1024,
       },
@@ -130,7 +141,7 @@ export function gitDirtyFiles(): Set<string> {
     const output = execFileSync(
       'git',
       ['status', '--porcelain=v1', '--untracked-files=all', '--', ...getContentDirs()],
-      { cwd: DOCS_ROOT, encoding: 'utf8' },
+      { cwd: docsRoot(), encoding: 'utf8' },
     )
     return new Set(
       output.split('\n')
@@ -148,14 +159,15 @@ export function gitDirtyFiles(): Set<string> {
 export function scanMarkdownFiles(): Array<{ path: string, tracked: boolean }> {
   const files: Array<{ path: string, tracked: boolean }> = []
 
+  const root = docsRoot()
   const walk = (relDir: string): void => {
-    const absDir = join(DOCS_ROOT, relDir)
+    const absDir = join(root, relDir)
     if (!existsSync(absDir)) return
     for (const entry of readdirSync(absDir, { withFileTypes: true })) {
       if (entry.name.startsWith('.') || EXCLUDED_DIRS.has(entry.name)) continue
       const relPath = `${relDir}/${entry.name}`
       if (entry.isDirectory()) walk(relPath)
-      else if (entry.name.endsWith('.md')) files.push({ path: relPath, tracked: isTracked(join(DOCS_ROOT, relPath)) })
+      else if (entry.name.endsWith('.md')) files.push({ path: relPath, tracked: isTracked(join(root, relPath)) })
     }
   }
 
@@ -170,7 +182,7 @@ export function backlinksTo(target: string): string[] {
   for (const { path } of scanMarkdownFiles()) {
     if (path === target) continue
     try {
-      const text = readFileSync(join(DOCS_ROOT, path), 'utf8')
+      const text = readFileSync(join(docsRoot(), path), 'utf8')
       if (mdLinkTargets(text).some(href => resolveRelative(path, href) === target)) result.push(path)
     } catch {
       // Unreadable file: not a backlink.
@@ -187,7 +199,7 @@ export function fileForPageId(pageId: string): string | null {
   for (const { path, tracked } of scanMarkdownFiles()) {
     if (!tracked) continue
     try {
-      const head = readFileSync(join(DOCS_ROOT, path), 'utf8').slice(0, 2048)
+      const head = readFileSync(join(docsRoot(), path), 'utf8').slice(0, 2048)
       const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(head)
       if (frontmatter && idLine.test(frontmatter[1])) return path
     } catch {
