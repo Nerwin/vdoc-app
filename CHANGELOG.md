@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.5.0](///compare/v1.4.0...v1.5.0) (2026-08-20)
+
+### Features
+
+* **logs:** add CLI logs view, sync help modal, and persisted checks 8944219
 ## [1.4.0](///compare/v1.3.0...v1.4.0) (2026-08-20)
 
 ### Features

@@ -1,6 +1,6 @@
 {
   "name": "vdoc-app",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "private": true,
   "description": "App GUI over the vdoc CLI",
   "main": "out/main/index.js",
@@ -10,7 +10,6 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
-    "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "npm run typecheck && node --experimental-strip-types --test src/shared/__tests__/*.test.ts",
     "pack": "electron-vite build && electron-builder --dir",
