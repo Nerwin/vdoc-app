@@ -5,7 +5,7 @@
   "description": "App GUI over the vdoc CLI",
   "main": "out/main/index.js",
   "productName": "V-DOC",
-  "author": "Nerwin <anthropic@nerwin.dev>",
+  "author": "Nerwin",
   "homepage": "https://github.com/nerwin/vdoc-app",
   "scripts": {
     "dev": "electron-vite dev",
