@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import type { VdocLogEntry } from '../../../shared/types.ts'
-
-const LOG_MAX = 200
+import { LOG_MAX, type VdocLogEntry } from '../../../shared/types.ts'
 
 /** Every CLI command the app spawned this session, newest first — the debugging trail. */
 export function LogsView({ onClose }: { onClose(): void }) {

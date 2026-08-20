@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
 
 import type { AuthStatus, Settings, SettingsInfo } from '../../../shared/types.ts'
+import { humanTtl } from '../../../shared/time.ts'
+import { ModalButton } from './Modal.tsx'
 
 interface Props {
   settings: SettingsInfo
@@ -92,8 +94,8 @@ export function SettingsModal(props: Props) {
             Show in folder
           </button>
           <span className="flex-1" />
-          <Button label="Cancel" onClick={props.onClose} />
-          <Button label="Done" primary onClick={props.onClose} />
+          <ModalButton label="Cancel" onClick={props.onClose} />
+          <ModalButton label="Done" primary onClick={props.onClose} />
         </footer>
       </div>
     </div>
@@ -133,7 +135,7 @@ function Folders({ settings, spaceMapping, busy, onAddFolder, onPickDocsRoot, on
           >
             {settings.resolvedRoot}
           </span>
-          <Button label="Change…" disabled={busy} onClick={onPickDocsRoot} />
+          <ModalButton label="Change…" disabled={busy} onClick={onPickDocsRoot} />
         </div>
       </Field>
       <div className="overflow-hidden rounded-md border border-control">
@@ -171,7 +173,7 @@ function Folders({ settings, spaceMapping, busy, onAddFolder, onPickDocsRoot, on
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button label="+ Add folder…" disabled={busy} onClick={onAddFolder} />
+        <ModalButton label="+ Add folder…" disabled={busy} onClick={onAddFolder} />
         <div className="flex items-center gap-1.5 rounded-md border border-control px-1.5 py-1">
           <select
             value={unmapped.includes(mapDir) ? mapDir : ''}
@@ -190,7 +192,7 @@ function Folders({ settings, spaceMapping, busy, onAddFolder, onPickDocsRoot, on
             className="w-[74px] rounded border-none bg-transparent font-mono text-[12px] text-ink placeholder-ink-mute outline-none"
           />
         </div>
-        <Button
+        <ModalButton
           label="Map"
           disabled={mapDir === '' || mapSpace.trim() === '' || busy}
           onClick={() => {
@@ -243,7 +245,7 @@ function Auth({ auth, busy, onSaveApiKey, onSetAuthMethod, onRenewToken }: Props
             </p>
           )}
         </div>
-        {method === 'session-token' && <Button label="Renew…" onClick={onRenewToken} />}
+        {method === 'session-token' && <ModalButton label="Renew…" onClick={onRenewToken} />}
       </div>
 
       {method === 'api-token' && (
@@ -259,7 +261,7 @@ function Auth({ auth, busy, onSaveApiKey, onSetAuthMethod, onRenewToken }: Props
                 type="password"
                 placeholder={auth?.hasApiKey ? 'stored — paste to replace' : 'Atlassian API token'}
               />
-              <Button
+              <ModalButton
                 label="Save key"
                 disabled={email.trim() === '' || apiToken.trim() === '' || busy}
                 onClick={() => {
@@ -285,7 +287,7 @@ function Cli({ settings, busy, onUpdate, onReloadVersion }: Props) {
       <Field label="BINARY PATH">
         <div className="flex items-center gap-2">
           <TextInput value={bin} onChange={setBin} placeholder={settings.resolvedBin} />
-          <Button label="Apply" disabled={!dirty || busy} onClick={() => onUpdate({ vdocBin: bin.trim() || null })} />
+          <ModalButton label="Apply" disabled={!dirty || busy} onClick={() => onUpdate({ vdocBin: bin.trim() || null })} />
         </div>
       </Field>
       <p className="flex items-center gap-2 font-mono text-[11.5px]">
@@ -318,7 +320,7 @@ function Config({ settings, onRevealConfig }: Props) {
           >
             {settings.configPath ?? 'not resolved — is the CLI runnable?'}
           </span>
-          <Button label="Show in folder" disabled={settings.configPath === null} onClick={onRevealConfig} />
+          <ModalButton label="Show in folder" disabled={settings.configPath === null} onClick={onRevealConfig} />
         </div>
       </Field>
     </Section>
@@ -386,27 +388,6 @@ function Segmented<T extends string>({ options, value, onPick }: {
   )
 }
 
-function Button({ label, onClick, primary, disabled }: {
-  label: string
-  onClick(): void
-  primary?: boolean
-  disabled?: boolean
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`shrink-0 whitespace-nowrap rounded-md px-3 py-[7px] text-[12.5px] disabled:opacity-40 ${
-        primary
-          ? 'border border-primary-edge bg-primary text-primary-ink hover:bg-primary-hover'
-          : 'border border-control bg-raised text-ink-body hover:bg-hover'
-      }`}
-    >
-      {label}
-    </button>
-  )
-}
-
 function InfoStrip({ children }: { children: ReactNode }) {
   return (
     <p className="flex items-start gap-2 rounded-md border border-line-subtle bg-sidebar px-3 py-2 text-[11.5px] leading-[1.55] text-ink-dim">
@@ -414,12 +395,4 @@ function InfoStrip({ children }: { children: ReactNode }) {
       <span>{children}</span>
     </p>
   )
-}
-
-/** ≥24h → `6d 2h`, ≥1h → `14h`, else minutes. */
-function humanTtl(ms: number): string {
-  const hours = Math.floor(ms / 3_600_000)
-  if (hours >= 24) return `${Math.floor(hours / 24)}d ${hours % 24}h`
-  if (hours >= 1) return `${hours}h`
-  return `${Math.max(1, Math.floor(ms / 60_000))}m`
 }

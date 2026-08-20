@@ -180,6 +180,7 @@ export function App() {
           <aside style={{ width: sidebarWidth }} className="relative shrink-0 border-r border-line bg-sidebar">
             <FileTree
               entries={app.entries}
+              totals={totals}
               selection={app.selection}
               filterText={app.filterText}
               stateFilter={app.stateFilter}

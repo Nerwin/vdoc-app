@@ -22,15 +22,15 @@ export function buildTree(paths: string[]): TreeNode[] {
   const roots: TreeNode[] = []
   const dirs = new Map<string, TreeDir>()
 
-  const dirFor = (dirPath: string, depth: number): TreeDir[] => {
+  const dirFor = (dirPath: string, depth: number): TreeDir => {
     const existing = dirs.get(dirPath)
-    if (existing) return [existing]
+    if (existing) return existing
     const name = dirPath.split('/').at(-1) ?? dirPath
     const dir: TreeDir = { kind: 'dir', path: dirPath, name, depth, children: [] }
     dirs.set(dirPath, dir)
-    const parent = dirPath.includes('/') ? dirFor(dirPath.slice(0, dirPath.lastIndexOf('/')), depth - 1)[0] : undefined
+    const parent = dirPath.includes('/') ? dirFor(dirPath.slice(0, dirPath.lastIndexOf('/')), depth - 1) : undefined
     ;(parent ? parent.children : roots).push(dir)
-    return [dir]
+    return dir
   }
 
   for (const path of [...paths].sort()) {
@@ -39,7 +39,7 @@ export function buildTree(paths: string[]): TreeNode[] {
     const depth = segments.length - 1
     const leaf: TreeLeaf = { kind: 'file', path, name, depth }
     if (segments.length === 1) roots.push(leaf)
-    else dirFor(segments.slice(0, -1).join('/'), depth - 1)[0].children.push(leaf)
+    else dirFor(segments.slice(0, -1).join('/'), depth - 1).children.push(leaf)
   }
 
   return roots

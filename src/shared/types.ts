@@ -148,6 +148,9 @@ export interface CheckProgress {
   results: CheckFile[]
 }
 
+/** Ring-buffer size of the CLI invocation log (kept in main, mirrored in the renderer). */
+export const LOG_MAX = 200
+
 /** One spawned CLI invocation, as recorded by the main process (secrets redacted). */
 export interface VdocLogEntry {
   id: number
@@ -221,8 +224,7 @@ export interface VdocApi {
   setToken(token: string): Promise<AuthStatus>
   saveApiKey(email: string, apiToken: string): Promise<AuthStatus>
   setAuthMethod(method: 'api-token' | 'session-token'): Promise<AuthStatus>
-  openConfluence(path: string): Promise<void>
-  /** The page's Confluence URL, for copying (never opens anything). */
+  /** The page's Confluence URL — copy it, or open it via openExternal. */
   confluenceUrl(path: string): Promise<string>
   openEditor(path: string): Promise<void>
   revealFinder(path: string): Promise<void>

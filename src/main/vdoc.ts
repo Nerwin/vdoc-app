@@ -4,7 +4,7 @@ import { homedir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
 import { BrowserWindow } from 'electron'
 
-import type { VdocLogEntry } from '../shared/types.ts'
+import { LOG_MAX, type VdocLogEntry } from '../shared/types.ts'
 import { mdLinkTargets, resolveRelative } from '../shared/links.ts'
 import { DEFAULT_DOCS_ROOT, EXCLUDED_DIRS, loadSettings } from './settings.ts'
 
@@ -65,7 +65,6 @@ export interface VdocRun {
   stderr: string
 }
 
-const LOG_MAX = 200
 const OUTPUT_CLIP = 8192
 const logEntries: VdocLogEntry[] = []
 let logId = 0

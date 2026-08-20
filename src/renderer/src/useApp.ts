@@ -682,7 +682,7 @@ export function useApp() {
     submitCreate,
     runLint,
     saveToken,
-    openConfluence: (path: string) => api.openConfluence(path).catch(fail),
+    openConfluence: (path: string) => api.confluenceUrl(path).then(url => api.openExternal(url)).catch(fail),
     confluenceUrl: (path: string) => api.confluenceUrl(path).catch(error => {
       fail(error)
       return null

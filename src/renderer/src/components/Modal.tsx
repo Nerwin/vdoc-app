@@ -43,7 +43,7 @@ export function ModalButton({ label, onClick, primary, danger, disabled }: {
       ? 'border border-primary-edge bg-primary text-primary-ink hover:bg-primary-hover'
       : 'border border-control bg-raised text-ink-body hover:bg-hover'
   return (
-    <button onClick={onClick} disabled={disabled} className={`rounded-md px-3 py-1.5 text-[12px] disabled:opacity-40 ${tone}`}>
+    <button onClick={onClick} disabled={disabled} className={`shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 text-[12px] disabled:opacity-40 ${tone}`}>
       {label}
     </button>
   )

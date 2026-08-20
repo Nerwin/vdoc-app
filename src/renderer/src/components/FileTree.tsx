@@ -8,6 +8,8 @@ import { StateDot } from './StateDot.tsx'
 
 interface Props {
   entries: Map<string, FileEntry>
+  /** Repo-wide file/tracked counts — computed once in App. */
+  totals: { files: number, tracked: number }
   selection: string | null
   filterText: string
   stateFilter: TriageFilter
@@ -38,7 +40,7 @@ function matchesFilter(entry: FileEntry, filter: TriageFilter): boolean {
 }
 
 export function FileTree(props: Props) {
-  const { entries, selection, filterText, stateFilter, pinnedDirs } = props
+  const { entries, selection, filterText, stateFilter, pinnedDirs, totals } = props
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [menu, setMenu] = useState<FolderMenu | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -74,11 +76,6 @@ export function FileTree(props: Props) {
   }, [entries, filterText, stateFilter, selection, filtering, collapsed, pinnedDirs])
 
   const fileRows = useMemo(() => rows.filter(row => row.kind === 'file'), [rows])
-
-  const totals = useMemo(() => ({
-    files: entries.size,
-    tracked: [...entries.values()].filter(entry => entry.tracked).length,
-  }), [entries])
 
   const toggleDir = (path: string): void => {
     setCollapsed(prev => {

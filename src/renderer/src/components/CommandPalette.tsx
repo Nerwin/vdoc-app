@@ -1,7 +1,7 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 
 import { displayState, type FileEntry } from '../../../shared/status.ts'
-import { fuzzyRank, fuzzyScore } from '../../../shared/fuzzy.ts'
+import { fuzzyMatch, fuzzyRank, type FuzzyMatch } from '../../../shared/fuzzy.ts'
 import { COMMANDS, fullLabel, keycaps, type Command, type CommandContext } from '../commands.ts'
 import { StateDot } from './StateDot.tsx'
 
@@ -34,31 +34,14 @@ function pushRecent(id: string): void {
   localStorage.setItem(RECENT_KEY, JSON.stringify([id, ...readRecent().filter(other => other !== id)].slice(0, 8)))
 }
 
-/** Indices of the query characters inside the label — substring if possible, else subsequence. */
-function matchIndices(query: string, label: string): Set<number> {
-  const q = query.toLowerCase()
-  const l = label.toLowerCase()
-  if (q === '') return new Set()
-  const at = l.indexOf(q)
-  if (at >= 0) return new Set(Array.from({ length: q.length }, (_, i) => at + i))
-  const indices = new Set<number>()
-  let cursor = 0
-  for (const char of q) {
-    const index = l.indexOf(char, cursor)
-    if (index < 0) return new Set()
-    indices.add(index)
-    cursor = index + 1
-  }
-  return indices
-}
-
-function Highlight({ text, query }: { text: string, query: string }) {
-  const indices = matchIndices(query, text)
-  if (indices.size === 0) return <>{text}</>
+/** Bold the matched characters — indices come from the ranking pass (one walk, not two). */
+function Highlight({ text, indices }: { text: string, indices: number[] }) {
+  const marked = new Set(indices)
+  if (marked.size === 0) return <>{text}</>
   return (
     <>
       {[...text].map((char, index) => (
-        indices.has(index)
+        marked.has(index)
           ? <span key={index} className="font-bold text-match">{char}</span>
           : <span key={index}>{char}</span>
       ))}
@@ -70,6 +53,8 @@ interface Row {
   key: string
   group: string
   command?: Command
+  /** Matched character positions in the command label, for highlighting. */
+  indices?: number[]
   path?: string
   disabled?: string
 }
@@ -97,23 +82,24 @@ export function CommandPalette({ ctx, entries, mode, recents, onPick, onRun, onC
       return ranked.map(path => ({ key: path, group: 'FILES', path }))
     }
     const ranked = COMMANDS
-      .map(command => ({ command, score: fuzzyScore(search, fullLabel(command)) }))
-      .filter((item): item is { command: Command, score: number } => item.score !== null)
-      .sort((a, b) => a.score - b.score)
+      .map(command => ({ command, match: fuzzyMatch(search, fullLabel(command)) }))
+      .filter((item): item is { command: Command, match: FuzzyMatch } => item.match !== null)
+      .sort((a, b) => a.match.score - b.match.score)
     const recentIds = readRecent().filter(id => ranked.some(item => item.command.id === id)).slice(0, RECENT_MAX)
-    const row = (command: Command, group: string): Row => ({
-      key: `${group}:${command.id}`,
+    const row = (item: { command: Command, match: FuzzyMatch }, group: string): Row => ({
+      key: `${group}:${item.command.id}`,
       group,
-      command,
-      disabled: command.reason?.(ctx),
+      command: item.command,
+      indices: item.match.indices,
+      disabled: item.command.reason?.(ctx),
     })
-    const recent = recentIds.map(id => row(ranked.find(item => item.command.id === id)!.command, 'RECENT'))
+    const recent = recentIds.map(id => row(ranked.find(item => item.command.id === id)!, 'RECENT'))
     const rest = ranked.filter(item => !recentIds.includes(item.command.id))
     return [
       ...recent,
-      ...rest.filter(item => item.command.group === 'Sync').map(item => row(item.command, 'SYNC')),
-      ...rest.filter(item => item.command.group === 'File').map(item => row(item.command, 'FILE')),
-      ...rest.filter(item => item.command.group === 'View' || item.command.group === 'App').map(item => row(item.command, 'VIEW & APP')),
+      ...rest.filter(item => item.command.group === 'Sync').map(item => row(item, 'SYNC')),
+      ...rest.filter(item => item.command.group === 'File').map(item => row(item, 'FILE')),
+      ...rest.filter(item => item.command.group === 'View' || item.command.group === 'App').map(item => row(item, 'VIEW & APP')),
     ]
   }, [commandMode, search, entries, ctx, mode, recents])
 
@@ -197,7 +183,7 @@ export function CommandPalette({ ctx, entries, mode, recents, onPick, onRun, onC
                   </div>
                 )}
                 {row.command
-                  ? <CommandRow row={row} query={search} ctx={ctx} selected={position === index} onClick={() => activate(row)} position={position} />
+                  ? <CommandRow row={row} ctx={ctx} selected={position === index} onClick={() => activate(row)} position={position} />
                   : <FileRow path={row.path!} entries={entries} selected={position === index} onClick={() => activate(row)} position={position} />}
               </li>
             )
@@ -222,9 +208,8 @@ const TINT: Record<string, string> = {
   create: 'text-sync',
 }
 
-function CommandRow({ row, query, ctx, selected, onClick, position }: {
+function CommandRow({ row, ctx, selected, onClick, position }: {
   row: Row
-  query: string
   ctx: CommandContext
   selected: boolean
   onClick(): void
@@ -248,7 +233,7 @@ function CommandRow({ row, query, ctx, selected, onClick, position }: {
         {command.icon}
       </span>
       <span className={`min-w-0 truncate text-[13px] ${row.disabled ? 'text-ink-ghost' : 'text-ink'}`}>
-        <Highlight text={label} query={query} />
+        <Highlight text={label} indices={row.indices ?? []} />
         {suffix && <span className={row.disabled ? 'text-ink-ghost' : 'text-ink-dim'}> — {suffix}</span>}
       </span>
       <span className="flex shrink-0 items-center gap-[3px]">

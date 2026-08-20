@@ -1,36 +1,44 @@
 /**
- * Score a query against a path for the command palette. Lower is better,
- * null = no match. Basename substring beats path substring beats subsequence.
+ * Fuzzy matching for the command palette. Lower score is better, null = no
+ * match. Basename substring beats full-text substring beats subsequence.
  */
-export function fuzzyScore(query: string, path: string): number | null {
+export interface FuzzyMatch {
+  score: number
+  /** Matched character positions in the text, for highlighting. */
+  indices: number[]
+}
+
+const range = (start: number, length: number): number[] => Array.from({ length }, (_, i) => start + i)
+
+export function fuzzyMatch(query: string, text: string): FuzzyMatch | null {
   const q = query.toLowerCase()
-  if (q === '') return 0
-  const p = path.toLowerCase()
+  if (q === '') return { score: 0, indices: [] }
+  const t = text.toLowerCase()
 
-  const name = p.slice(p.lastIndexOf('/') + 1)
-  const inName = name.indexOf(q)
-  if (inName >= 0) return inName
+  const nameStart = t.lastIndexOf('/') + 1
+  const inName = t.slice(nameStart).indexOf(q)
+  if (inName >= 0) return { score: inName, indices: range(nameStart + inName, q.length) }
 
-  const inPath = p.indexOf(q)
-  if (inPath >= 0) return 100 + inPath
+  const inText = t.indexOf(q)
+  if (inText >= 0) return { score: 100 + inText, indices: range(inText, q.length) }
 
-  let last = -1
+  const indices: number[] = []
   let spread = 0
   for (const char of q) {
-    const index = p.indexOf(char, last + 1)
+    const index = t.indexOf(char, (indices.at(-1) ?? -1) + 1)
     if (index < 0) return null
-    if (last >= 0) spread += index - last - 1
-    last = index
+    if (indices.length > 0) spread += index - indices.at(-1)! - 1
+    indices.push(index)
   }
-  return 1000 + spread
+  return { score: 1000 + spread, indices }
 }
 
 /** Paths ranked best-first for the query, capped at `limit`. */
 export function fuzzyRank(query: string, paths: string[], limit: number): string[] {
   return paths
-    .map(path => ({ path, score: fuzzyScore(query, path) }))
-    .filter((entry): entry is { path: string, score: number } => entry.score !== null)
-    .sort((a, b) => a.score - b.score || a.path.localeCompare(b.path))
+    .map(path => ({ path, match: fuzzyMatch(query, path) }))
+    .filter((entry): entry is { path: string, match: FuzzyMatch } => entry.match !== null)
+    .sort((a, b) => a.match.score - b.match.score || a.path.localeCompare(b.path))
     .slice(0, limit)
     .map(entry => entry.path)
 }

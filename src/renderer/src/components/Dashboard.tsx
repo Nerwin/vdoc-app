@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import type { DisplayState, VersionEntry } from '../../../shared/types.ts'
 import { parseFrontmatter } from '../../../shared/frontmatter.ts'
+import { timeAgo } from '../../../shared/time.ts'
 import { displayState, needsAttention, type FileEntry } from '../../../shared/status.ts'
 import { shortcutLabel } from '../commands.ts'
 import { STATE_META } from '../state-meta.ts'
@@ -94,7 +95,7 @@ export function Dashboard(props: Props) {
         </h1>
         <span className="font-mono text-[11px] text-ink-faint">
           {props.totals.files} files · {props.totals.tracked} tracked
-          {props.lastChecked && ` · checked ${timeAgo(props.lastChecked.toISOString())}`}
+          {props.lastChecked && ` · checked ${timeAgo(props.lastChecked)}`}
         </span>
       </header>
 
@@ -123,7 +124,7 @@ export function Dashboard(props: Props) {
                                   </span>
                                   <span className="block truncate font-mono text-[10.5px] text-ink-faint">{visit.path}</span>
                                 </span>
-                                <span className="shrink-0 font-mono text-[11px] text-ink-dim">{timeAgo(new Date(visit.at).toISOString())}</span>
+                                <span className="shrink-0 font-mono text-[11px] text-ink-dim">{timeAgo(visit.at)}</span>
                               </button>
                             </li>
                           )
@@ -171,7 +172,7 @@ export function Dashboard(props: Props) {
                           <div key={`${event.op}-${event.path}-${event.at}`} className="flex items-baseline gap-2">
                             <span className={`shrink-0 text-[11px] ${event.op === 'pulled' ? 'text-sync-text' : 'text-behind'}`}>{event.op}</span>
                             <span className="min-w-0 flex-1 truncate font-mono text-[11.5px] text-ink-mid">{event.path.split('/').at(-1)}</span>
-                            <span className="shrink-0 font-mono text-[10.5px] text-ink-faint">{timeAgo(new Date(event.at).toISOString())}</span>
+                            <span className="shrink-0 font-mono text-[10.5px] text-ink-faint">{timeAgo(event.at)}</span>
                           </div>
                         ))}
                       </div>
@@ -254,10 +255,3 @@ function displayAuthor(author: string): string {
   return /^\w+:[\w-]{20,}$/.test(author) ? 'unmapped user' : author
 }
 
-function timeAgo(iso: string): string {
-  const minutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000)
-  if (minutes < 1) return 'just now'
-  if (minutes < 60) return `${minutes}m ago`
-  if (minutes < 24 * 60) return `${Math.floor(minutes / 60)}h ago`
-  return `${Math.floor(minutes / (24 * 60))}d ago`
-}

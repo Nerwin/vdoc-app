@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import type { AuthStatus, TriageFilter } from '../../../shared/types.ts'
+import { humanTtl, timeAgo } from '../../../shared/time.ts'
 import { StateDot } from './StateDot.tsx'
 
 interface Props {
@@ -18,12 +19,12 @@ interface Props {
 }
 
 export function StatusBar(props: Props) {
-  const tick = useMinuteTick()
+  useMinuteTick() // re-render each minute so the relative times below stay fresh
   const offline = props.auth !== null && !props.auth.ok
 
   return (
     <footer className="flex h-8 shrink-0 items-center gap-3 border-t border-line bg-chrome px-3 font-mono text-[11.5px]">
-      <AuthChip auth={props.auth} tick={tick} onClick={props.onOpenToken} />
+      <AuthChip auth={props.auth} onClick={props.onOpenToken} />
 
       <div className="h-4 w-px bg-line" />
 
@@ -83,7 +84,6 @@ export function StatusBar(props: Props) {
         checking={props.checking}
         busyOp={props.busyOp}
         lastChecked={props.lastChecked}
-        tick={tick}
         onCancelCheck={props.onCancelCheck}
       />
 
@@ -125,11 +125,10 @@ function Counter({ active, title, tone, onClick, children }: {
 }
 
 /** Only ever one task in the slot; idle shows the last-checked time — never blank. */
-function TaskSlot({ checking, busyOp, lastChecked, tick, onCancelCheck }: {
+function TaskSlot({ checking, busyOp, lastChecked, onCancelCheck }: {
   checking: { done: number, total: number } | null
   busyOp: string | null
   lastChecked: Date | null
-  tick: number
   onCancelCheck(): void
 }) {
   if (checking) {
@@ -164,7 +163,7 @@ function TaskSlot({ checking, busyOp, lastChecked, tick, onCancelCheck }: {
     )
   }
   if (lastChecked) {
-    return <span className="whitespace-nowrap text-ink-faint">last checked {timeAgo(lastChecked, tick)}</span>
+    return <span className="whitespace-nowrap text-ink-faint">last checked {timeAgo(lastChecked)}</span>
   }
   return null
 }
@@ -197,8 +196,7 @@ function taskLabel(op: string): string {
   return TASK_LABELS[op] ?? op
 }
 
-function AuthChip({ auth, tick, onClick }: { auth: AuthStatus | null, tick: number, onClick(): void }) {
-  void tick
+function AuthChip({ auth, onClick }: { auth: AuthStatus | null, onClick(): void }) {
   if (!auth) return <button onClick={onClick} className="text-ink-ghost">auth…</button>
 
   const expiryMs = auth.tokenExp ? auth.tokenExp * 1000 - Date.now() : null
@@ -236,18 +234,3 @@ function useMinuteTick(): number {
   return tick
 }
 
-/** Humanised TTL: ≥24h → `6d 2h`, ≥1h → `14h`, else minutes. */
-function humanTtl(ms: number): string {
-  const hours = Math.floor(ms / 3_600_000)
-  if (hours >= 24) return `${Math.floor(hours / 24)}d ${hours % 24}h`
-  if (hours >= 1) return `${hours}h`
-  return `${Math.max(1, Math.floor(ms / 60_000))}m`
-}
-
-function timeAgo(date: Date, tick: number): string {
-  void tick
-  const minutes = Math.floor((Date.now() - date.getTime()) / 60_000)
-  if (minutes < 1) return 'just now'
-  if (minutes < 60) return `${minutes}m ago`
-  return `${Math.floor(minutes / 60)}h ago`
-}

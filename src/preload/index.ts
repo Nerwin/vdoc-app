@@ -35,7 +35,6 @@ const api: VdocApi = {
   setToken: token => ipcRenderer.invoke('set-token', token),
   saveApiKey: (email, apiToken) => ipcRenderer.invoke('save-api-key', email, apiToken),
   setAuthMethod: method => ipcRenderer.invoke('set-auth-method', method),
-  openConfluence: path => ipcRenderer.invoke('open-confluence', path),
   confluenceUrl: path => ipcRenderer.invoke('confluence-url', path),
   openEditor: path => ipcRenderer.invoke('open-editor', path),
   revealFinder: path => ipcRenderer.invoke('reveal-finder', path),

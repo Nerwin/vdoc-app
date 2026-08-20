@@ -147,11 +147,6 @@ export function registerIpc(): void {
     return authStatus()
   })
 
-  ipcMain.handle('open-confluence', async (_event, path: string) => {
-    const { url } = await runVdocJson<{ url: string }>(['cf', 'open', path, '--print'])
-    await shell.openExternal(url)
-  })
-
   ipcMain.handle('confluence-url', async (_event, path: string) => {
     const { url } = await runVdocJson<{ url: string }>(['cf', 'open', path, '--print'])
     return url
