@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.12.0](https://github.com/Nerwin/vdoc-app/compare/v1.11.0...v1.12.0) (2026-08-24)
+
+### Features
+
+* **monitoring:** report toast-path errors and render crashes to Sentry ([63a5b45](https://github.com/Nerwin/vdoc-app/commit/63a5b45f21076398c6da23f53e5ed8ff2c0c3be4))
 ## [1.11.0](https://github.com/Nerwin/vdoc-app/compare/v1.10.0...v1.11.0) (2026-08-24)
 
 ### Features
