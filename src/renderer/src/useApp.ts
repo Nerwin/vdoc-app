@@ -718,7 +718,12 @@ export function useApp() {
     }),
     update,
     checkUpdateNow,
-    openUpdate: () => update && api.openExternal(update.url).catch(fail),
+    openUpdate: () => {
+      if (!update) return
+      // In-app install when the release ships a matching installer; release page otherwise.
+      if (update.assetUrl) void runOp('install update', () => api.installUpdate(update.assetUrl!))
+      else void api.openExternal(update.url).catch(fail)
+    },
     message,
     dismissMessage: () => setMessage(null),
     notify: (text: string) => setMessage({ kind: 'info', text }),

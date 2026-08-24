@@ -107,7 +107,7 @@ export function StatusBar(props: Props) {
             ? (
                 <button
                   onClick={props.onOpenUpdate}
-                  title={`V-DOC ${props.update.latest} is available (you have ${props.update.current}) - open the release page`}
+                  title={`V-DOC ${props.update.latest} is available (you have ${props.update.current}) - ${props.update.assetUrl ? 'click to download and install' : 'open the release page'}`}
                   className="whitespace-nowrap rounded-[5px] px-2 py-[3px] text-accent hover:bg-hover"
                 >
                   ↑ v{props.update.latest} available
@@ -212,6 +212,7 @@ const TASK_LABELS: Record<string, string> = {
   'save API key': 'Saving API key',
   'switch auth': 'Switching auth',
   'check update': 'Checking for updates',
+  'install update': 'Downloading update',
 }
 
 function taskLabel(op: string): string {

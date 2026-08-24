@@ -47,6 +47,7 @@ const api: VdocApi = {
   setSite: site => ipcRenderer.invoke('set-site', site),
   vdocVersion: () => ipcRenderer.invoke('vdoc-version'),
   checkUpdate: () => ipcRenderer.invoke('check-update'),
+  installUpdate: (assetUrl: string) => ipcRenderer.invoke('install-update', assetUrl),
   pickFolder: () => ipcRenderer.invoke('pick-folder'),
   pickDocsRoot: () => ipcRenderer.invoke('pick-docs-root'),
   openFolder: path => ipcRenderer.invoke('open-folder', path),
