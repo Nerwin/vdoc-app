@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.6.0](///compare/v1.5.1...v1.6.0) (2026-08-24)
+
+### Features
+
+* **renderer:** add editable assets dir and config file editing de05a6a
+* **renderer:** add force-pull action and log copy menu 75c2cad
 ## [1.5.1](///compare/v1.5.0...v1.5.1) (2026-08-20)
 
 ### Refactoring
