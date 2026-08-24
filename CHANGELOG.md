@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.9.2](https://github.com/Nerwin/vdoc-app/compare/v1.9.1...v1.9.2) (2026-08-24)
+
+### Bug Fixes
+
+* **update:** report 'no newer release found' on manual check ([b2b1773](https://github.com/Nerwin/vdoc-app/commit/b2b1773becfd8d1d120bb2e35f473160279dbb60))
+
+### Refactoring
+
+* **update:** release-provider adapters with the feed sourced from package.json ([8081cc2](https://github.com/Nerwin/vdoc-app/commit/8081cc2d3703cd21cfec6a0c864b5983ba0cd787))
 ## [1.9.1](https://github.com/Nerwin/vdoc-app/compare/v1.9.0...v1.9.1) (2026-08-24)
 
 ### Bug Fixes
