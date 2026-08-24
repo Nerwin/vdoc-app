@@ -78,7 +78,7 @@ export function SettingsModal(props: Props) {
             ))}
           </nav>
 
-          <div className="min-w-0 flex-1 overflow-y-auto px-5 py-[18px]">
+          <div className="min-w-0 flex-1 overflow-y-auto px-5 py-[18px] [&>*+*]:mt-7 [&>*+*]:border-t [&>*+*]:border-line-subtle [&>*+*]:pt-7">
             {section === "Appearance" && <Appearance {...props} />}
             {section === "Folders & spaces" && <Folders {...props} />}
             {section === "Confluence" && <Confluence {...props} />}
