@@ -8,13 +8,13 @@ import { StateDot } from './StateDot.tsx'
 
 interface Props {
   entries: Map<string, FileEntry>
-  /** Repo-wide file/tracked counts — computed once in App. */
+  /** Repo-wide file/tracked counts - computed once in App. */
   totals: { files: number, tracked: number }
   selection: string | null
   filterText: string
   stateFilter: TriageFilter
   counts: { attention: number, behind: number, unverified: number, dirty: number }
-  /** Configured root folders — the only ones removable from the tree. */
+  /** Configured root folders - the only ones removable from the tree. */
   rootDirs: string[]
   pinnedDirs: string[]
   onSelect(path: string): void
@@ -171,7 +171,7 @@ export function FileTree(props: Props) {
         </div>
       </div>
 
-      {/* ponytail: no virtualization — a few hundred rows render fine; virtualise if the repo grows 10x. */}
+      {/* ponytail: no virtualization - a few hundred rows render fine; virtualise if the repo grows 10x. */}
       <div
         ref={containerRef}
         tabIndex={0}
@@ -338,14 +338,14 @@ function Row({ node, entries, selected, dimmed, pinned, collapsed, onClick, onCo
   const state = entry ? displayState(entry) : 'unchecked'
   const meta = STATE_META[state]
   const glyphHint = entry?.check && meta.glyph
-    ? `${meta.label.toLowerCase()} — v${entry.check.localVersion ?? '—'} → v${entry.check.remoteVersion ?? '—'}`
+    ? `${meta.label.toLowerCase()} - v${entry.check.localVersion ?? '-'} → v${entry.check.remoteVersion ?? '-'}`
     : meta.label.toLowerCase()
 
   return (
     <button
       data-path={node.path}
       onClick={onClick}
-      title={`${node.path}${meta.hint ? ` — ${meta.hint}` : ''}`}
+      title={`${node.path}${meta.hint ? ` - ${meta.hint}` : ''}`}
       style={indent}
       className={`flex w-full shrink-0 items-center gap-[9px] rounded-[5px] py-[5px] pr-2 text-left ${
         selected ? 'bg-selected shadow-[inset_2px_0_0_var(--color-select-edge)]' : 'hover:bg-row-hover'

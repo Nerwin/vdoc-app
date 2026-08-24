@@ -4,7 +4,7 @@ import { confluencePageId } from '../../../shared/links.ts'
 import { Modal, ModalButton } from './Modal.tsx'
 
 interface Props {
-  /** Root folders the tree shows — the only allowed destinations. */
+  /** Root folders the tree shows - the only allowed destinations. */
   folders: string[]
   busy: boolean
   /** Tracked file already carrying this page id, or null. */
@@ -85,7 +85,7 @@ export function GetForm({ folders, busy, findExisting, onOpenExisting, onSubmit,
         )}
         {existing && (
           <p className="text-[11px] text-warn">
-            Page {pageId} is already tracked by <span className="font-mono text-ink">{existing}</span> — open it instead of fetching a duplicate.
+            Page {pageId} is already tracked by <span className="font-mono text-ink">{existing}</span> - open it instead of fetching a duplicate.
           </p>
         )}
       </div>

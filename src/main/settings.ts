@@ -9,7 +9,7 @@ import type { Settings } from '../shared/types.ts'
 export const DEFAULT_DOCS_ROOT = homedir()
 
 /** Directory names never scanned or watched, wherever they appear in the tree. */
-// ponytail: constant, not a Settings field — promote to Settings if another repo layout ever needs it.
+// ponytail: constant, not a Settings field - promote to Settings if another repo layout ever needs it.
 export const EXCLUDED_DIRS = new Set(['Images', 'Private', 'Temp', '_audit', 'Scripts', 'node_modules', 'dist'])
 
 const DEFAULTS: Settings = {
@@ -23,7 +23,7 @@ const DEFAULTS: Settings = {
 const settingsFile = (): string => join(app.getPath('userData'), 'settings.json')
 
 // Settings only ever change through saveSettings in this process, so cache the
-// parse — loadSettings is on the scan hot path (once per walked file).
+// parse - loadSettings is on the scan hot path (once per walked file).
 let cache: Settings | null = null
 
 export function loadSettings(): Settings {

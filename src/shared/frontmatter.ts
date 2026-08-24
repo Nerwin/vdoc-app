@@ -8,7 +8,7 @@ export interface Frontmatter {
 const unquote = (value: string): string => value.replace(/^(["'])(.*)\1$/, '$2')
 
 /**
- * Minimal YAML subset — top-level `key: value` scalars and inline `[a, b]` lists,
+ * Minimal YAML subset - top-level `key: value` scalars and inline `[a, b]` lists,
  * which is all the vdoc frontmatter uses. Anything else is ignored, never an error.
  */
 export function parseFrontmatter(content: string): Frontmatter {

@@ -54,11 +54,11 @@ if (!app.requestSingleInstanceLock()) {
     const settings = loadSettings()
     setVdocBin(settings.vdocBin)
 
-    // Dev only — the packaged bundle carries its own icon from build/icon.png.
+    // Dev only - the packaged bundle carries its own icon from build/icon.png.
     const icon = join(__dirname, '../../build/icon.png')
     if (app.dock && existsSync(icon)) app.dock.setIcon(icon)
 
-    // macOS: only OS roles — the default View menu would swallow ⌘R / ⌘⇧R / ⌥⌘I before
+    // macOS: only OS roles - the default View menu would swallow ⌘R / ⌘⇧R / ⌥⌘I before
     // the window sees them. Windows/Linux: no menu bar; every action lives in the palette.
     if (process.platform === 'darwin') {
       Menu.setApplicationMenu(Menu.buildFromTemplate([

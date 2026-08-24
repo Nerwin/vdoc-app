@@ -9,7 +9,7 @@ import { mdLinkTargets, resolveRelative } from '../shared/links.ts'
 import { DEFAULT_DOCS_ROOT, EXCLUDED_DIRS, loadSettings } from './settings.ts'
 
 /** The docs repository root: Settings → $VDOC_APP_ROOT → home directory. */
-// env read at call time, not import time — importLoginShellEnv runs after module load.
+// env read at call time, not import time - importLoginShellEnv runs after module load.
 export function docsRoot(): string {
   return loadSettings().docsRoot ?? process.env.VDOC_APP_ROOT ?? DEFAULT_DOCS_ROOT
 }
@@ -29,12 +29,12 @@ const defaultBin = (): string => {
 
 /**
  * GUI-launched apps (Finder, GNOME shell) get a minimal environment, so exports like
- * VDOC_ENCRYPTION_KEY never reach the spawned CLI — import the login shell's env once
+ * VDOC_ENCRYPTION_KEY never reach the spawned CLI - import the login shell's env once
  * at startup (existing vars win). Windows GUI apps inherit the user env: skip.
  */
 export function importLoginShellEnv(): void {
   if (process.platform === 'win32') return
-  if (process.env.VDOC_ENCRYPTION_KEY) return // launched from a shell — env already complete
+  if (process.env.VDOC_ENCRYPTION_KEY) return // launched from a shell - env already complete
   const shell = process.env.SHELL ?? '/bin/zsh'
   try {
     // -i so rc files (where user exports live) are sourced.
@@ -69,7 +69,7 @@ const OUTPUT_CLIP = 8192
 const logEntries: VdocLogEntry[] = []
 let logId = 0
 
-/** Every CLI invocation this session, oldest first — feeds the Logs view. */
+/** Every CLI invocation this session, oldest first - feeds the Logs view. */
 export function vdocLogs(): VdocLogEntry[] {
   return logEntries
 }
@@ -82,7 +82,7 @@ function recordRun(args: string[], run: VdocRun, startedAt: number): void {
     args: args.map((arg, index) => (args[index - 1] === '--encrypt' ? '•••' : arg)),
     exitCode: run.exitCode,
     durationMs: Date.now() - startedAt,
-    stdout: args.includes('--decrypt') ? '(hidden — output contains credentials)' : run.stdout.slice(0, OUTPUT_CLIP),
+    stdout: args.includes('--decrypt') ? '(hidden - output contains credentials)' : run.stdout.slice(0, OUTPUT_CLIP),
     stderr: run.stderr.slice(-OUTPUT_CLIP),
   }
   logEntries.push(entry)
@@ -132,7 +132,7 @@ export async function runVdocJson<T>(args: string[]): Promise<T> {
   const { exitCode, stdout, stderr } = await runVdoc([...args, '--json'])
 
   if (exitCode === -1) {
-    throw new Error('vdoc binary not found — is it linked (`bun link` in the vdoc repo)?')
+    throw new Error('vdoc binary not found - is it linked (`bun link` in the vdoc repo)?')
   }
 
   let parsed: unknown
@@ -172,7 +172,7 @@ export function gitDirtyFiles(): Set<string> {
     return new Set(
       output.split('\n')
         .filter(line => line.length > 3)
-        // "XY path" — renames are "R  old -> new"; keep the new path.
+        // "XY path" - renames are "R  old -> new"; keep the new path.
         .map(line => line.slice(3).split(' -> ').at(-1) ?? '')
         .filter(Boolean),
     )
@@ -202,7 +202,7 @@ export function scanMarkdownFiles(): Array<{ path: string, tracked: boolean }> {
 }
 
 /** Docs under the content dirs whose markdown links resolve to `target`. */
-// ponytail: full rescan per call, no index — the corpus is a few hundred small files.
+// ponytail: full rescan per call, no index - the corpus is a few hundred small files.
 export function backlinksTo(target: string): string[] {
   const result: string[] = []
   for (const { path } of scanMarkdownFiles()) {

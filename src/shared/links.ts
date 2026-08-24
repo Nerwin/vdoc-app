@@ -1,7 +1,7 @@
 /** Markdown link helpers shared by the backlinks scan (main) and the preview (renderer). */
 
 /**
- * Page id from a bare numeric id or a Confluence page URL — mirrors the CLI's
+ * Page id from a bare numeric id or a Confluence page URL - mirrors the CLI's
  * parsePageArg. Null when the input is neither.
  */
 export function confluencePageId(input: string): string | null {

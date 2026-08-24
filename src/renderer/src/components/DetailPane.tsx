@@ -17,7 +17,7 @@ interface Props {
   busyOp: string | null
   theme: 'dark' | 'light'
   connected: boolean
-  /** The active tab — owned by App so the ⌘1–4 commands can drive it. */
+  /** The active tab - owned by App so the ⌘1–4 commands can drive it. */
   view: ViewMode
   /** Bumped by the Reload-from-disk command to re-read the file. */
   reloadKey: number
@@ -31,7 +31,7 @@ interface Props {
   onCheck(path: string): void
   onMarkVerified(path: string): void
   onPull(path: string): void
-  /** Opens the red confirm — pull that overwrites local content. */
+  /** Opens the red confirm - pull that overwrites local content. */
   onForcePull(path: string): void
   onPush(path: string, force: boolean): void
   onLint(path: string): void
@@ -78,7 +78,7 @@ export function DetailPane(props: Props) {
     void window.vdoc.readFile(pending.path)
       .then(onDisk => {
         if (expected === null || onDisk !== expected) {
-          throw new Error(`${pending.path.split('/').at(-1)} changed on disk while editing — draft not saved. Reload from disk (⌘⌥R) and redo the edit.`)
+          throw new Error(`${pending.path.split('/').at(-1)} changed on disk while editing - draft not saved. Reload from disk (⌘⌥R) and redo the edit.`)
         }
         return window.vdoc.writeFile(pending.path, pending.text).then(() => {
           if (diskRef.current?.path === pending.path) diskRef.current = pending
@@ -157,7 +157,7 @@ export function DetailPane(props: Props) {
     }
   }, [path, entry.tracked, props.connected, props.reloadKey])
 
-  /** The split view's preview trails typing by 300ms — mermaid re-renders are not free. */
+  /** The split view's preview trails typing by 300ms - mermaid re-renders are not free. */
   const previewContent = useDebouncedContent(content, 300)
 
   const { onSelect } = props
@@ -210,7 +210,7 @@ export function DetailPane(props: Props) {
     notes.push({ text: meta.hint, error: state === 'conflict' || state === 'not-found', help: true })
   }
   if (check?.titleMismatch) {
-    notes.push({ text: 'Frontmatter title differs from the body H1 — pushes use the frontmatter title.', error: false })
+    notes.push({ text: 'Frontmatter title differs from the body H1 - pushes use the frontmatter title.', error: false })
   }
 
   return (
@@ -222,8 +222,8 @@ export function DetailPane(props: Props) {
           )}
           <h1 title={path} className="truncate text-[15px] font-medium text-ink">{name}</h1>
           <div className="flex shrink-0 gap-0.5">
-            <IconButton title={`Open in editor — ${shortcutLabel('file.editor')}`} onClick={() => props.onOpenEditor(path)}>✎</IconButton>
-            <IconButton title={`Show in folder — ${shortcutLabel('file.finder')}`} onClick={() => props.onRevealFinder(path)}>⊞</IconButton>
+            <IconButton title={`Open in editor - ${shortcutLabel('file.editor')}`} onClick={() => props.onOpenEditor(path)}>✎</IconButton>
+            <IconButton title={`Show in folder - ${shortcutLabel('file.finder')}`} onClick={() => props.onRevealFinder(path)}>⊞</IconButton>
           </div>
         </div>
 
@@ -236,10 +236,10 @@ export function DetailPane(props: Props) {
           {check && (check.localVersion !== undefined || check.remoteVersion !== undefined) && (
             <div className="flex items-center gap-2 whitespace-nowrap rounded-full border border-control bg-raised px-[11px] py-1 text-[12px]">
               <span className="hidden text-ink-label @min-[1080px]:inline">local</span>
-              <span className="text-ink-body">v{check.localVersion ?? '—'}</span>
+              <span className="text-ink-body">v{check.localVersion ?? '-'}</span>
               <span className="text-glyph">{relationGlyph(state)}</span>
               <span className="hidden text-ink-label @min-[1080px]:inline">remote</span>
-              <span className="text-ink-body">v{check.remoteVersion ?? '—'}</span>
+              <span className="text-ink-body">v{check.remoteVersion ?? '-'}</span>
             </div>
           )}
 
@@ -377,7 +377,7 @@ export function DetailPane(props: Props) {
                           onClick={() => props.onMarkVerified(path)}
                           disabled={busy}
                           className="rounded-md border border-ok-edge px-3 py-1.5 text-[12px] text-sync-text hover:bg-ok-bg disabled:opacity-40"
-                          title="Content is identical — record the local-edit baseline so this file shows Synced"
+                          title="Content is identical - record the local-edit baseline so this file shows Synced"
                         >
                           Verify
                         </button>
@@ -387,8 +387,8 @@ export function DetailPane(props: Props) {
                 : (
                     <div className="flex h-full flex-col">
                       <div className="flex border-b border-line font-mono text-[11px] text-ink-dim">
-                        <span className="flex-1 px-4 py-1.5">Confluence — v{props.diff.result.remoteVersion}</span>
-                        <span className="flex-1 border-l border-line px-4 py-1.5">Local — v{props.diff.result.localVersion ?? '—'}</span>
+                        <span className="flex-1 px-4 py-1.5">Confluence - v{props.diff.result.remoteVersion}</span>
+                        <span className="flex-1 border-l border-line px-4 py-1.5">Local - v{props.diff.result.localVersion ?? '-'}</span>
                       </div>
                       <div className="min-h-0 flex-1">
                         <DiffView remote={props.diff.result.remote} local={props.diff.result.local} />
@@ -418,7 +418,7 @@ export function DetailPane(props: Props) {
 
 /**
  * Trailing debounce; null (file switch, loading) resets immediately, and the first
- * value after a reset lands immediately too — the preview opens without a blank beat.
+ * value after a reset lands immediately too - the preview opens without a blank beat.
  */
 function useDebouncedContent(value: string | null, ms: number): string | null {
   const [debounced, setDebounced] = useState(value)
@@ -483,7 +483,7 @@ function ActionsMenu({ entry, primaryLabel, canPull, pushMode, busy, connected, 
       next.focus()
     }
     const onClick = (event: MouseEvent): void => {
-      // The wrapper also holds the Actions button — its own onClick handles the toggle.
+      // The wrapper also holds the Actions button - its own onClick handles the toggle.
       if (!menuRef.current?.parentElement?.contains(event.target as Node)) onClose()
     }
     window.addEventListener('keydown', onKey, true)
@@ -553,7 +553,7 @@ function ActionsMenu({ entry, primaryLabel, canPull, pushMode, busy, connected, 
   )
 }
 
-/** Docs linking to this one — click a row to open it. Same popover idiom as ActionsMenu. */
+/** Docs linking to this one - click a row to open it. Same popover idiom as ActionsMenu. */
 function BacklinksButton({ links, onPick }: { links: string[], onPick(path: string): void }) {
   const [open, setOpen] = useState(false)
   const wrapperRef = useRef<HTMLDivElement>(null)

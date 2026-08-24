@@ -31,7 +31,7 @@ export function StatusBar(props: Props) {
       {offline
         ? (
             <button onClick={props.onOpenToken} className="whitespace-nowrap rounded-[5px] px-2 py-[3px] text-conflict hover:bg-hover">
-              Not connected — reconnect
+              Not connected - reconnect
             </button>
           )
         : (
@@ -124,7 +124,7 @@ function Counter({ active, title, tone, onClick, children }: {
   )
 }
 
-/** Only ever one task in the slot; idle shows the last-checked time — never blank. */
+/** Only ever one task in the slot; idle shows the last-checked time - never blank. */
 function TaskSlot({ checking, busyOp, lastChecked, onCancelCheck }: {
   checking: { done: number, total: number } | null
   busyOp: string | null
@@ -204,9 +204,9 @@ function AuthChip({ auth, onClick }: { auth: AuthStatus | null, onClick(): void 
   const expiringSoon = expiryMs !== null && !expired && expiryMs < 24 * 3600 * 1000
   const dot = !auth.ok || expired ? 'bg-conflict' : expiringSoon ? 'bg-warn' : 'bg-sync'
   const title = !auth.ok
-    ? (auth.error ?? 'Not authenticated — click to update credentials')
+    ? (auth.error ?? 'Not authenticated - click to update credentials')
     : auth.tokenExp
-      ? `Authenticated — token expires ${new Date(auth.tokenExp * 1000).toLocaleString()}`
+      ? `Authenticated - token expires ${new Date(auth.tokenExp * 1000).toLocaleString()}`
       : 'Authenticated'
 
   return (

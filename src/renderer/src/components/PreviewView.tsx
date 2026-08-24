@@ -50,11 +50,11 @@ interface TocItem {
 interface Props {
   content: string
   theme: 'dark' | 'light'
-  /** Intercepted `<a>` clicks — receives the href as written in the markdown. */
+  /** Intercepted `<a>` clicks - receives the href as written in the markdown. */
   onOpenLink?(href: string): void
 }
 
-/** Unique mermaid render ids — an id colliding with an svg already in the DOM breaks the render. */
+/** Unique mermaid render ids - an id colliding with an svg already in the DOM breaks the render. */
 let mermaidSeq = 0
 
 export function PreviewView({ content, theme, onOpenLink }: Props) {
@@ -64,7 +64,7 @@ export function PreviewView({ content, theme, onOpenLink }: Props) {
   const [toc, setToc] = useState<TocItem[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
 
-  // Never let a link navigate the window — local .md links open in-app,
+  // Never let a link navigate the window - local .md links open in-app,
   // everything else goes through the handler (external browser) or nowhere.
   const handleClick = (event: React.MouseEvent): void => {
     const anchor = (event.target as HTMLElement).closest('a')
@@ -77,7 +77,7 @@ export function PreviewView({ content, theme, onOpenLink }: Props) {
   const meta = useMemo(() => metaLine(content), [content])
 
   // Mermaid diagrams are rendered into the html string itself, not patched into the
-  // container afterwards — React re-applies dangerouslySetInnerHTML on re-renders,
+  // container afterwards - React re-applies dangerouslySetInnerHTML on re-renders,
   // which would silently wipe any DOM patched in behind its back. The plain body
   // (diagram source as placeholder) shows immediately; the enriched html replaces it.
   useEffect(() => {

@@ -42,12 +42,12 @@ function loadJson<T>(key: string, fallback: T): T {
   }
 }
 
-/** Persisted check results — sync state survives restarts, keyed to the docs root. */
+/** Persisted check results - sync state survives restarts, keyed to the docs root. */
 const CHECKS_KEY = 'checkState'
 
 interface SavedChecks {
   root: string
-  /** Epoch ms of the last full check, when one ran — restored into “last checked”. */
+  /** Epoch ms of the last full check, when one ran - restored into “last checked”. */
   at: number | null
   results: CheckFile[]
 }
@@ -63,9 +63,9 @@ export function useApp() {
   const [root, setRoot] = useState('')
   const [entries, setEntries] = useState<Map<string, FileEntry>>(new Map())
   const [selection, setSelection] = useState<string | null>(null)
-  /** Files navigated away from, oldest first — Back pops from the end. */
+  /** Files navigated away from, oldest first - Back pops from the end. */
   const [history, setHistory] = useState<string[]>([])
-  /** Files backed out of — Forward pops from the end; any new navigation clears it. */
+  /** Files backed out of - Forward pops from the end; any new navigation clears it. */
   const [forward, setForward] = useState<string[]>([])
   const [filterText, setFilterText] = useState('')
   const [stateFilter, setStateFilter] = useState<TriageFilter>(null)
@@ -85,9 +85,9 @@ export function useApp() {
   const [authors, setAuthors] = useState<Map<string, VersionEntry | null>>(new Map())
   const [message, setMessage] = useState<Message | null>(null)
 
-  /** Recently opened files, newest first — feeds the dashboard's Continue reading. */
+  /** Recently opened files, newest first - feeds the dashboard's Continue reading. */
   const [recents, setRecents] = useState<Visit[]>(() => loadJson('recentFiles', []))
-  /** Last few pulls / pushes / gets — the dashboard's sync-activity card. */
+  /** Last few pulls / pushes / gets - the dashboard's sync-activity card. */
   const [activity, setActivity] = useState<SyncEvent[]>(() => loadJson('syncActivity', []))
 
   const checkingRef = useRef(false)
@@ -125,7 +125,7 @@ export function useApp() {
     setHistory(stack)
     if (target !== undefined) {
       if (selection !== null) setForward(next => [...next, selection])
-      // Going back is not a new visit — bypass the recording wrapper.
+      // Going back is not a new visit - bypass the recording wrapper.
       setSelection(target)
     }
   }, [entries, history, selection])
@@ -212,7 +212,7 @@ export function useApp() {
   }, [api, fail])
 
   // Initial load: tree first (fast, local), then the auth probe. Checking is never
-  // automatic — the first check is always a deliberate click (or ⌘⇧R).
+  // automatic - the first check is always a deliberate click (or ⌘⇧R).
   useEffect(() => {
     void (async () => {
       try {
@@ -239,7 +239,7 @@ export function useApp() {
     })()
   }, [api, applyChecks, fail, mergeScan])
 
-  // Persist whatever check results exist — full checks, single files, folder checks.
+  // Persist whatever check results exist - full checks, single files, folder checks.
   // An empty result set never overwrites a saved snapshot (startup runs before restore).
   useEffect(() => {
     if (root === '') return
@@ -269,7 +269,7 @@ export function useApp() {
     })()
   }), [api, applyChecks, fail, mergeScan])
 
-  // On window focus: refresh what a check (this session or restored) already established —
+  // On window focus: refresh what a check (this session or restored) already established -
   // full re-check when over an hour old, otherwise just the files needing attention.
   useEffect(() => {
     const onFocus = (): void => {
@@ -326,9 +326,9 @@ export function useApp() {
     const results = await api.pull(paths, force)
     setPullConfirm(null)
     const pulled = results.filter(result => result.status === 'pulled' || result.status === 'updated')
-    // Files that did NOT update are the interesting part — say why, per file.
+    // Files that did NOT update are the interesting part - say why, per file.
     const skipped = results.filter(result => !pulled.includes(result))
-    const detail = skipped.slice(0, 5).map(result => `${normalize(result.file).split('/').at(-1)} — ${result.summary ?? result.status}`)
+    const detail = skipped.slice(0, 5).map(result => `${normalize(result.file).split('/').at(-1)} - ${result.summary ?? result.status}`)
     if (skipped.length > 5) detail.push(`… and ${skipped.length - 5} more`)
     setMessage({ kind: 'info', text: `Pull: ${pulled.length}/${results.length} file(s) updated`, detail: detail.length > 0 ? detail : undefined })
     recordActivity('pulled', pulled.map(result => normalize(result.file)))
@@ -392,10 +392,10 @@ export function useApp() {
         setMessage({ kind: 'info', text: `${name} already tracks page ${result.pageId}` })
         break
       case 'not-found':
-        setMessage({ kind: 'error', text: `No Confluence page titled "${result.title}" — use Create instead` })
+        setMessage({ kind: 'error', text: `No Confluence page titled "${result.title}" - use Create instead` })
         break
       case 'ambiguous':
-        setMessage({ kind: 'error', text: `${result.matchCount} pages share the title "${result.title}" — link manually` })
+        setMessage({ kind: 'error', text: `${result.matchCount} pages share the title "${result.title}" - link manually` })
         break
       default:
         setMessage({ kind: 'error', text: `Sync skipped: ${result?.reason ?? 'no result'}` })
@@ -408,7 +408,7 @@ export function useApp() {
     void runOp('create', async () => {
       const result = await api.create(path, space.trim(), parent.trim() || undefined)
       setCreateForm(null)
-      setMessage({ kind: 'info', text: `Created page ${result.pageId} in ${space} — ${result.title}` })
+      setMessage({ kind: 'info', text: `Created page ${result.pageId} in ${space} - ${result.title}` })
       await recheck([path])
     })
   }, [api, createForm, recheck, runOp])
@@ -434,7 +434,7 @@ export function useApp() {
     const issues = files.flatMap(file => file.issues)
     const name = path.split('/').at(-1)
     if (issues.length === 0) {
-      setMessage({ kind: 'info', text: `Lint passed — ${name} has no issues` })
+      setMessage({ kind: 'info', text: `Lint passed - ${name} has no issues` })
     } else {
       const detail = issues.slice(0, 5).map(issue => `${issue.severity} ${issue.rule}: ${issue.message}`)
       if (issues.length > 5) detail.push(`… and ${issues.length - 5} more`)
@@ -446,11 +446,11 @@ export function useApp() {
     const result = await api.recordBaseline(path)
     const name = path.split('/').at(-1)
     if (result.baselineRecorded) {
-      setMessage({ kind: 'info', text: `${name} verified — baseline recorded at v${result.remoteVersion}` })
+      setMessage({ kind: 'info', text: `${name} verified - baseline recorded at v${result.remoteVersion}` })
       await recheck([path])
     } else {
       setDiff({ path, result })
-      setMessage({ kind: 'error', text: `${name} has the same version but different content — no baseline recorded. Review the diff, then Pull (take Confluence) or Push (publish local).` })
+      setMessage({ kind: 'error', text: `${name} has the same version but different content - no baseline recorded. Review the diff, then Pull (take Confluence) or Push (publish local).` })
     }
   }), [api, recheck, runOp])
 
@@ -468,8 +468,8 @@ export function useApp() {
       }
       if (verified.length > 0) await recheck(verified)
       setMessage(differing > 0
-        ? { kind: 'error', text: `${verified.length} verified; ${differing} differ from Confluence — review them` }
-        : { kind: 'info', text: `${verified.length} file(s) verified — baselines recorded` })
+        ? { kind: 'error', text: `${verified.length} verified; ${differing} differ from Confluence - review them` }
+        : { kind: 'info', text: `${verified.length} file(s) verified - baselines recorded` })
     })
   }, [api, entries, recheck, runOp])
 
@@ -488,7 +488,7 @@ export function useApp() {
     const status = await api.saveApiKey(email, apiToken)
     setAuth(status)
     setMessage(status.ok
-      ? { kind: 'info', text: `API key saved — authenticated as ${status.displayName ?? email}` }
+      ? { kind: 'info', text: `API key saved - authenticated as ${status.displayName ?? email}` }
       : { kind: 'error', text: status.error ?? 'API key rejected' })
   }), [api, runOp])
 
@@ -504,7 +504,7 @@ export function useApp() {
     void api.settingsSet(patch).then(setSettings).catch(fail)
   }, [api, fail])
 
-  /** confluence.assetsDir in the CLI config file — null clears back to the CLI default. */
+  /** confluence.assetsDir in the CLI config file - null clears back to the CLI default. */
   const setAssetsDir = useCallback((dir: string | null) => {
     void api.setAssetsDir(dir).then(setSettings).catch(fail)
   }, [api, fail])
@@ -542,7 +542,7 @@ export function useApp() {
         return
       }
       await applyFolderSettings({ contentDirs: [...settings.contentDirs, picked].sort() })
-      setMessage({ kind: 'info', text: `Added ${picked} — right-click it to check its files` })
+      setMessage({ kind: 'info', text: `Added ${picked} - right-click it to check its files` })
     } catch (error) {
       fail(error)
     }
@@ -554,7 +554,7 @@ export function useApp() {
     void applyFolderSettings({
       contentDirs: settings.contentDirs.filter(entry => entry !== dir),
       pinnedDirs: settings.pinnedDirs.filter(entry => entry !== dir && !entry.startsWith(`${dir}/`)),
-    }).then(() => setMessage({ kind: 'info', text: `Removed ${dir} from the tree — add it back in Settings` }))
+    }).then(() => setMessage({ kind: 'info', text: `Removed ${dir} from the tree - add it back in Settings` }))
   }, [applyFolderSettings, settings])
 
   const togglePin = useCallback((dir: string) => {

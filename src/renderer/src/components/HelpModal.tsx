@@ -9,7 +9,7 @@ const CONCEPTS: Array<{ term: string, text: string }> = [
   },
   {
     term: 'Baseline',
-    text: 'A fingerprint of the file\'s content, stored in .vdoc/state.json inside the docs repository whenever local and Confluence are known to be identical (after a pull, push, get, or successful Verify). It is how local edits are detected: no baseline means a version match cannot prove the contents still agree — the file shows as Unverified.',
+    text: 'A fingerprint of the file\'s content, stored in .vdoc/state.json inside the docs repository whenever local and Confluence are known to be identical (after a pull, push, get, or successful Verify). It is how local edits are detected: no baseline means a version match cannot prove the contents still agree - the file shows as Unverified.',
   },
   {
     term: 'Verify',
@@ -25,7 +25,7 @@ const CONCEPTS: Array<{ term: string, text: string }> = [
   },
 ]
 
-/** States with a hint, in lifecycle order — the confusing one (unverified) up front. */
+/** States with a hint, in lifecycle order - the confusing one (unverified) up front. */
 const STATE_ORDER: DisplayState[] = ['unverified', 'behind', 'ahead', 'local-edits', 'conflict', 'no-version', 'not-found', 'untracked']
 
 export function HelpModal({ onClose }: { onClose(): void }) {

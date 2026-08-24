@@ -51,7 +51,7 @@ export function SettingsModal(props: Props) {
           <h2 className="flex-1 text-[14px] font-semibold text-ink">Settings</h2>
           <button
             onClick={props.onClose}
-            title="Close — esc"
+            title="Close - esc"
             className="flex h-6 w-6 items-center justify-center rounded text-[13px] text-ink-mute hover:bg-hover hover:text-ink"
           >
             ✕
@@ -119,7 +119,7 @@ function Folders({ settings, spaceMapping, busy, onAddFolder, onPickDocsRoot, on
   return (
     <Section
       title="Folders & spaces"
-      description="Folders must live inside the docs repository — only Markdown files are listed. The space prefills Create and narrows Sync's title search."
+      description="Folders must live inside the docs repository - only Markdown files are listed. The space prefills Create and narrows Sync's title search."
     >
       <Field label="DOCS REPOSITORY">
         <div className="flex items-center gap-2">
@@ -162,7 +162,7 @@ function Folders({ settings, spaceMapping, busy, onAddFolder, onPickDocsRoot, on
           </div>
         ))}
         {settings.contentDirs.length === 0 && (
-          <p className="border-t border-divider px-2.5 py-[7px] text-[12px] text-ink-mute">No folders — the tree is empty.</p>
+          <p className="border-t border-divider px-2.5 py-[7px] text-[12px] text-ink-mute">No folders - the tree is empty.</p>
         )}
       </div>
 
@@ -262,7 +262,7 @@ function Auth({ auth, busy, onSaveApiKey, onSetAuthMethod, onRenewToken }: Props
                 value={apiToken}
                 onChange={setApiToken}
                 type="password"
-                placeholder={auth?.hasApiKey ? "stored — paste to replace" : "Atlassian API token"}
+                placeholder={auth?.hasApiKey ? "stored - paste to replace" : "Atlassian API token"}
               />
               <ModalButton
                 label="Save key"
@@ -297,7 +297,7 @@ function Cli({ settings, busy, onUpdate, onReloadVersion }: Props) {
         {settings.version ? (
           <span className="text-ink-dim">{settings.version}</span>
         ) : (
-          <span className="text-conflict">cannot run {settings.resolvedBin} — check the path (and that bun is installed)</span>
+          <span className="text-conflict">cannot run {settings.resolvedBin} - check the path (and that bun is installed)</span>
         )}
         <button
           onClick={onReloadVersion}
@@ -320,7 +320,7 @@ function Config({ settings, onRevealConfig, onEditConfig }: Props) {
             className="flex-1 truncate rounded-md border border-control bg-pane px-2.5 py-[7px] font-mono text-[12.5px] text-ink-dim"
             title={settings.configPath ?? undefined}
           >
-            {settings.configPath ?? "not resolved — is the CLI runnable?"}
+            {settings.configPath ?? "not resolved - is the CLI runnable?"}
           </span>
           <ModalButton label="Show in folder" disabled={settings.configPath === null} onClick={onRevealConfig} />
           <ModalButton label="Edit file" disabled={settings.configPath === null} onClick={onEditConfig} />

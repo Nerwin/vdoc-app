@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 
 import { LOG_MAX, type VdocLogEntry } from '../../../shared/types.ts'
 
-/** Every CLI command the app spawned this session, newest first — the debugging trail. */
+/** Every CLI command the app spawned this session, newest first - the debugging trail. */
 export function LogsView({ notify, onClose }: { notify(text: string): void, onClose(): void }) {
   const [entries, setEntries] = useState<VdocLogEntry[]>([])
   const [openId, setOpenId] = useState<number | null>(null)
@@ -40,7 +40,7 @@ export function LogsView({ notify, onClose }: { notify(text: string): void, onCl
       <div className="flex items-center gap-3 px-[18px] pb-[13px] pt-3.5">
         <h1 className="text-[15px] font-medium text-ink">CLI logs</h1>
         <span className="text-[12px] text-ink-faint">
-          {entries.length} command(s) this session — exit code 1 with results is normal (findings, not failure)
+          {entries.length} command(s) this session - exit code 1 with results is normal (findings, not failure)
         </span>
         <div className="flex-1" />
         <label className="flex items-center gap-1.5 text-[12px] text-ink-dim">

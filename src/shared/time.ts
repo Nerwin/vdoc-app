@@ -8,7 +8,7 @@ export function humanTtl(ms: number): string {
   return `${Math.max(1, Math.floor(ms / 60_000))}m`
 }
 
-/** Relative past time — `just now`, `5m ago`, `3h ago`, `2d ago`. */
+/** Relative past time - `just now`, `5m ago`, `3h ago`, `2d ago`. */
 export function timeAgo(at: number | string | Date): string {
   const minutes = Math.floor((Date.now() - new Date(at).getTime()) / 60_000)
   if (minutes < 1) return 'just now'

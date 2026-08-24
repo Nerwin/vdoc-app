@@ -66,7 +66,7 @@ test('every light text token clears 4.5:1 on its surface', () => {
 })
 
 test('the disabled token stays above the 3:1 non-text floor', () => {
-  // Disabled palette rows are deliberately below 4.5 — but never below the UI-element floor.
+  // Disabled palette rows are deliberately below 4.5 - but never below the UI-element floor.
   assert.ok(contrast(light['--color-ink-ghost'], light['--color-pane']) >= 3)
 })
 

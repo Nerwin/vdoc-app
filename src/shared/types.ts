@@ -133,7 +133,7 @@ export interface AuthStatus {
 export interface ScanFile {
   path: string
   tracked: boolean
-  /** Has uncommitted git changes (purely informational — no sync logic depends on it). */
+  /** Has uncommitted git changes (purely informational - no sync logic depends on it). */
   gitDirty: boolean
 }
 
@@ -156,13 +156,13 @@ export interface VdocLogEntry {
   id: number
   /** Epoch ms when the command started. */
   at: number
-  /** argv after the binary — credential values are replaced with •••. */
+  /** argv after the binary - credential values are replaced with •••. */
   args: string[]
   exitCode: number
   durationMs: number
   /** First 8KB of stdout; hidden entirely for commands that print credentials. */
   stdout: string
-  /** Last 8KB of stderr — the CLI's human log lines. */
+  /** Last 8KB of stderr - the CLI's human log lines. */
   stderr: string
 }
 
@@ -187,9 +187,9 @@ export interface SettingsInfo extends Settings {
   version: string | null
   /** This app's own version (package.json / bundle). */
   appVersion: string
-  /** The CLI config file in use — shared between the CLI and the app. */
+  /** The CLI config file in use - shared between the CLI and the app. */
   configPath: string | null
-  /** confluence.assetsDir from the CLI config file — null = CLI default ("assets"). */
+  /** confluence.assetsDir from the CLI config file - null = CLI default ("assets"). */
   assetsDir: string | null
 }
 
@@ -200,7 +200,7 @@ export interface VdocApi {
   checkCancel(): Promise<void>
   checkFiles(paths: string[]): Promise<CheckFile[]>
   readFile(path: string): Promise<string>
-  /** Overwrite a file inside the docs root — the in-app editor's save. */
+  /** Overwrite a file inside the docs root - the in-app editor's save. */
   writeFile(path: string, content: string): Promise<void>
   /** Docs in the tree whose markdown links resolve to this file. */
   backlinks(path: string): Promise<string[]>
@@ -226,7 +226,7 @@ export interface VdocApi {
   setToken(token: string): Promise<AuthStatus>
   saveApiKey(email: string, apiToken: string): Promise<AuthStatus>
   setAuthMethod(method: 'api-token' | 'session-token'): Promise<AuthStatus>
-  /** The page's Confluence URL — copy it, or open it via openExternal. */
+  /** The page's Confluence URL - copy it, or open it via openExternal. */
   confluenceUrl(path: string): Promise<string>
   openEditor(path: string): Promise<void>
   revealFinder(path: string): Promise<void>

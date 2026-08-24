@@ -6,7 +6,7 @@ export function CodeView({ content, onChange, onSave }: {
   content: string
   /** Present = editable; called with the full text after every edit. */
   onChange?: (text: string) => void
-  /** ⌘S — flush pending edits to disk immediately. */
+  /** ⌘S - flush pending edits to disk immediately. */
   onSave?: () => void
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -45,7 +45,7 @@ export function CodeView({ content, onChange, onSave }: {
     editorRef.current?.updateOptions({ readOnly: !editable })
   }, [editable])
 
-  // Only push external content in — echoing the editor's own value back via
+  // Only push external content in - echoing the editor's own value back via
   // setValue would reset the cursor on every keystroke.
   useEffect(() => {
     const editor = editorRef.current

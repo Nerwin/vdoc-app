@@ -10,7 +10,7 @@ interface Props {
   entries: Map<string, FileEntry>
   /** `command` opens pre-seeded with `> `; deleting it drops back to file mode. */
   mode: 'file' | 'command' | 'recent'
-  /** Recently opened paths, newest first — the pool in `recent` mode. */
+  /** Recently opened paths, newest first - the pool in `recent` mode. */
   recents: string[]
   onPick(path: string): void
   onRun(command: Command): void
@@ -34,7 +34,7 @@ function pushRecent(id: string): void {
   localStorage.setItem(RECENT_KEY, JSON.stringify([id, ...readRecent().filter(other => other !== id)].slice(0, 8)))
 }
 
-/** Bold the matched characters — indices come from the ranking pass (one walk, not two). */
+/** Bold the matched characters - indices come from the ranking pass (one walk, not two). */
 function Highlight({ text, indices }: { text: string, indices: number[] }) {
   const marked = new Set(indices)
   if (marked.size === 0) return <>{text}</>
@@ -63,7 +63,7 @@ export function CommandPalette({ ctx, entries, mode, recents, onPick, onRun, onC
   const [query, setQuery] = useState(mode === 'command' ? '> ' : '')
   const [index, setIndex] = useState(0)
   const listRef = useRef<HTMLUListElement>(null)
-  // The whole corpus re-ranks on every keystroke — defer it so typing never stutters.
+  // The whole corpus re-ranks on every keystroke - defer it so typing never stutters.
   const deferred = useDeferredValue(query)
   const commandMode = deferred.startsWith('>')
   const search = commandMode ? deferred.slice(1).trim() : deferred
@@ -224,7 +224,7 @@ function CommandRow({ row, ctx, selected, onClick, position }: {
     <button
       data-row={position}
       onClick={onClick}
-      title={row.disabled ? `${label} — ${row.disabled}` : label}
+      title={row.disabled ? `${label} - ${row.disabled}` : label}
       className={`grid w-full grid-cols-[22px_1fr_auto] items-center gap-[10px] px-[14px] py-[7px] text-left ${
         selected ? 'bg-selected shadow-[inset_2px_0_0_var(--color-select-edge)]' : 'hover:bg-row-hover'
       }`}
@@ -234,11 +234,11 @@ function CommandRow({ row, ctx, selected, onClick, position }: {
       </span>
       <span className={`min-w-0 truncate text-[13px] ${row.disabled ? 'text-ink-ghost' : 'text-ink'}`}>
         <Highlight text={label} indices={row.indices ?? []} />
-        {suffix && <span className={row.disabled ? 'text-ink-ghost' : 'text-ink-dim'}> — {suffix}</span>}
+        {suffix && <span className={row.disabled ? 'text-ink-ghost' : 'text-ink-dim'}> - {suffix}</span>}
       </span>
       <span className="flex shrink-0 items-center gap-[3px]">
         {caps.length === 0
-          ? <span className="text-[11px] text-ink-mute">—</span>
+          ? <span className="text-[11px] text-ink-mute">-</span>
           : caps.map((cap, index) => (
               <kbd
                 key={index}

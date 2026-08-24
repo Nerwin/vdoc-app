@@ -32,7 +32,7 @@ interface Props {
 
 const SEVERITY: DisplayState[] = ['conflict', 'not-found', 'behind', 'local-edits', 'ahead']
 
-/** States where the remote moved — worth showing who changed it. */
+/** States where the remote moved - worth showing who changed it. */
 const REMOTE_MOVED: DisplayState[] = ['conflict', 'behind']
 
 const SECTION_LABEL = 'mb-2.5 text-[10.5px] uppercase tracking-[0.12em] text-ink-ghost'
@@ -59,7 +59,7 @@ export function Dashboard(props: Props) {
     [props.entries, props.recents],
   )
 
-  // Doc titles come from the files' frontmatter — a filename is the fallback, never the goal.
+  // Doc titles come from the files' frontmatter - a filename is the fallback, never the goal.
   const [titles, setTitles] = useState<Map<string, string>>(new Map())
   useEffect(() => {
     const missing = recents.filter(visit => !titles.has(visit.path))
@@ -204,7 +204,7 @@ export function Dashboard(props: Props) {
                       <span className={`font-mono text-[11px] ${meta.color}`}>{meta.label}</span>
                       {check && (
                         <span className="font-mono text-[11px] text-ink-dim">
-                          v{check.localVersion ?? '—'} → v{check.remoteVersion ?? '—'}
+                          v{check.localVersion ?? '-'} → v{check.remoteVersion ?? '-'}
                         </span>
                       )}
                       {REMOTE_MOVED.includes(state) && (
@@ -222,7 +222,7 @@ export function Dashboard(props: Props) {
       {props.unverifiedCount > 0 && (
         <footer className="mt-6 border-t border-line pt-4">
           <p className="mb-2 text-[12px] text-ink-dim">
-            <span className="text-warn">◌</span> {props.unverifiedCount} tracked file(s) have no local-edit baseline —
+            <span className="text-warn">◌</span> {props.unverifiedCount} tracked file(s) have no local-edit baseline -
             content is compared against Confluence and, when identical, the baseline is recorded so they can turn green.
           </p>
           <button
@@ -250,7 +250,7 @@ function QuickAction({ label, keycap, onClick }: { label: string, keycap?: strin
   )
 }
 
-/** Raw Atlassian account ids (not mapped in the metadata file) are noise — soften them. */
+/** Raw Atlassian account ids (not mapped in the metadata file) are noise - soften them. */
 function displayAuthor(author: string): string {
   return /^\w+:[\w-]{20,}$/.test(author) ? 'unmapped user' : author
 }

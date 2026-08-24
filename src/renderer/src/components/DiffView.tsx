@@ -3,9 +3,9 @@ import { useEffect, useRef } from 'react'
 import { EDITOR_FONT, monaco } from './monaco-setup.ts'
 
 interface Props {
-  /** Remote (Confluence) body — the "original" side. */
+  /** Remote (Confluence) body - the "original" side. */
   remote: string
-  /** Local file body — the "modified" side. */
+  /** Local file body - the "modified" side. */
   local: string
 }
 

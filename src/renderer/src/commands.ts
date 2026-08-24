@@ -11,7 +11,7 @@ export type CommandGroup = 'Sync' | 'File' | 'View' | 'App'
 
 export const IS_MAC = navigator.platform.startsWith('Mac')
 
-/** The platform's primary modifier — ⌘ on macOS, Ctrl elsewhere. */
+/** The platform's primary modifier - ⌘ on macOS, Ctrl elsewhere. */
 export const isMod = (event: KeyboardEvent): boolean => (IS_MAC ? event.metaKey : event.ctrlKey)
 
 export interface KeyBinding {
@@ -52,7 +52,7 @@ export interface CommandContext {
 export interface Command {
   id: string
   group: CommandGroup
-  /** Without the scope — the palette renders `${group}: ${label}`. */
+  /** Without the scope - the palette renders `${group}: ${label}`. */
   label: string
   icon: string
   /** Icon tint; the palette maps it to a state colour. */
@@ -76,7 +76,7 @@ const idle = (ctx: CommandContext): string | undefined => (ctx.busy || ctx.check
 
 const online = (ctx: CommandContext): string | undefined => (ctx.connected ? undefined : 'not connected to Confluence')
 
-/** First failing precondition wins — the palette shows exactly one reason. */
+/** First failing precondition wins - the palette shows exactly one reason. */
 const all = (...checks: Array<(ctx: CommandContext) => string | undefined>) =>
   (ctx: CommandContext): string | undefined => {
     for (const check of checks) {
@@ -89,7 +89,7 @@ const all = (...checks: Array<(ctx: CommandContext) => string | undefined>) =>
 const versions = (ctx: CommandContext): string | undefined => {
   const check = ctx.entry?.check
   if (!check || (check.localVersion === undefined && check.remoteVersion === undefined)) return undefined
-  return `v${check.localVersion ?? '—'} → v${check.remoteVersion ?? '—'}`
+  return `v${check.localVersion ?? '-'} → v${check.remoteVersion ?? '-'}`
 }
 
 const copy = (ctx: CommandContext, text: string, what: string): void => {
@@ -202,7 +202,7 @@ export const COMMANDS: Command[] = [
     icon: '⇣',
     tint: 'pull',
     reason: all(
-      ctx => ((ctx.app.settings?.contentDirs.length ?? 0) > 0 ? undefined : 'no folders in the tree — add one in Settings'),
+      ctx => ((ctx.app.settings?.contentDirs.length ?? 0) > 0 ? undefined : 'no folders in the tree - add one in Settings'),
       idle,
       online,
     ),
@@ -300,7 +300,7 @@ export const COMMANDS: Command[] = [
     group: 'File',
     label: 'Copy page ID',
     icon: '⧉',
-    reason: all(linked, ctx => (ctx.entry?.check?.pageId ? undefined : 'page id unknown — check the file first')),
+    reason: all(linked, ctx => (ctx.entry?.check?.pageId ? undefined : 'page id unknown - check the file first')),
     run: ctx => copy(ctx, ctx.entry!.check!.pageId!, 'Page ID'),
   },
   {
@@ -442,7 +442,7 @@ export function command(id: string): Command {
   return found
 }
 
-/** One cap per key — `⌘⇧R` (mac) / `Ctrl` `Shift` `R` (elsewhere) renders as three caps. */
+/** One cap per key - `⌘⇧R` (mac) / `Ctrl` `Shift` `R` (elsewhere) renders as three caps. */
 export function keycaps(keys: KeyBinding | undefined): string[] {
   if (!keys) return []
   const caps: string[] = []
@@ -459,12 +459,12 @@ export function keycaps(keys: KeyBinding | undefined): string[] {
   return caps
 }
 
-/** Flat form for tooltips and menu rows — `⌘⇧R` / `Ctrl+Shift+R`. */
+/** Flat form for tooltips and menu rows - `⌘⇧R` / `Ctrl+Shift+R`. */
 export function shortcutLabel(id: string): string {
   return keycaps(command(id).keys).join(IS_MAC ? '' : '+')
 }
 
-/** `Sync: Check this file` — the palette label, also used for fuzzy matching. */
+/** `Sync: Check this file` - the palette label, also used for fuzzy matching. */
 export function fullLabel(cmd: Command): string {
   return `${cmd.group}: ${cmd.label}`
 }
@@ -479,7 +479,7 @@ function matches(keys: KeyBinding, event: KeyboardEvent): boolean {
     && !otherMod
 }
 
-/** The bound, currently-available command for a key event — or undefined. */
+/** The bound, currently-available command for a key event - or undefined. */
 export function commandFor(event: KeyboardEvent, ctx: CommandContext): Command | undefined {
   return COMMANDS.find(cmd => cmd.keys && matches(cmd.keys, event) && cmd.reason?.(ctx) === undefined)
 }

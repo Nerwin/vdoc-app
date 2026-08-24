@@ -40,7 +40,7 @@ monaco.editor.defineTheme('vdoc-light', {
   },
 })
 
-/** Monaco themes are global — one call restyles every open editor. */
+/** Monaco themes are global - one call restyles every open editor. */
 export function applyMonacoTheme(theme: 'dark' | 'light'): void {
   monaco.editor.setTheme(theme === 'light' ? 'vdoc-light' : 'vdoc-dark')
 }

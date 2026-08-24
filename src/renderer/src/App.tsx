@@ -66,7 +66,7 @@ export function App() {
   const taskRunning = app.checking !== null || app.busyOp !== null
   const connected = app.auth?.ok === true
 
-  // A new selection starts on Preview — reading is the common case; ⌘1 drops into
+  // A new selection starts on Preview - reading is the common case; ⌘1 drops into
   // the editor. A freshly loaded diff takes the stage (see DetailPane).
   useEffect(() => setView('preview'), [app.selection])
 
@@ -105,7 +105,7 @@ export function App() {
   const ctxRef = useRef(ctx)
   ctxRef.current = ctx
 
-  // Global shortcuts stand down while any dialog is open — each dialog owns its keys.
+  // Global shortcuts stand down while any dialog is open - each dialog owns its keys.
   const dialogOpen = palette !== null || tokenOpen || settingsOpen || helpOpen
     || app.pushPreview !== null || app.pullConfirm !== null || app.createForm !== null || app.getForm
 
@@ -326,7 +326,7 @@ export function App() {
             <>
               <ModalButton label="Cancel" onClick={() => app.setPushPreview(null)} />
               <ModalButton
-                label={app.pushPreview.force ? 'Force push — overwrite remote' : 'Push to Confluence'}
+                label={app.pushPreview.force ? 'Force push - overwrite remote' : 'Push to Confluence'}
                 primary={!app.pushPreview.force}
                 danger={app.pushPreview.force}
                 disabled={app.busyOp === 'push'}
@@ -338,8 +338,8 @@ export function App() {
           {app.pushPreview.force && (
             <p className="mb-2 text-conflict">
               Confluence moved to v{app.pushPreview.result.version} since this file was last pulled
-              (it records v{app.entries.get(app.pushPreview.path)?.check?.localVersion ?? '—'}).
-              Force pushing replaces the remote edits with your local content — compare first if unsure.
+              (it records v{app.entries.get(app.pushPreview.path)?.check?.localVersion ?? '-'}).
+              Force pushing replaces the remote edits with your local content - compare first if unsure.
             </p>
           )}
           <DryRunSummary preview={app.pushPreview.result} />
@@ -415,7 +415,7 @@ export function App() {
           {app.pullConfirm.force && (
             <p className="mb-2 text-conflict">
               This file has (or may have) local edits. Pulling with force replaces the local body with the Confluence
-              version — compare first if unsure.
+              version - compare first if unsure.
             </p>
           )}
           <ul className="space-y-0.5 font-mono text-[11px]">
@@ -425,7 +425,7 @@ export function App() {
                 <li key={path} className="truncate">
                   {path}
                   {entry?.check && (
-                    <span className="text-ink-faint"> v{entry.check.localVersion ?? '—'} → v{entry.check.remoteVersion ?? '—'}</span>
+                    <span className="text-ink-faint"> v{entry.check.localVersion ?? '-'} → v{entry.check.remoteVersion ?? '-'}</span>
                   )}
                 </li>
               )
@@ -440,12 +440,12 @@ export function App() {
 function DryRunSummary({ preview }: { preview: { pageId: string, version: number, resolvedLinks?: number, unresolvedLinks?: number } }) {
   return (
     <div className="space-y-1 font-mono text-[12px]">
-      <p>Page <span className="text-ink">{preview.pageId}</span> — currently v{preview.version}, push writes v{preview.version + 1}</p>
+      <p>Page <span className="text-ink">{preview.pageId}</span> - currently v{preview.version}, push writes v{preview.version + 1}</p>
       <p>{preview.resolvedLinks ?? 0} relative link(s) resolve to Confluence URLs</p>
       {(preview.unresolvedLinks ?? 0) > 0 && (
         <p className="text-warn">{preview.unresolvedLinks} link(s) cannot be resolved and stay as-is</p>
       )}
-      <p className="pt-1 text-ink-faint">Dry run verified against the live remote version. The source file is never rewritten — links resolve at push time only.</p>
+      <p className="pt-1 text-ink-faint">Dry run verified against the live remote version. The source file is never rewritten - links resolve at push time only.</p>
     </div>
   )
 }
