@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 
-import type { AuthStatus, Settings, SettingsInfo } from "../../../shared/types.ts";
+import type { AuthStatus, CredentialKey, Settings, SettingsInfo } from "../../../shared/types.ts";
 import { humanTtl } from "../../../shared/time.ts";
 import { ModalButton } from "./Modal.tsx";
 
@@ -15,6 +15,8 @@ interface Props {
   onReloadVersion(): void;
   onSaveApiKey(email: string, apiToken: string): void;
   onSetAuthMethod(method: "api-token" | "session-token"): void;
+  onCredentialPreview(key: CredentialKey): Promise<string | null>;
+  onClearCredential(key: CredentialKey): void;
   onAddFolder(): void;
   onPickDocsRoot(): void;
   onRemoveFolder(path: string): void;
@@ -239,7 +241,7 @@ function Confluence(props: Props) {
   );
 }
 
-function Auth({ auth, busy, onSaveApiKey, onSetAuthMethod, onRenewToken }: Props) {
+function Auth({ auth, busy, onSaveApiKey, onSetAuthMethod, onRenewToken, onCredentialPreview, onClearCredential }: Props) {
   const [method, setMethod] = useState<"api-token" | "session-token">(auth?.method === "api-token" ? "api-token" : "session-token");
   const [email, setEmail] = useState(auth?.email ?? "");
   const [apiToken, setApiToken] = useState("");
@@ -277,10 +279,14 @@ function Auth({ auth, busy, onSaveApiKey, onSetAuthMethod, onRenewToken }: Props
         {method === "session-token" && <ModalButton label="Renew…" onClick={onRenewToken} />}
       </div>
 
+      {method === "session-token" && auth?.hasSessionToken && (
+        <StoredSecret name="session token" secretKey="sessionToken" busy={busy} onPreview={onCredentialPreview} onRemove={onClearCredential} />
+      )}
+
       {method === "api-token" && (
         <>
           <Field label="EMAIL">
-            <TextInput value={email} onChange={setEmail} placeholder="you@company.com" />
+            <TextInput value={email} onChange={setEmail} placeholder="you@company.com - leave empty for a service account" />
           </Field>
           <Field label="API TOKEN">
             <div className="flex items-center gap-2">
@@ -292,7 +298,7 @@ function Auth({ auth, busy, onSaveApiKey, onSetAuthMethod, onRenewToken }: Props
               />
               <ModalButton
                 label="Save key"
-                disabled={email.trim() === "" || apiToken.trim() === "" || busy}
+                disabled={apiToken.trim() === "" || busy}
                 onClick={() => {
                   onSaveApiKey(email, apiToken);
                   setApiToken("");
@@ -300,9 +306,36 @@ function Auth({ auth, busy, onSaveApiKey, onSetAuthMethod, onRenewToken }: Props
               />
             </div>
           </Field>
+          {auth?.hasApiKey && (
+            <StoredSecret name="API key" secretKey="apiToken" busy={busy} onPreview={onCredentialPreview} onRemove={onClearCredential} />
+          )}
           <InfoStrip>Stored encrypted via config set --encrypt and activated immediately.</InfoStrip>
         </>
       )}
+    </div>
+  );
+}
+
+/** One stored secret: masked identity on demand (Show), removal via config set with an empty value. */
+function StoredSecret({ name, secretKey, busy, onPreview, onRemove }: {
+  name: string;
+  secretKey: CredentialKey;
+  busy: boolean;
+  onPreview(key: CredentialKey): Promise<string | null>;
+  onRemove(key: CredentialKey): void;
+}) {
+  const [preview, setPreview] = useState<string | null>(null);
+
+  return (
+    <div className="flex items-center gap-2 rounded-md border border-control bg-sidebar px-3 py-2">
+      <span className="min-w-0 flex-1 truncate text-[12px] text-ink-dim">
+        Stored {name}: <code className="font-mono text-ink">{preview ?? "••••••••"}</code>
+      </span>
+      <ModalButton
+        label={preview ? "Hide" : "Show"}
+        onClick={() => (preview ? setPreview(null) : void onPreview(secretKey).then(setPreview))}
+      />
+      <ModalButton label="Remove" danger disabled={busy} onClick={() => onRemove(secretKey)} />
     </div>
   );
 }

@@ -358,6 +358,8 @@ export function App() {
           onReloadVersion={app.reloadVersion}
           onSaveApiKey={(email, token) => void app.saveApiKey(email, token)}
           onSetAuthMethod={method => void app.setAuthMethod(method)}
+          onCredentialPreview={app.credentialPreview}
+          onClearCredential={key => void app.clearCredential(key)}
           onAddFolder={() => void app.addFolder()}
           onPickDocsRoot={() => void app.pickDocsRoot()}
           onRemoveFolder={app.removeFolder}

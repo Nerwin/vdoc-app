@@ -118,6 +118,9 @@ export interface LintFile {
   issues: LintIssue[]
 }
 
+/** The two secrets stored in the CLI config file. */
+export type CredentialKey = 'apiToken' | 'sessionToken'
+
 export interface AuthStatus {
   ok: boolean
   method: 'api-token' | 'session-token' | 'none'
@@ -126,6 +129,8 @@ export interface AuthStatus {
   tokenExp?: number
   /** An API key is stored in the config (regardless of the active method). */
   hasApiKey: boolean
+  /** A session token is stored in the config (regardless of the active method). */
+  hasSessionToken: boolean
   email?: string
   error?: string
 }
@@ -226,8 +231,13 @@ export interface VdocApi {
   lint(path: string): Promise<LintFile[]>
   authStatus(): Promise<AuthStatus>
   setToken(token: string): Promise<AuthStatus>
+  /** Empty email = service account key (the CLI needs no confluence.email then). */
   saveApiKey(email: string, apiToken: string): Promise<AuthStatus>
   setAuthMethod(method: 'api-token' | 'session-token'): Promise<AuthStatus>
+  /** Masked stored credential (first 4 + last 4 chars), or null when none is set. */
+  credentialPreview(key: CredentialKey): Promise<string | null>
+  /** Remove a stored credential (`config set` with an empty string). */
+  clearCredential(key: CredentialKey): Promise<AuthStatus>
   /** The page's Confluence URL - copy it, or open it via openExternal. */
   confluenceUrl(path: string): Promise<string>
   openEditor(path: string): Promise<void>

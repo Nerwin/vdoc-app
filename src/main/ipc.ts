@@ -2,7 +2,8 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 
-import type { AuthStatus, CheckFile, CommentEntry, CreateResult, DiffResult, GetPageResult, LintFile, PullFile, PushFile, Settings, SettingsInfo, SyncFile, VersionEntry } from '../shared/types.ts'
+import type { AuthStatus, CheckFile, CommentEntry, CreateResult, CredentialKey, DiffResult, GetPageResult, LintFile, PullFile, PushFile, Settings, SettingsInfo, SyncFile, VersionEntry } from '../shared/types.ts'
+import { maskSecret } from '../shared/secret.ts'
 import { backlinksTo, docsRoot, fileForPageId, gitDirtyFiles, resolvedVdocBin, runVdoc, runVdocJson, scanMarkdownFiles, setVdocBin, vdocLogs } from './vdoc.ts'
 import { loadSettings, saveSettings } from './settings.ts'
 import { watchDocs } from './watcher.ts'
@@ -136,9 +137,23 @@ export function registerIpc(): void {
   })
 
   ipcMain.handle('save-api-key', async (_event, email: string, apiToken: string) => {
-    await runVdocJson(['config', 'set', 'confluence.email', email.trim()])
+    // Service-account keys carry no email - clear any stale one so the CLI doesn't combine them.
+    if (email.trim() === '') await runVdocJson(['config', 'set', 'confluence.email', '--delete'])
+    else await runVdocJson(['config', 'set', 'confluence.email', email.trim()])
     await runVdocJson(['config', 'set', 'confluence.apiToken', '--encrypt', apiToken.trim()])
     await runVdocJson(['config', 'set', 'confluence.authMethod', 'api-token'])
+    return authStatus()
+  })
+
+  ipcMain.handle('credential-preview', async (_event, key: CredentialKey) => {
+    assertCredentialKey(key)
+    const value = (await confluenceConfig())[key]
+    return value ? maskSecret(value) : null
+  })
+
+  ipcMain.handle('credential-clear', async (_event, key: CredentialKey) => {
+    assertCredentialKey(key)
+    await runVdocJson(['config', 'set', `confluence.${key}`, ''])
     return authStatus()
   })
 
@@ -280,10 +295,19 @@ interface ConfluenceConfig {
   email?: string
 }
 
+function assertCredentialKey(key: string): void {
+  if (key !== 'apiToken' && key !== 'sessionToken') throw new Error(`Not a credential key: ${key}`)
+}
+
+/** The decrypted confluence section of the config file ({} when unreadable). */
+function confluenceConfig(): Promise<ConfluenceConfig> {
+  return runVdocJson<ConfluenceConfig>(['config', 'get', 'confluence', '--decrypt'])
+    .catch(() => ({}) as ConfluenceConfig)
+}
+
 /** Probe credentials via whoami; tokens themselves never leave the main process. */
 async function authStatus(): Promise<AuthStatus> {
-  const config = await runVdocJson<ConfluenceConfig>(['config', 'get', 'confluence', '--decrypt'])
-    .catch(() => ({}) as ConfluenceConfig)
+  const config = await confluenceConfig()
 
   // Mirror the CLI's resolution: an explicit session-token preference skips the stored API key.
   const method: AuthStatus['method'] = config.authMethod === 'session-token'
@@ -292,7 +316,7 @@ async function authStatus(): Promise<AuthStatus> {
       ? 'api-token'
       : config.sessionToken ? 'session-token' : 'none'
   const tokenExp = method === 'session-token' && config.sessionToken ? decodeJwtExp(config.sessionToken) : undefined
-  const base = { method, tokenExp, hasApiKey: Boolean(config.apiToken), email: config.email }
+  const base = { method, tokenExp, hasApiKey: Boolean(config.apiToken), hasSessionToken: Boolean(config.sessionToken), email: config.email }
 
   if (method === 'none') return { ok: false, ...base, error: 'No Confluence credentials configured' }
 

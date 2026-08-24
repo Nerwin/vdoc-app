@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import type { AuthStatus, CheckFile, DiffResult, PushFile, ScanFile, Settings, SettingsInfo, TriageFilter, VersionEntry } from '../../shared/types.ts'
+import type { AuthStatus, CheckFile, CredentialKey, DiffResult, PushFile, ScanFile, Settings, SettingsInfo, TriageFilter, VersionEntry } from '../../shared/types.ts'
 import { displayState, needsAttention, type FileEntry } from '../../shared/status.ts'
 import { STATE_META } from './state-meta.ts'
 
@@ -492,6 +492,12 @@ export function useApp() {
       : { kind: 'error', text: status.error ?? 'API key rejected' })
   }), [api, runOp])
 
+  const clearCredential = useCallback((key: CredentialKey) => runOp('remove credential', async () => {
+    const status = await api.clearCredential(key)
+    setAuth(status)
+    setMessage({ kind: 'info', text: `${key === 'apiToken' ? 'API key' : 'Session token'} removed from the config file` })
+  }), [api, runOp])
+
   const setAuthMethod = useCallback((method: 'api-token' | 'session-token') => runOp('switch auth', async () => {
     const status = await api.setAuthMethod(method)
     setAuth(status)
@@ -678,6 +684,11 @@ export function useApp() {
     verifyAllUnverified,
     saveApiKey,
     setAuthMethod,
+    clearCredential,
+    credentialPreview: (key: CredentialKey) => api.credentialPreview(key).catch(error => {
+      fail(error)
+      return null
+    }),
     message,
     dismissMessage: () => setMessage(null),
     notify: (text: string) => setMessage({ kind: 'info', text }),
