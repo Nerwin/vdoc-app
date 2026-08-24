@@ -431,6 +431,13 @@ export const COMMANDS: Command[] = [
     run: ctx => ctx.openTour(),
   },
   {
+    id: 'app.checkUpdate',
+    group: 'App',
+    label: 'Check for updates',
+    icon: '⇡',
+    run: ctx => void ctx.app.checkUpdateNow(),
+  },
+  {
     id: 'app.revealConfig',
     group: 'App',
     label: 'Open config file',
