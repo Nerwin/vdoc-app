@@ -1,3 +1,4 @@
+import { captureException } from '@sentry/electron/renderer'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { AuthStatus, CheckFile, CredentialKey, DiffResult, PushFile, ScanFile, Settings, SettingsInfo, TriageFilter, UpdateInfo, VersionEntry } from '../../shared/types.ts'
@@ -144,6 +145,7 @@ export function useApp() {
   }, [entries, forward, selection])
 
   const fail = useCallback((error: unknown) => {
+    captureException(error)
     const raw = error instanceof Error ? error.message : String(error)
     // Electron wraps IPC rejections: "Error invoking remote method 'x': Error: <real message>"
     const text = raw.replace(/^Error invoking remote method '[^']+': (?:\w*Error: )?/, '')

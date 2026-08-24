@@ -1,4 +1,4 @@
-import { init as sentryInit } from '@sentry/electron/renderer'
+import { captureException, init as sentryInit } from '@sentry/electron/renderer'
 import { Component, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 
@@ -15,6 +15,11 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
 
   static getDerivedStateFromError(error: Error): { error: Error } {
     return { error }
+  }
+
+  // React 19 does not rethrow boundary-caught errors to window, so report here.
+  componentDidCatch(error: Error): void {
+    captureException(error)
   }
 
   render(): ReactNode {
