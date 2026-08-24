@@ -41,6 +41,7 @@ const api: VdocApi = {
   settingsGet: () => ipcRenderer.invoke('settings-get'),
   settingsSet: patch => ipcRenderer.invoke('settings-set', patch),
   setAssetsDir: dir => ipcRenderer.invoke('set-assets-dir', dir),
+  setSite: site => ipcRenderer.invoke('set-site', site),
   vdocVersion: () => ipcRenderer.invoke('vdoc-version'),
   pickFolder: () => ipcRenderer.invoke('pick-folder'),
   pickDocsRoot: () => ipcRenderer.invoke('pick-docs-root'),

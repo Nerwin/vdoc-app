@@ -210,6 +210,12 @@ export function registerIpc(): void {
     return settingsInfo()
   })
 
+  ipcMain.handle('set-site', async (_event, site: string | null) => {
+    if (site === null) await runVdocJson(['config', 'set', 'confluence.site', '--delete'])
+    else await runVdocJson(['config', 'set', 'confluence.site', site])
+    return settingsInfo()
+  })
+
   ipcMain.handle('space-mapping-get', () => spaceMapping())
 
   ipcMain.handle('space-mapping-set', async (_event, dir: string, space: string | null) => {
@@ -239,17 +245,21 @@ export function registerIpc(): void {
 
 async function settingsInfo(): Promise<SettingsInfo> {
   const configPath = await runVdocJson<{ path: string }>(['config', 'path']).then(r => r.path).catch(() => null)
-  // `config get <key> --json` wraps scalars as { "<key>": value }.
-  const assetsDir = await runVdocJson<Record<string, unknown>>(['config', 'get', 'confluence.assetsDir'])
+  const [assetsDir, site] = await Promise.all([configScalar('confluence.assetsDir'), configScalar('confluence.site')])
+  return { ...loadSettings(), resolvedBin: resolvedVdocBin(), resolvedRoot: docsRoot(), version: await probeVersion(), appVersion: app.getVersion(), configPath, assetsDir, site }
+}
+
+/** One string value from the config file - `config get <key> --json` wraps scalars as { "<key>": value }. */
+function configScalar(key: string): Promise<string | null> {
+  return runVdocJson<Record<string, unknown>>(['config', 'get', key])
     .then(result => {
-      const value = result?.['confluence.assetsDir']
+      const value = result?.[key]
       return typeof value === 'string' && value !== '' ? value : null
     })
     .catch(() => null)
-  return { ...loadSettings(), resolvedBin: resolvedVdocBin(), resolvedRoot: docsRoot(), version: await probeVersion(), appVersion: app.getVersion(), configPath, assetsDir }
 }
 
-/** The shared .vdocrc's folder → space mapping ({} when absent). */
+/** The shared config file's folder → space mapping ({} when absent). */
 function spaceMapping(): Promise<Record<string, string>> {
   return runVdocJson<Record<string, string>>(['config', 'get', 'confluence.spaceMapping'])
     .then(mapping => mapping ?? {})

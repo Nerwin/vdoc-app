@@ -509,6 +509,11 @@ export function useApp() {
     void api.setAssetsDir(dir).then(setSettings).catch(fail)
   }, [api, fail])
 
+  /** confluence.site in the CLI config file - null clears it. */
+  const setSite = useCallback((site: string | null) => {
+    void api.setSite(site).then(setSettings).catch(fail)
+  }, [api, fail])
+
   /** Settings change that alters which files exist in the tree → rescan after. */
   const applyFolderSettings = useCallback(async (patch: Partial<Settings>) => {
     try {
@@ -655,6 +660,7 @@ export function useApp() {
     settings,
     updateSettings,
     setAssetsDir,
+    setSite,
     reloadVersion,
     addFolder,
     pickDocsRoot,

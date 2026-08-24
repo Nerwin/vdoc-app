@@ -191,6 +191,8 @@ export interface SettingsInfo extends Settings {
   configPath: string | null
   /** confluence.assetsDir from the CLI config file - null = CLI default ("assets"). */
   assetsDir: string | null
+  /** confluence.site from the CLI config file (bare hostname, e.g. "your-org.atlassian.net"). */
+  site: string | null
 }
 
 export interface VdocApi {
@@ -234,13 +236,15 @@ export interface VdocApi {
   settingsSet(patch: Partial<Settings>): Promise<SettingsInfo>
   /** Set (or clear with null) confluence.assetsDir in the CLI config file. */
   setAssetsDir(dir: string | null): Promise<SettingsInfo>
+  /** Set (or clear with null) confluence.site in the CLI config file. */
+  setSite(site: string | null): Promise<SettingsInfo>
   vdocVersion(): Promise<string | null>
   /** Native folder picker rooted at the docs repo; returns a relative path or null. */
   pickFolder(): Promise<string | null>
   /** Native folder picker for the docs repository itself; returns an absolute path or null. */
   pickDocsRoot(): Promise<string | null>
   openFolder(path: string): Promise<void>
-  /** Folder → Confluence space mapping, stored in the shared .vdocrc. */
+  /** Folder → Confluence space mapping, stored in the shared config file. */
   spaceMappingGet(): Promise<Record<string, string>>
   /** Set (or delete with null) one mapping entry; returns the fresh mapping. */
   spaceMappingSet(dir: string, space: string | null): Promise<Record<string, string>>

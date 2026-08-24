@@ -354,6 +354,7 @@ export function App() {
           spaceMapping={app.spaceMapping}
           onUpdate={app.updateSettings}
           onSetAssetsDir={app.setAssetsDir}
+          onSetSite={app.setSite}
           onReloadVersion={app.reloadVersion}
           onSaveApiKey={(email, token) => void app.saveApiKey(email, token)}
           onSetAuthMethod={method => void app.setAuthMethod(method)}

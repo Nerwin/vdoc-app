@@ -11,6 +11,7 @@ interface Props {
   spaceMapping: Record<string, string>;
   onUpdate(patch: Partial<Settings>): void;
   onSetAssetsDir(dir: string | null): void;
+  onSetSite(site: string | null): void;
   onReloadVersion(): void;
   onSaveApiKey(email: string, apiToken: string): void;
   onSetAuthMethod(method: "api-token" | "session-token"): void;
@@ -24,7 +25,7 @@ interface Props {
   onClose(): void;
 }
 
-const SECTIONS = ["Appearance", "Folders & spaces", "Confluence auth", "vdoc CLI", "Config file"] as const;
+const SECTIONS = ["Appearance", "Folders & spaces", "Confluence", "vdoc CLI", "Config file"] as const;
 type Section = (typeof SECTIONS)[number];
 
 export function SettingsModal(props: Props) {
@@ -78,7 +79,7 @@ export function SettingsModal(props: Props) {
           <div className="min-w-0 flex-1 overflow-y-auto px-5 py-[18px]">
             {section === "Appearance" && <Appearance {...props} />}
             {section === "Folders & spaces" && <Folders {...props} />}
-            {section === "Confluence auth" && <Auth {...props} />}
+            {section === "Confluence" && <Confluence {...props} />}
             {section === "vdoc CLI" && <Cli {...props} />}
             {section === "Config file" && <Config {...props} />}
           </div>
@@ -213,6 +214,31 @@ function Folders({ settings, spaceMapping, busy, onAddFolder, onPickDocsRoot, on
   );
 }
 
+function Confluence(props: Props) {
+  const { settings, busy, onSetSite } = props;
+  const [site, setSite] = useState(settings.site ?? "");
+  const siteDirty = (site.trim() || null) !== settings.site;
+
+  return (
+    <Section title="Confluence" description="Global Confluence configuration shared with the CLI - the site and credentials live in the config file.">
+      <Field label="SITE">
+        <div className="flex items-center gap-2">
+          <TextInput value={site} onChange={setSite} placeholder="your-org.atlassian.net" />
+          <ModalButton label="Apply" disabled={!siteDirty || busy} onClick={() => onSetSite(site.trim() || null)} />
+        </div>
+      </Field>
+
+      <div className="border-t border-line-subtle pt-4">
+        <span className="mb-1 block text-[11px] tracking-[1px] text-ink-mute">AUTHENTICATION</span>
+        <p className="mb-3 max-w-[460px] text-[11.5px] leading-[1.55] text-ink-dim">
+          A session cookie expires every couple of weeks; an API key does not.
+        </p>
+        <Auth {...props} />
+      </div>
+    </Section>
+  );
+}
+
 function Auth({ auth, busy, onSaveApiKey, onSetAuthMethod, onRenewToken }: Props) {
   const [method, setMethod] = useState<"api-token" | "session-token">(auth?.method === "api-token" ? "api-token" : "session-token");
   const [email, setEmail] = useState(auth?.email ?? "");
@@ -228,7 +254,7 @@ function Auth({ auth, busy, onSaveApiKey, onSetAuthMethod, onRenewToken }: Props
   const expiryMs = auth?.tokenExp ? auth.tokenExp * 1000 - Date.now() : null;
 
   return (
-    <Section title="Confluence auth" description="A session cookie expires every couple of weeks; an API key does not. Both live in .vdocrc.">
+    <div className="flex flex-col gap-4">
       <Segmented
         options={[
           ["session-token", "Session token"],
@@ -277,7 +303,7 @@ function Auth({ auth, busy, onSaveApiKey, onSetAuthMethod, onRenewToken }: Props
           <InfoStrip>Stored encrypted via config set --encrypt and activated immediately.</InfoStrip>
         </>
       )}
-    </Section>
+    </div>
   );
 }
 
