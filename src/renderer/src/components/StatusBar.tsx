@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import type { AuthStatus, TriageFilter } from '../../../shared/types.ts'
+import type { AuthStatus, TriageFilter, UpdateInfo } from '../../../shared/types.ts'
 import { humanTtl, timeAgo } from '../../../shared/time.ts'
 import { StateDot } from './StateDot.tsx'
 
@@ -11,11 +11,15 @@ interface Props {
   lastChecked: Date | null
   busyOp: string | null
   appVersion: string | null
+  /** A newer GitHub release, when the daily (or manual) check found one. */
+  update: UpdateInfo | null
   stateFilter: TriageFilter
   onFilterState(filter: TriageFilter): void
   onOpenToken(): void
   onOpenLogs(): void
   onCancelCheck(): void
+  onCheckUpdate(): void
+  onOpenUpdate(): void
 }
 
 export function StatusBar(props: Props) {
@@ -99,7 +103,25 @@ export function StatusBar(props: Props) {
       {props.appVersion && (
         <>
           <div className="h-4 w-px bg-line" />
-          <span title="Up to date" className="whitespace-nowrap text-ink-ghost">v{props.appVersion}</span>
+          {props.update
+            ? (
+                <button
+                  onClick={props.onOpenUpdate}
+                  title={`V-DOC ${props.update.latest} is available (you have ${props.update.current}) - open the release page`}
+                  className="whitespace-nowrap rounded-[5px] px-2 py-[3px] text-accent hover:bg-hover"
+                >
+                  ↑ v{props.update.latest} available
+                </button>
+              )
+            : (
+                <button
+                  onClick={props.onCheckUpdate}
+                  title="Check for updates"
+                  className="whitespace-nowrap rounded-[5px] px-2 py-[3px] text-ink-ghost hover:bg-hover hover:text-ink"
+                >
+                  v{props.appVersion}
+                </button>
+              )}
         </>
       )}
     </footer>
@@ -189,6 +211,7 @@ const TASK_LABELS: Record<string, string> = {
   'save token': 'Saving token',
   'save API key': 'Saving API key',
   'switch auth': 'Switching auth',
+  'check update': 'Checking for updates',
 }
 
 function taskLabel(op: string): string {

@@ -1,9 +1,10 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, net, shell } from 'electron'
 
-import type { AuthStatus, CheckFile, CommentEntry, CreateResult, CredentialKey, DiffResult, GetPageResult, LintFile, PullFile, PushFile, Settings, SettingsInfo, SyncFile, VersionEntry } from '../shared/types.ts'
+import type { AuthStatus, CheckFile, CommentEntry, CreateResult, CredentialKey, DiffResult, GetPageResult, LintFile, PullFile, PushFile, Settings, SettingsInfo, SyncFile, UpdateInfo, VersionEntry } from '../shared/types.ts'
 import { maskSecret } from '../shared/secret.ts'
+import { isNewerVersion } from '../shared/version.ts'
 import { backlinksTo, docsRoot, fileForPageId, gitDirtyFiles, resolvedVdocBin, runVdoc, runVdocJson, scanMarkdownFiles, searchContent, setVdocBin, vdocLogs } from './vdoc.ts'
 import { loadSettings, saveSettings } from './settings.ts'
 import { watchDocs } from './watcher.ts'
@@ -257,6 +258,8 @@ export function registerIpc(): void {
 
   ipcMain.handle('vdoc-version', () => probeVersion())
 
+  ipcMain.handle('check-update', () => checkUpdate())
+
   ipcMain.handle('quit', () => app.quit())
 }
 
@@ -281,6 +284,23 @@ function spaceMapping(): Promise<Record<string, string>> {
   return runVdocJson<Record<string, string>>(['config', 'get', 'confluence.spaceMapping'])
     .then(mapping => mapping ?? {})
     .catch(() => ({}))
+}
+
+/** GitHub repo the release workflow publishes installers to - the update feed. */
+const UPDATE_REPO = 'Nerwin/vdoc-app'
+
+/** Newer release than the running app, or null. Throws on network failure (renderer decides silence). */
+async function checkUpdate(): Promise<UpdateInfo | null> {
+  const response = await net.fetch(`https://api.github.com/repos/${UPDATE_REPO}/releases/latest`, {
+    headers: { Accept: 'application/vnd.github+json' },
+  })
+  // 404 = no release published yet; rate limits etc. also just mean "nothing to offer".
+  if (!response.ok) return null
+  const release = await response.json() as { tag_name?: string, html_url?: string }
+  const latest = String(release.tag_name ?? '').replace(/^v/, '')
+  const current = app.getVersion()
+  if (!latest || !isNewerVersion(latest, current)) return null
+  return { current, latest, url: release.html_url ?? `https://github.com/${UPDATE_REPO}/releases/latest` }
 }
 
 /** First stdout line of `vdoc --version`, or null when the binary is unusable. */

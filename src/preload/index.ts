@@ -46,6 +46,7 @@ const api: VdocApi = {
   setAssetsDir: dir => ipcRenderer.invoke('set-assets-dir', dir),
   setSite: site => ipcRenderer.invoke('set-site', site),
   vdocVersion: () => ipcRenderer.invoke('vdoc-version'),
+  checkUpdate: () => ipcRenderer.invoke('check-update'),
   pickFolder: () => ipcRenderer.invoke('pick-folder'),
   pickDocsRoot: () => ipcRenderer.invoke('pick-docs-root'),
   openFolder: path => ipcRenderer.invoke('open-folder', path),

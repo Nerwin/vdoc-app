@@ -272,11 +272,14 @@ export function App() {
         lastChecked={app.lastChecked}
         busyOp={app.busyOp}
         appVersion={app.settings?.appVersion ?? null}
+        update={app.update}
         stateFilter={app.stateFilter}
         onFilterState={app.setStateFilter}
         onOpenToken={() => setTokenOpen(true)}
         onOpenLogs={() => setLogsOpen(open => !open)}
         onCancelCheck={app.cancelCheck}
+        onCheckUpdate={app.checkUpdateNow}
+        onOpenUpdate={() => void app.openUpdate()}
       />
 
       {app.message && <Toast message={app.message} onDismiss={app.dismissMessage} />}

@@ -120,6 +120,14 @@ export interface LintFile {
   issues: LintIssue[]
 }
 
+/** A newer app release on GitHub - the auto-update check's positive result. */
+export interface UpdateInfo {
+  current: string
+  latest: string
+  /** Release page to open in the browser - installers are attached there. */
+  url: string
+}
+
 /** The two secrets stored in the CLI config file. */
 export type CredentialKey = 'apiToken' | 'sessionToken'
 
@@ -255,6 +263,8 @@ export interface VdocApi {
   /** Set (or clear with null) confluence.site in the CLI config file. */
   setSite(site: string | null): Promise<SettingsInfo>
   vdocVersion(): Promise<string | null>
+  /** Newer GitHub release than the running app, or null (also null when offline/no releases). */
+  checkUpdate(): Promise<UpdateInfo | null>
   /** Native folder picker rooted at the docs repo; returns a relative path or null. */
   pickFolder(): Promise<string | null>
   /** Native folder picker for the docs repository itself; returns an absolute path or null. */

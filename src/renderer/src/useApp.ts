@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import type { AuthStatus, CheckFile, CredentialKey, DiffResult, PushFile, ScanFile, Settings, SettingsInfo, TriageFilter, VersionEntry } from '../../shared/types.ts'
+import type { AuthStatus, CheckFile, CredentialKey, DiffResult, PushFile, ScanFile, Settings, SettingsInfo, TriageFilter, UpdateInfo, VersionEntry } from '../../shared/types.ts'
 import { displayState, needsAttention, type FileEntry } from '../../shared/status.ts'
 import { STATE_META } from './state-meta.ts'
 
@@ -84,6 +84,8 @@ export function useApp() {
   /** Latest remote version info per file, keyed `path@vN` so a new version refetches. */
   const [authors, setAuthors] = useState<Map<string, VersionEntry | null>>(new Map())
   const [message, setMessage] = useState<Message | null>(null)
+  /** A newer GitHub release than the running app - surfaced in the status bar. */
+  const [update, setUpdate] = useState<UpdateInfo | null>(null)
 
   /** Recently opened files, newest first - feeds the dashboard's Continue reading. */
   const [recents, setRecents] = useState<Visit[]>(() => loadJson('recentFiles', []))
@@ -611,6 +613,28 @@ export function useApp() {
       : { kind: 'error', text: status.error ?? 'Token rejected' })
   }), [api, runOp])
 
+  // Update check: non-blocking after startup, then daily. Failures are silent - offline is normal.
+  useEffect(() => {
+    const check = (): void => {
+      void api.checkUpdate().then(setUpdate).catch(() => undefined)
+    }
+    const timer = setTimeout(check, 10_000)
+    const interval = setInterval(check, 24 * 60 * 60 * 1000)
+    return () => {
+      clearTimeout(timer)
+      clearInterval(interval)
+    }
+  }, [api])
+
+  /** Status-bar version click - explicit check with a spoken result. */
+  const checkUpdateNow = useCallback(() => runOp('check update', async () => {
+    const info = await api.checkUpdate()
+    setUpdate(info)
+    setMessage(info
+      ? { kind: 'info', text: `V-DOC ${info.latest} is available - you have ${info.current}` }
+      : { kind: 'info', text: 'V-DOC is up to date' })
+  }), [api, runOp])
+
   const counts = useMemo(() => {
     let attention = 0
     let behind = 0
@@ -690,6 +714,9 @@ export function useApp() {
       fail(error)
       return null
     }),
+    update,
+    checkUpdateNow,
+    openUpdate: () => update && api.openExternal(update.url).catch(fail),
     message,
     dismissMessage: () => setMessage(null),
     notify: (text: string) => setMessage({ kind: 'info', text }),
