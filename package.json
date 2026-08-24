@@ -1,6 +1,6 @@
 {
   "name": "vdoc-app",
-  "version": "1.12.0",
+  "version": "1.12.1",
   "private": true,
   "description": "App GUI over the vdoc CLI",
   "main": "out/main/index.js",
