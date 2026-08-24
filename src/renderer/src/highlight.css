@@ -1,0 +1,15 @@
+/*
+ * In-document find (⌘F) - CSS Custom Highlights paint ranges, never DOM edits.
+ * Lives outside styles.css because Tailwind's LightningCSS optimizer doesn't
+ * recognize the ::highlight() pseudo-element and warns on every build; this
+ * file goes through Vite's plain CSS pipeline instead. The tokens resolve at
+ * runtime from the @theme variables styles.css puts on :root.
+ */
+::highlight(vdoc-find) {
+  background-color: color-mix(in srgb, var(--color-warn) 35%, transparent);
+}
+
+::highlight(vdoc-find-active) {
+  background-color: var(--color-primary);
+  color: var(--color-primary-ink);
+}

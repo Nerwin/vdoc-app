@@ -457,16 +457,6 @@ select:focus {
   border-color: var(--color-conflict);
 }
 
-/* In-document find (⌘F) - CSS Custom Highlights paint ranges, never DOM edits. */
-::highlight(vdoc-find) {
-  background-color: color-mix(in srgb, var(--color-warn) 35%, transparent);
-}
-
-::highlight(vdoc-find-active) {
-  background-color: var(--color-primary);
-  color: var(--color-primary-ink);
-}
-
 /* Guided tour spotlight - a pulsing accent outline on the region the active step describes. */
 .tour-target {
   outline: 2px solid var(--color-accent);

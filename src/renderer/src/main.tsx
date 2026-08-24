@@ -2,6 +2,7 @@ import { Component, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 
 import './styles.css'
+import './highlight.css'
 import { App } from './App.tsx'
 
 /** Last-resort net: a render crash shows the error instead of unmounting to a black window. */
