@@ -9,7 +9,11 @@
     "name": "Nerwin",
     "email": "7089842+Nerwin@users.noreply.github.com"
   },
-  "homepage": "https://github.com/nerwin/vdoc-app",
+  "homepage": "https://github.com/Nerwin/vdoc-app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Nerwin/vdoc-app.git"
+  },
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
