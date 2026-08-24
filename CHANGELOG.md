@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.11.0](https://github.com/Nerwin/vdoc-app/compare/v1.10.0...v1.11.0) (2026-08-24)
+
+### Features
+
+* **monitoring:** optional Sentry crash reports with a Settings toggle ([13dca11](https://github.com/Nerwin/vdoc-app/commit/13dca11860891fd6344393ccf33646244e0b9532))
+* **update:** in-app install on macOS - download release zip, swap bundle, relaunch ([57651b3](https://github.com/Nerwin/vdoc-app/commit/57651b3a6d6d4aa927ef9b0d9a2230b279d45ed3))
 ## [1.10.0](https://github.com/Nerwin/vdoc-app/compare/v1.9.2...v1.10.0) (2026-08-24)
 
 ### Features
