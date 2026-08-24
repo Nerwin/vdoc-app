@@ -176,6 +176,7 @@ export function useApp() {
           path: file.path,
           tracked: file.tracked,
           gitDirty: file.gitDirty,
+          title: file.title,
           check: file.tracked ? previous?.check : undefined,
         })
       }

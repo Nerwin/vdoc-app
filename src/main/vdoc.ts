@@ -6,6 +6,8 @@ import { BrowserWindow } from 'electron'
 
 import { LOG_MAX, type VdocLogEntry } from '../shared/types.ts'
 import { mdLinkTargets, resolveRelative } from '../shared/links.ts'
+import { parseFrontmatter } from '../shared/frontmatter.ts'
+import { firstMatch, type SearchHit } from '../shared/search.ts'
 import { DEFAULT_DOCS_ROOT, EXCLUDED_DIRS, loadSettings } from './settings.ts'
 
 /** The docs repository root: Settings → $VDOC_APP_ROOT → home directory. */
@@ -182,8 +184,8 @@ export function gitDirtyFiles(): Set<string> {
 }
 
 /** Relative paths of all Markdown files in the content dirs, tracked = has confluencePageId frontmatter. */
-export function scanMarkdownFiles(): Array<{ path: string, tracked: boolean }> {
-  const files: Array<{ path: string, tracked: boolean }> = []
+export function scanMarkdownFiles(): Array<{ path: string, tracked: boolean, title?: string }> {
+  const files: Array<{ path: string, tracked: boolean, title?: string }> = []
 
   const root = docsRoot()
   const walk = (relDir: string): void => {
@@ -193,12 +195,30 @@ export function scanMarkdownFiles(): Array<{ path: string, tracked: boolean }> {
       if (entry.name.startsWith('.') || EXCLUDED_DIRS.has(entry.name)) continue
       const relPath = `${relDir}/${entry.name}`
       if (entry.isDirectory()) walk(relPath)
-      else if (entry.name.endsWith('.md')) files.push({ path: relPath, tracked: isTracked(join(root, relPath)) })
+      else if (entry.name.endsWith('.md')) files.push({ path: relPath, ...fileMeta(join(root, relPath)) })
     }
   }
 
   for (const dir of getContentDirs()) walk(dir)
   return files
+}
+
+/** Full-text search: first matching line per file, capped. Case-insensitive substring. */
+// ponytail: full rescan per query, same trade as backlinksTo - the debounce lives in the renderer.
+export function searchContent(query: string): SearchHit[] {
+  const trimmed = query.trim()
+  if (trimmed.length < 2) return []
+  const hits: SearchHit[] = []
+  for (const { path } of scanMarkdownFiles()) {
+    try {
+      const match = firstMatch(readFileSync(join(docsRoot(), path), 'utf8'), trimmed)
+      if (match) hits.push({ path, ...match })
+    } catch {
+      // Unreadable file: no hit.
+    }
+    if (hits.length >= 50) break
+  }
+  return hits
 }
 
 /** Docs under the content dirs whose markdown links resolve to `target`. */
@@ -237,12 +257,16 @@ export function fileForPageId(pageId: string): string | null {
 
 // ponytail: frontmatter regex approximates the CLI's parsePublishDoc; the CLI
 // re-verifies on every command, so a miss only costs a stale badge.
-function isTracked(absPath: string): boolean {
+function fileMeta(absPath: string): { tracked: boolean, title?: string } {
   try {
     const head = readFileSync(absPath, 'utf8').slice(0, 2048)
     const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(head)
-    return frontmatter ? /^confluencePageId\s*:/m.test(frontmatter[1]) : false
+    if (!frontmatter) return { tracked: false }
+    return {
+      tracked: /^confluencePageId\s*:/m.test(frontmatter[1]),
+      title: parseFrontmatter(head).title,
+    }
   } catch {
-    return false
+    return { tracked: false }
   }
 }

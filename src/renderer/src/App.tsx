@@ -38,13 +38,15 @@ function useResolvedTheme(preference: 'dark' | 'light' | 'system'): 'dark' | 'li
 export function App() {
   const app = useApp()
   const [tokenOpen, setTokenOpen] = useState(false)
-  const [palette, setPalette] = useState<'file' | 'command' | 'recent' | null>(null)
+  const [palette, setPalette] = useState<'file' | 'command' | 'recent' | 'search' | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [logsOpen, setLogsOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
   const [tourOpen, setTourOpen] = useState(() => localStorage.getItem('tourSeen') === null)
   const [view, setView] = useState<ViewMode>('preview')
   const [reloadKey, setReloadKey] = useState(0)
+  /** Bumped by ⌘F - opens (or refocuses) the preview's find bar. */
+  const [findSeq, setFindSeq] = useState(0)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = Number(localStorage.getItem('sidebarWidth'))
@@ -86,6 +88,7 @@ export function App() {
     entry: selected,
     state: selectionState(selected),
     theme,
+    view,
     checking: app.checking !== null,
     busy: app.busyOp !== null,
     connected,
@@ -98,6 +101,7 @@ export function App() {
     focusFilter: () => filterRef.current?.focus(),
     setView,
     openDiff,
+    openFind: () => setFindSeq(seq => seq + 1),
     toggleSidebar: () => setSidebarOpen(open => !open),
     toggleTheme: () => app.updateSettings({ theme: theme === 'dark' ? 'light' : 'dark' }),
     reloadFile: () => setReloadKey(key => key + 1),
@@ -215,6 +219,7 @@ export function App() {
                   connected={connected}
                   view={view}
                   reloadKey={reloadKey}
+                  findSeq={findSeq}
                   onView={setView}
                   onError={app.reportError}
                   onHelp={() => setHelpOpen(true)}

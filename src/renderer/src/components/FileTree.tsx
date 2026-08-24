@@ -63,7 +63,7 @@ export function FileTree(props: Props) {
     const query = filterText.toLowerCase()
     const paths = [...entries.values()]
       .filter(entry => {
-        if (query && !entry.path.toLowerCase().includes(query)) return false
+        if (query && !entry.path.toLowerCase().includes(query) && !entry.title?.toLowerCase().includes(query)) return false
         return matchesFilter(entry, stateFilter)
       })
       .map(entry => entry.path)
@@ -353,7 +353,7 @@ function Row({ node, entries, selected, dimmed, pinned, collapsed, onClick, onCo
     >
       <StateDot state={state} dim={dimmed} />
       <span className={`min-w-0 flex-1 truncate text-[12.5px] ${selected ? 'text-ink font-medium' : entry?.tracked ? 'text-ink-mid' : 'text-ink-label'}`}>
-        {node.name}
+        {entry?.title ?? node.name}
       </span>
       {meta.glyph
         ? <span title={glyphHint} className={`shrink-0 text-[11px] ${meta.color}`}>{meta.glyph}</span>

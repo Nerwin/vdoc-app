@@ -1,5 +1,7 @@
 /** JSON shapes returned by the vdoc CLI (`--json`), plus the IPC api surface. */
 
+import type { SearchHit } from './search.ts'
+
 export type SyncState =
   | 'in-sync'
   | 'behind'
@@ -140,6 +142,8 @@ export interface ScanFile {
   tracked: boolean
   /** Has uncommitted git changes (purely informational - no sync logic depends on it). */
   gitDirty: boolean
+  /** Frontmatter `title:` - the display name in the sidebar; filename when absent. */
+  title?: string
 }
 
 export interface ScanResult {
@@ -211,6 +215,8 @@ export interface VdocApi {
   writeFile(path: string, content: string): Promise<void>
   /** Docs in the tree whose markdown links resolve to this file. */
   backlinks(path: string): Promise<string[]>
+  /** Full-text search over the content dirs - first matching line per file. */
+  searchContent(query: string): Promise<SearchHit[]>
   /** Open an http(s) URL in the default browser. */
   openExternal(url: string): Promise<void>
   diff(path: string): Promise<DiffResult>

@@ -4,7 +4,7 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 
 import type { AuthStatus, CheckFile, CommentEntry, CreateResult, CredentialKey, DiffResult, GetPageResult, LintFile, PullFile, PushFile, Settings, SettingsInfo, SyncFile, VersionEntry } from '../shared/types.ts'
 import { maskSecret } from '../shared/secret.ts'
-import { backlinksTo, docsRoot, fileForPageId, gitDirtyFiles, resolvedVdocBin, runVdoc, runVdocJson, scanMarkdownFiles, setVdocBin, vdocLogs } from './vdoc.ts'
+import { backlinksTo, docsRoot, fileForPageId, gitDirtyFiles, resolvedVdocBin, runVdoc, runVdocJson, scanMarkdownFiles, searchContent, setVdocBin, vdocLogs } from './vdoc.ts'
 import { loadSettings, saveSettings } from './settings.ts'
 import { watchDocs } from './watcher.ts'
 
@@ -53,6 +53,8 @@ export function registerIpc(): void {
   ipcMain.handle('read-file', (_event, path: string) => readFileSync(join(docsRoot(), path), 'utf8'))
 
   ipcMain.handle('backlinks', (_event, path: string) => backlinksTo(path))
+
+  ipcMain.handle('search-content', (_event, query: string) => searchContent(query))
 
   ipcMain.handle('open-external', (_event, url: string) => {
     if (!/^https?:\/\//i.test(url)) throw new Error(`Refusing to open non-http URL: ${url}`)

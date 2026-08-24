@@ -5,6 +5,8 @@ export interface FileEntry {
   tracked: boolean
   /** Uncommitted git changes - display-only, never feeds sync logic. */
   gitDirty?: boolean
+  /** Frontmatter `title:` - shown in the sidebar instead of the filename when present. */
+  title?: string
   check?: CheckFile
 }
 

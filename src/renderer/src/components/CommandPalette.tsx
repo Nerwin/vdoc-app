@@ -2,6 +2,7 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 
 import { displayState, type FileEntry } from '../../../shared/status.ts'
 import { fuzzyMatch, fuzzyRank, type FuzzyMatch } from '../../../shared/fuzzy.ts'
+import type { SearchHit } from '../../../shared/search.ts'
 import { COMMANDS, fullLabel, keycaps, type Command, type CommandContext } from '../commands.ts'
 import { StateDot } from './StateDot.tsx'
 
@@ -9,7 +10,7 @@ interface Props {
   ctx: CommandContext
   entries: Map<string, FileEntry>
   /** `command` opens pre-seeded with `> `; deleting it drops back to file mode. */
-  mode: 'file' | 'command' | 'recent'
+  mode: 'file' | 'command' | 'recent' | 'search'
   /** Recently opened paths, newest first - the pool in `recent` mode. */
   recents: string[]
   onPick(path: string): void
@@ -56,6 +57,8 @@ interface Row {
   /** Matched character positions in the command label, for highlighting. */
   indices?: number[]
   path?: string
+  /** Search mode: the file's first matching line. */
+  snippet?: string
   disabled?: string
 }
 
@@ -74,7 +77,28 @@ export function CommandPalette({ ctx, entries, mode, recents, onPick, onRun, onC
     return () => previous?.focus()
   }, [])
 
+  // Search mode asks the main process; the deferred query keeps typing smooth.
+  const [hits, setHits] = useState<SearchHit[]>([])
+  useEffect(() => {
+    if (mode !== 'search' || commandMode) return
+    const query = search.trim()
+    if (query.length < 2) {
+      setHits([])
+      return
+    }
+    let live = true
+    void window.vdoc.searchContent(query)
+      .then(results => live && setHits(results))
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [mode, commandMode, search])
+
   const rows = useMemo<Row[]>(() => {
+    if (!commandMode && mode === 'search') {
+      return hits.map(hit => ({ key: hit.path, group: 'FILES', path: hit.path, snippet: hit.snippet }))
+    }
     if (!commandMode) {
       // Recent mode: rank within the recents pool, keeping recency order on an empty query.
       const pool = mode === 'recent' ? recents : [...entries.keys()]
@@ -101,7 +125,7 @@ export function CommandPalette({ ctx, entries, mode, recents, onPick, onRun, onC
       ...rest.filter(item => item.command.group === 'File').map(item => row(item, 'FILE')),
       ...rest.filter(item => item.command.group === 'View' || item.command.group === 'App').map(item => row(item, 'VIEW & APP')),
     ]
-  }, [commandMode, search, entries, ctx, mode, recents])
+  }, [commandMode, search, entries, ctx, mode, recents, hits])
 
   useEffect(() => setIndex(0), [deferred])
 
@@ -139,6 +163,8 @@ export function CommandPalette({ ctx, entries, mode, recents, onPick, onRun, onC
   const noun = mode === 'recent' ? 'recent' : 'files'
   const counter = commandMode
     ? (search === '' ? `${COMMANDS.length} commands` : `${rows.length} of ${COMMANDS.length}`)
+    : mode === 'search'
+    ? (search.trim().length < 2 ? 'content search' : `${rows.length} file(s)`)
     : (search === '' ? `${poolSize} ${noun}` : `${rows.length} of ${poolSize}`)
 
   return (
@@ -160,7 +186,7 @@ export function CommandPalette({ ctx, entries, mode, recents, onPick, onRun, onC
               if (event.key === 'Backspace' && commandMode && query.replace(/^>\s*/, '') === '') setQuery('')
               onKeyDown(event)
             }}
-            placeholder={commandMode ? 'Type a command…' : mode === 'recent' ? 'Recent files…' : 'Go to file…'}
+            placeholder={commandMode ? 'Type a command…' : mode === 'search' ? 'Search in files…' : mode === 'recent' ? 'Recent files…' : 'Go to file…'}
             spellCheck={false}
             className="min-w-0 flex-1 border-none bg-transparent font-mono text-[13px] text-ink placeholder-ink-faint outline-none focus:shadow-none"
           />
@@ -170,7 +196,11 @@ export function CommandPalette({ ctx, entries, mode, recents, onPick, onRun, onC
         <ul ref={listRef} className="max-h-[60vh] overflow-y-auto py-1">
           {rows.length === 0 && (
             <li className="px-[14px] py-3 font-mono text-[12px] text-ink-faint">
-              {commandMode ? 'No matching command' : 'No matching files'}
+              {commandMode
+                ? 'No matching command'
+                : mode === 'search' && search.trim().length < 2
+                ? 'Type at least 2 characters to search file contents'
+                : 'No matching files'}
             </li>
           )}
           {rows.map((row, position) => {
@@ -184,7 +214,7 @@ export function CommandPalette({ ctx, entries, mode, recents, onPick, onRun, onC
                 )}
                 {row.command
                   ? <CommandRow row={row} ctx={ctx} selected={position === index} onClick={() => activate(row)} position={position} />
-                  : <FileRow path={row.path!} entries={entries} selected={position === index} onClick={() => activate(row)} position={position} />}
+                  : <FileRow path={row.path!} snippet={row.snippet} entries={entries} selected={position === index} onClick={() => activate(row)} position={position} />}
               </li>
             )
           })}
@@ -252,8 +282,9 @@ function CommandRow({ row, ctx, selected, onClick, position }: {
   )
 }
 
-function FileRow({ path, entries, selected, onClick, position }: {
+function FileRow({ path, snippet, entries, selected, onClick, position }: {
   path: string
+  snippet?: string
   entries: Map<string, FileEntry>
   selected: boolean
   onClick(): void
@@ -270,9 +301,12 @@ function FileRow({ path, entries, selected, onClick, position }: {
       }`}
     >
       <span className="flex justify-center"><StateDot state={entry ? displayState(entry) : 'unchecked'} /></span>
-      <span className="min-w-0 truncate">
-        <span className="text-ink">{path.slice(slash + 1)}</span>
-        <span className="text-ink-faint">  {path.slice(0, slash + 1)}</span>
+      <span className="min-w-0">
+        <span className="block truncate">
+          <span className="text-ink">{path.slice(slash + 1)}</span>
+          <span className="text-ink-faint">  {path.slice(0, slash + 1)}</span>
+        </span>
+        {snippet && <span className="block truncate text-[11px] text-ink-faint">{snippet}</span>}
       </span>
     </button>
   )

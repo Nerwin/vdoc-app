@@ -17,6 +17,7 @@ const api: VdocApi = {
   readFile: path => ipcRenderer.invoke('read-file', path),
   writeFile: (path, content) => ipcRenderer.invoke('write-file', path, content),
   backlinks: path => ipcRenderer.invoke('backlinks', path),
+  searchContent: query => ipcRenderer.invoke('search-content', query),
   openExternal: url => ipcRenderer.invoke('open-external', url),
   diff: path => ipcRenderer.invoke('diff', path),
   recordBaseline: path => ipcRenderer.invoke('record-baseline', path),

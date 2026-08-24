@@ -21,6 +21,8 @@ interface Props {
   view: ViewMode
   /** Bumped by the Reload-from-disk command to re-read the file. */
   reloadKey: number
+  /** Bumped by ⌘F - opens (or refocuses) the preview's find bar. */
+  findSeq: number
   onView(view: ViewMode): void
   onError(error: unknown): void
   /** Open the sync-concepts help modal (the state banners link to it). */
@@ -223,7 +225,7 @@ export function DetailPane(props: Props) {
           <h1 title={path} className="truncate text-[15px] font-medium text-ink">{name}</h1>
           <div className="flex shrink-0 gap-0.5">
             <IconButton title={`Open in editor - ${shortcutLabel('file.editor')}`} onClick={() => props.onOpenEditor(path)}>✎</IconButton>
-            <IconButton title={`Show in folder - ${shortcutLabel('file.finder')}`} onClick={() => props.onRevealFinder(path)}>⊞</IconButton>
+            <IconButton title="Show in folder" onClick={() => props.onRevealFinder(path)}>⊞</IconButton>
           </div>
         </div>
 
@@ -407,7 +409,7 @@ export function DetailPane(props: Props) {
                   </div>
                   {view === 'split' && <div className="w-px shrink-0 bg-line" />}
                   <div className={`min-w-0 ${view === 'split' ? 'flex-1' : view === 'preview' ? 'flex-1' : 'hidden'}`}>
-                    {previewContent !== null && <PreviewView content={previewContent} theme={props.theme} onOpenLink={openLink} />}
+                    {previewContent !== null && <PreviewView content={previewContent} theme={props.theme} findSeq={props.findSeq} onOpenLink={openLink} />}
                   </div>
                 </div>
               )}

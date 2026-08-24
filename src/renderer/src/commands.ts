@@ -32,10 +32,11 @@ export interface CommandContext {
   entry: FileEntry | null
   state: DisplayState | null
   theme: 'dark' | 'light'
+  view: ViewMode
   checking: boolean
   busy: boolean
   connected: boolean
-  openPalette(mode: 'file' | 'command' | 'recent'): void
+  openPalette(mode: 'file' | 'command' | 'recent' | 'search'): void
   openSettings(): void
   openToken(): void
   openLogs(): void
@@ -44,6 +45,8 @@ export interface CommandContext {
   focusFilter(): void
   setView(view: ViewMode): void
   openDiff(): void
+  /** Open (or refocus) the in-document find bar over the preview. */
+  openFind(): void
   toggleSidebar(): void
   toggleTheme(): void
   reloadFile(): void
@@ -278,11 +281,18 @@ export const COMMANDS: Command[] = [
     run: ctx => void ctx.app.openEditor(ctx.selection!),
   },
   {
+    id: 'file.search',
+    group: 'File',
+    label: 'Search in files…',
+    icon: '⌕',
+    keys: { key: 'f', meta: true, shift: true },
+    run: ctx => ctx.openPalette('search'),
+  },
+  {
     id: 'file.finder',
     group: 'File',
     label: 'Show in folder',
     icon: '⊞',
-    keys: { key: 'f', meta: true, shift: true },
     reason: noFile,
     run: ctx => void ctx.app.revealFinder(ctx.selection!),
   },
@@ -342,6 +352,17 @@ export const COMMANDS: Command[] = [
     icon: '◧',
     keys: { key: 'b', meta: true },
     run: ctx => ctx.toggleSidebar(),
+  },
+  {
+    // Shares ⌘F with the filter field below: with the preview on screen this one
+    // wins (commandFor takes the first available match); elsewhere ⌘F filters.
+    id: 'view.find',
+    group: 'View',
+    label: 'Find in document',
+    icon: '⌕',
+    keys: { key: 'f', meta: true },
+    reason: all(noFile, ctx => (ctx.view === 'preview' || ctx.view === 'split' ? undefined : 'open the Preview tab first')),
+    run: ctx => ctx.openFind(),
   },
   {
     id: 'view.filterField',
