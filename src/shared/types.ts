@@ -187,8 +187,10 @@ export interface SettingsInfo extends Settings {
   version: string | null
   /** This app's own version (package.json / bundle). */
   appVersion: string
-  /** The .vdocrc actually in use — shared between the CLI and the app. */
+  /** The CLI config file in use — shared between the CLI and the app. */
   configPath: string | null
+  /** confluence.assetsDir from the CLI config file — null = CLI default ("assets"). */
+  assetsDir: string | null
 }
 
 export interface VdocApi {
@@ -230,6 +232,8 @@ export interface VdocApi {
   revealFinder(path: string): Promise<void>
   settingsGet(): Promise<SettingsInfo>
   settingsSet(patch: Partial<Settings>): Promise<SettingsInfo>
+  /** Set (or clear with null) confluence.assetsDir in the CLI config file. */
+  setAssetsDir(dir: string | null): Promise<SettingsInfo>
   vdocVersion(): Promise<string | null>
   /** Native folder picker rooted at the docs repo; returns a relative path or null. */
   pickFolder(): Promise<string | null>
@@ -241,6 +245,8 @@ export interface VdocApi {
   /** Set (or delete with null) one mapping entry; returns the fresh mapping. */
   spaceMappingSet(dir: string, space: string | null): Promise<Record<string, string>>
   revealConfig(): Promise<void>
+  /** Open the CLI config file in the OS default editor. */
+  editConfig(): Promise<void>
   quit(): Promise<void>
   /** All recorded CLI invocations, oldest first (ring buffer of the last 200). */
   logs(): Promise<VdocLogEntry[]>

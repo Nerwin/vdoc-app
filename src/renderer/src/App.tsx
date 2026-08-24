@@ -340,6 +340,7 @@ export function App() {
           busy={app.busyOp !== null}
           spaceMapping={app.spaceMapping}
           onUpdate={app.updateSettings}
+          onSetAssetsDir={app.setAssetsDir}
           onReloadVersion={app.reloadVersion}
           onSaveApiKey={(email, token) => void app.saveApiKey(email, token)}
           onSetAuthMethod={method => void app.setAuthMethod(method)}
@@ -348,6 +349,7 @@ export function App() {
           onRemoveFolder={app.removeFolder}
           onSetSpaceMapping={app.setSpaceMappingEntry}
           onRevealConfig={() => void app.revealConfig()}
+          onEditConfig={() => void app.editConfig()}
           onRenewToken={() => {
             setSettingsOpen(false)
             setTokenOpen(true)

@@ -504,6 +504,11 @@ export function useApp() {
     void api.settingsSet(patch).then(setSettings).catch(fail)
   }, [api, fail])
 
+  /** confluence.assetsDir in the CLI config file — null clears back to the CLI default. */
+  const setAssetsDir = useCallback((dir: string | null) => {
+    void api.setAssetsDir(dir).then(setSettings).catch(fail)
+  }, [api, fail])
+
   /** Settings change that alters which files exist in the tree → rescan after. */
   const applyFolderSettings = useCallback(async (patch: Partial<Settings>) => {
     try {
@@ -649,6 +654,7 @@ export function useApp() {
     }),
     settings,
     updateSettings,
+    setAssetsDir,
     reloadVersion,
     addFolder,
     pickDocsRoot,
@@ -659,6 +665,7 @@ export function useApp() {
     spaceMapping,
     setSpaceMappingEntry,
     revealConfig: () => api.revealConfig().catch(fail),
+    editConfig: () => api.editConfig().catch(fail),
     authors,
     loadAuthors,
     markVerified,

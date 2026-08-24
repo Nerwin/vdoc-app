@@ -204,6 +204,12 @@ export function registerIpc(): void {
 
   ipcMain.handle('open-folder', (_event, path: string) => shell.openPath(join(docsRoot(), path)).then(() => undefined))
 
+  ipcMain.handle('set-assets-dir', async (_event, dir: string | null) => {
+    if (dir === null) await runVdocJson(['config', 'set', 'confluence.assetsDir', '--delete'])
+    else await runVdocJson(['config', 'set', 'confluence.assetsDir', dir])
+    return settingsInfo()
+  })
+
   ipcMain.handle('space-mapping-get', () => spaceMapping())
 
   ipcMain.handle('space-mapping-set', async (_event, dir: string, space: string | null) => {
@@ -218,6 +224,12 @@ export function registerIpc(): void {
     shell.showItemInFolder(path)
   })
 
+  ipcMain.handle('edit-config', async () => {
+    const { path } = await runVdocJson<{ path: string }>(['config', 'path'])
+    const error = await shell.openPath(path)
+    if (error) throw new Error(error)
+  })
+
   ipcMain.handle('vdoc-logs', () => vdocLogs())
 
   ipcMain.handle('vdoc-version', () => probeVersion())
@@ -227,7 +239,14 @@ export function registerIpc(): void {
 
 async function settingsInfo(): Promise<SettingsInfo> {
   const configPath = await runVdocJson<{ path: string }>(['config', 'path']).then(r => r.path).catch(() => null)
-  return { ...loadSettings(), resolvedBin: resolvedVdocBin(), resolvedRoot: docsRoot(), version: await probeVersion(), appVersion: app.getVersion(), configPath }
+  // `config get <key> --json` wraps scalars as { "<key>": value }.
+  const assetsDir = await runVdocJson<Record<string, unknown>>(['config', 'get', 'confluence.assetsDir'])
+    .then(result => {
+      const value = result?.['confluence.assetsDir']
+      return typeof value === 'string' && value !== '' ? value : null
+    })
+    .catch(() => null)
+  return { ...loadSettings(), resolvedBin: resolvedVdocBin(), resolvedRoot: docsRoot(), version: await probeVersion(), appVersion: app.getVersion(), configPath, assetsDir }
 }
 
 /** The shared .vdocrc's folder → space mapping ({} when absent). */
