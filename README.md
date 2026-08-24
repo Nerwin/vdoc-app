@@ -1,7 +1,7 @@
 # V-DOC
 
 Cross-platform (macOS, Windows, Linux) desktop app for keeping a Markdown documentation
-repository in sync with Confluence. It is a GUI over the [vdoc CLI](../vdoc): the doc tree with
+repository in sync with Confluence. It is a GUI over the vdoc CLI: the doc tree with
 live sync states, side-by-side diffs, guarded pull/push, page linking/creation, comments, and
 session-token renewal - without auto-resolving anything or surprising you.
 
@@ -42,7 +42,7 @@ Then authenticate with either method (both can be stored; `confluence.authMethod
 active one - the app's Settings switch this too):
 
 - **API token** (preferred) - create one at [id.atlassian.com](https://id.atlassian.com/manage-profile/security/api-tokens),
-  then set `confluence.email` and the token via `vdoc config set`, or enter both in the app
+  then set the token via `vdoc config set`, or enter both in the app
   under Settings → Confluence authentication.
 - **Session token** - paste your browser's Confluence session cookie in the app's token panel;
   it expires periodically and the app offers renewal when it does.
@@ -71,8 +71,7 @@ be relaunched any time from the command palette (**App: Welcome tour**). The sam
 hand - open Settings (⌘, / Ctrl+,) and set up, top to bottom:
 
 1. **Docs repository** - point it at your clone of the docs repo (native folder picker).
-2. **Folders** - the root folders the tree shows (defaults: `1-Backend`, `2-DDA`, `3-Projects`;
-   add/remove any folder inside the docs repo). Only Markdown files are listed.
+2. **Folders** - the root folders the tree shows. Only Markdown files are listed.
 3. **Space mapping** (optional) - folder → Confluence space key; prefills Create's space and
    narrows Find matching page's title search.
 4. **Confluence authentication** - if you skipped step 2.

@@ -7,3 +7,6 @@ release/
 tsconfig.node.tsbuildinfo
 tsconfig.web.tsbuildinfo
 .vdoc/
+.claude/
+CLAUDE.md
+docs/
