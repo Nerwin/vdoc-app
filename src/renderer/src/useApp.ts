@@ -632,7 +632,9 @@ export function useApp() {
     setUpdate(info)
     setMessage(info
       ? { kind: 'info', text: `V-DOC ${info.latest} is available - you have ${info.current}` }
-      : { kind: 'info', text: 'V-DOC is up to date' })
+      // Covers both "latest release is not newer" and "no release visible"
+      // (a private repo 404s for the app's unauthenticated check).
+      : { kind: 'info', text: 'No newer release found' })
   }), [api, runOp])
 
   const counts = useMemo(() => {
