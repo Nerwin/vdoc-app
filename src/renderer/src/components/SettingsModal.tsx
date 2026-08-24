@@ -98,17 +98,29 @@ export function SettingsModal(props: Props) {
 
 function Appearance({ settings, onUpdate }: Props) {
   return (
-    <Section title="Appearance" description="System follows the OS appearance and switches with it. Light and dark pin the theme for this app only.">
-      <Segmented
-        options={[
-          ["light", "Light"],
-          ["dark", "Dark"],
-          ["system", "System"],
-        ]}
-        value={settings.theme}
-        onPick={(theme) => onUpdate({ theme })}
-      />
-    </Section>
+    <>
+      <Section title="Appearance" description="System follows the OS appearance and switches with it. Light and dark pin the theme for this app only.">
+        <Segmented
+          options={[
+            ["light", "Light"],
+            ["dark", "Dark"],
+            ["system", "System"],
+          ]}
+          value={settings.theme}
+          onPick={(theme) => onUpdate({ theme })}
+        />
+      </Section>
+      <Section title="Crash reports" description="Anonymous error and crash reports (Sentry) help fix bugs. Changing this takes effect after restarting the app.">
+        <Segmented
+          options={[
+            ["on", "On"],
+            ["off", "Off"],
+          ]}
+          value={settings.crashReports ? "on" : "off"}
+          onPick={(pick) => onUpdate({ crashReports: pick === "on" })}
+        />
+      </Section>
+    </>
   );
 }
 

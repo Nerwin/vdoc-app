@@ -1,9 +1,13 @@
+import { init as sentryInit } from '@sentry/electron/renderer'
 import { Component, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 
 import './styles.css'
 import './highlight.css'
 import { App } from './App.tsx'
+
+// Main owns the DSN and the settings toggle; the renderer only mirrors its state.
+void window.vdoc?.sentryActive().then(active => active && sentryInit()).catch(() => undefined)
 
 /** Last-resort net: a render crash shows the error instead of unmounting to a black window. */
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {

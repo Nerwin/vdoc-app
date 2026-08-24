@@ -108,5 +108,8 @@
     "portable": {
       "artifactName": "${productName}-${version}-portable-${arch}.${ext}"
     }
+  },
+  "dependencies": {
+    "@sentry/electron": "^7.17.0"
   }
 }

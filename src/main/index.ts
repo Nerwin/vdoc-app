@@ -7,6 +7,7 @@ import type { Settings } from '../shared/types.ts'
 import { importLoginShellEnv, setVdocBin } from './vdoc.ts'
 import { loadSettings } from './settings.ts'
 import { registerIpc } from './ipc.ts'
+import { initSentry } from './sentry.ts'
 import { watchDocs } from './watcher.ts'
 
 // Automation hook: VDOC_DEBUG_PORT=9222 npm run dev exposes CDP for driving the app.
@@ -37,6 +38,7 @@ function createWindow(theme: Settings['theme']): BrowserWindow {
 }
 
 app.setName('V-DOC')
+initSentry()
 
 let mainWindow: BrowserWindow | null = null
 

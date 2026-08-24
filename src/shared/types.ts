@@ -196,6 +196,8 @@ export interface Settings {
   contentDirs: string[]
   /** Folder paths pinned to the top of their parent's listing. */
   pinnedDirs: string[]
+  /** Send anonymous error/crash reports to Sentry. Change takes effect on restart. */
+  crashReports: boolean
 }
 
 export interface SettingsInfo extends Settings {
@@ -269,6 +271,8 @@ export interface VdocApi {
   checkUpdate(): Promise<UpdateInfo | null>
   /** Download the installer zip, swap the app bundle, relaunch (macOS in-app update). */
   installUpdate(assetUrl: string): Promise<void>
+  /** True when the main process initialized Sentry - the renderer inits its side only then. */
+  sentryActive(): Promise<boolean>
   /** Native folder picker rooted at the docs repo; returns a relative path or null. */
   pickFolder(): Promise<string | null>
   /** Native folder picker for the docs repository itself; returns an absolute path or null. */

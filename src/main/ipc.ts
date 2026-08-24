@@ -6,6 +6,7 @@ import type { AuthStatus, CheckFile, CommentEntry, CreateResult, CredentialKey, 
 import { maskSecret } from '../shared/secret.ts'
 import { backlinksTo, docsRoot, fileForPageId, gitDirtyFiles, resolvedVdocBin, runVdoc, runVdocJson, scanMarkdownFiles, searchContent, setVdocBin, vdocLogs } from './vdoc.ts'
 import { loadSettings, saveSettings } from './settings.ts'
+import { sentryActive } from './sentry.ts'
 import { checkUpdate, installUpdate } from './update.ts'
 import { watchDocs } from './watcher.ts'
 
@@ -261,6 +262,8 @@ export function registerIpc(): void {
   ipcMain.handle('check-update', () => checkUpdate())
 
   ipcMain.handle('install-update', (_event, assetUrl: string) => installUpdate(assetUrl))
+
+  ipcMain.handle('sentry-active', () => sentryActive)
 
   ipcMain.handle('quit', () => app.quit())
 }
