@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.9.0](https://github.com/Nerwin/vdoc-app/compare/v1.8.0...v1.9.0) (2026-08-24)
+
+### Features
+
+* **renderer:** in-document find, preview code highlighting, sidebar titles, and full-text search ([c5d277d](https://github.com/Nerwin/vdoc-app/commit/c5d277ddc31a2d2d5403db423a948363382af791))
+* **settings:** add credential preview and removal for stored keys ([25f2d9b](https://github.com/Nerwin/vdoc-app/commit/25f2d9b6aacedaf40f525194e17019295075c48f))
+* **update:** GitHub-release update check in the status bar ([ac159cb](https://github.com/Nerwin/vdoc-app/commit/ac159cb70caf73b0b865f7a06c42c8259146cac0))
+
+### Docs
+
+* memory, auto-update, and monitoring analysis ([32bb778](https://github.com/Nerwin/vdoc-app/commit/32bb7789fe7500e68cf854230d0fbc8c4e4e47d5))
 ## [1.8.0](///compare/v1.7.0...v1.8.0) (2026-08-24)
 
 ### Features
