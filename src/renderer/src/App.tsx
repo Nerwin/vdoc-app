@@ -12,6 +12,7 @@ import { GetForm } from './components/GetForm.tsx'
 import { SettingsModal } from './components/SettingsModal.tsx'
 import { LogsView } from './components/LogsView.tsx'
 import { HelpModal } from './components/HelpModal.tsx'
+import { Tour } from './components/Tour.tsx'
 import { Toast } from './components/Toast.tsx'
 import { Modal, ModalButton } from './components/Modal.tsx'
 import { applyMonacoTheme } from './components/monaco-setup.ts'
@@ -41,6 +42,7 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [logsOpen, setLogsOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
+  const [tourOpen, setTourOpen] = useState(() => localStorage.getItem('tourSeen') === null)
   const [view, setView] = useState<ViewMode>('preview')
   const [reloadKey, setReloadKey] = useState(0)
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -92,6 +94,7 @@ export function App() {
     openToken: () => setTokenOpen(true),
     openLogs: () => setLogsOpen(true),
     openHelp: () => setHelpOpen(true),
+    openTour: () => setTourOpen(true),
     focusFilter: () => filterRef.current?.focus(),
     setView,
     openDiff,
@@ -177,7 +180,7 @@ export function App() {
 
       <div className="flex min-h-0 flex-1">
         {sidebarOpen && (
-          <aside style={{ width: sidebarWidth }} className="relative shrink-0 border-r border-line bg-sidebar">
+          <aside data-tour="tree" style={{ width: sidebarWidth }} className="relative shrink-0 border-r border-line bg-sidebar">
             <FileTree
               entries={app.entries}
               totals={totals}
@@ -198,7 +201,7 @@ export function App() {
             <div onMouseDown={startSidebarResize} className="absolute inset-y-0 -right-0.5 z-10 w-1 cursor-col-resize" />
           </aside>
         )}
-        <main className="@container min-w-0 flex-1 bg-content">
+        <main data-tour="main" className="@container min-w-0 flex-1 bg-content">
           {logsOpen
             ? <LogsView notify={app.notify} onClose={() => setLogsOpen(false)} />
             : selected
@@ -272,6 +275,16 @@ export function App() {
       />
 
       {app.message && <Toast message={app.message} onDismiss={app.dismissMessage} />}
+
+      {tourOpen && (
+        <Tour
+          ctx={ctx}
+          onClose={() => {
+            localStorage.setItem('tourSeen', '1')
+            setTourOpen(false)
+          }}
+        />
+      )}
 
       {helpOpen && <HelpModal onClose={() => setHelpOpen(false)} />}
 

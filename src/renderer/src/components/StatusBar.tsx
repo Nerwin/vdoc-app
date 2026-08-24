@@ -23,7 +23,7 @@ export function StatusBar(props: Props) {
   const offline = props.auth !== null && !props.auth.ok
 
   return (
-    <footer className="flex h-8 shrink-0 items-center gap-3 border-t border-line bg-chrome px-3 font-mono text-[11.5px]">
+    <footer data-tour="statusbar" className="flex h-8 shrink-0 items-center gap-3 border-t border-line bg-chrome px-3 font-mono text-[11.5px]">
       <AuthChip auth={props.auth} onClick={props.onOpenToken} />
 
       <div className="h-4 w-px bg-line" />

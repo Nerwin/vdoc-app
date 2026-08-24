@@ -40,6 +40,7 @@ export interface CommandContext {
   openToken(): void
   openLogs(): void
   openHelp(): void
+  openTour(): void
   focusFilter(): void
   setView(view: ViewMode): void
   openDiff(): void
@@ -400,6 +401,13 @@ export const COMMANDS: Command[] = [
     icon: '?',
     keys: { key: '/', meta: true },
     run: ctx => ctx.openHelp(),
+  },
+  {
+    id: 'app.tour',
+    group: 'App',
+    label: 'Welcome tour',
+    icon: '✦',
+    run: ctx => ctx.openTour(),
   },
   {
     id: 'app.revealConfig',

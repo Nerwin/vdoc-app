@@ -456,3 +456,16 @@ select:focus {
 .preview .mermaid-error {
   border-color: var(--color-conflict);
 }
+
+/* Guided tour spotlight — a pulsing accent outline on the region the active step describes. */
+.tour-target {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+  animation: tour-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes tour-pulse {
+  50% {
+    outline-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
+  }
+}

@@ -35,7 +35,7 @@ export function TopBar(props: Props) {
       : null
 
   return (
-    <header className={`drag-region flex h-[46px] shrink-0 items-center gap-4 border-b border-line bg-chrome pr-3.5 ${IS_MAC ? 'pl-28' : 'pl-3.5'}`}>
+    <header data-tour="topbar" className={`drag-region flex h-[46px] shrink-0 items-center gap-4 border-b border-line bg-chrome pr-3.5 ${IS_MAC ? 'pl-28' : 'pl-3.5'}`}>
       <img
         src={props.theme === 'dark' ? darkLogo : lightLogo}
         alt="VOSKER DOC"
