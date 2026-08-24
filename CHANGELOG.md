@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.9.1](https://github.com/Nerwin/vdoc-app/compare/v1.9.0...v1.9.1) (2026-08-24)
+
+### Bug Fixes
+
+* **build:** stop electron-builder self-publishing and set deb maintainer email ([7dd5809](https://github.com/Nerwin/vdoc-app/commit/7dd5809511dbfe2f4a31e3a1508b22d62831eddf))
 ## [1.9.0](https://github.com/Nerwin/vdoc-app/compare/v1.8.0...v1.9.0) (2026-08-24)
 
 ### Features
