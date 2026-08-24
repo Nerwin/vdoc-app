@@ -5,7 +5,10 @@
   "description": "App GUI over the vdoc CLI",
   "main": "out/main/index.js",
   "productName": "V-DOC",
-  "author": "Nerwin",
+  "author": {
+    "name": "Nerwin",
+    "email": "7089842+Nerwin@users.noreply.github.com"
+  },
   "homepage": "https://github.com/nerwin/vdoc-app",
   "scripts": {
     "dev": "electron-vite dev",
@@ -13,7 +16,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "npm run typecheck && node --experimental-strip-types --test src/shared/__tests__/*.test.ts",
     "pack": "electron-vite build && electron-builder --dir",
-    "dist": "electron-vite build && electron-builder",
+    "dist": "electron-vite build && electron-builder --publish never",
     "dist:mac": "electron-vite build && electron-builder --mac",
     "dist:win": "electron-vite build && electron-builder --win",
     "dist:linux": "electron-vite build && electron-builder --linux",
