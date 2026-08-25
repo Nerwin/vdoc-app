@@ -1,3 +1,4 @@
+import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs'
 import { isAbsolute, join, relative } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -8,6 +9,7 @@ import { parseVdocCliRequirement, type VdocCliRequirement } from '../shared/app-
 import { parseConfluenceSpaces } from '../shared/confluence.ts'
 import { relativeAppPath, resolveExistingPathInsideRoot } from '../shared/path-policy.ts'
 import { maskSecret } from '../shared/secret.ts'
+import { OperationTickets } from '../shared/operation-tickets.ts'
 import { backlinksTo, docsRoot, fileForPageId, gitDirtyFiles, resolvedVdocBin, runVdoc, runVdocJson, scanMarkdownFiles, searchContent, setVdocBin, vdocLogs } from './vdoc.ts'
 import { loadSettings, saveSettings } from './settings.ts'
 import { sentryActive } from './sentry.ts'
@@ -15,6 +17,15 @@ import { checkUpdate } from './update.ts'
 import { watchDocs } from './watcher.ts'
 
 const CHECK_BATCH = 24
+const PUSH_PREVIEW_TTL_MS = 5 * 60 * 1000
+
+interface PendingPush {
+  path: string
+  force: boolean
+  contentHash: string
+}
+
+const pushTickets = new OperationTickets<PendingPush>(PUSH_PREVIEW_TTL_MS, 20)
 
 let checkCancelled = false
 
@@ -63,6 +74,11 @@ function docsPaths(value: unknown, label = 'paths'): string[] {
   return value.map((path, index) => docsPath(path, `${label}[${index}]`))
 }
 
+function contentHash(path: string): string {
+  const content = readFileSync(resolveExistingPathInsideRoot(docsRoot(), path))
+  return createHash('sha256').update(content).digest('hex')
+}
+
 function settingsPatch(value: unknown): Partial<Settings> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid settings patch')
   const patch = value as Record<string, unknown>
@@ -101,6 +117,22 @@ export function registerIpc(getMainWindow: () => BrowserWindow | null): void {
       assertTrustedSender(event, getMainWindow())
       return handler(event, ...args as Args)
     })
+  }
+
+  const confirmForce = async (title: string, message: string, detail: string, confirmLabel: string): Promise<boolean> => {
+    const window = getMainWindow()
+    if (!window) return false
+    const { response } = await dialog.showMessageBox(window, {
+      type: 'warning',
+      title,
+      message,
+      detail,
+      buttons: ['Cancel', confirmLabel],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+    })
+    return response === 1
   }
 
   handle('scan', () => {
@@ -193,21 +225,47 @@ export function registerIpc(getMainWindow: () => BrowserWindow | null): void {
   handle('pull', async (_event, pathsInput: unknown, forceInput?: unknown) => {
     const paths = docsPaths(pathsInput)
     const force = forceInput === undefined ? false : booleanValue(forceInput, 'force flag')
+    if (force && !await confirmForce(
+      'Overwrite local content?',
+      `Force pull ${paths.length} file(s) from Confluence?`,
+      'Local body changes will be replaced by the remote version. This cannot be undone by V-DOC.',
+      'Force pull',
+    )) return null
     const args = ['cf', 'pull', ...paths]
     if (force) args.push('--force')
     const { files } = await runVdocJson<{ files: PullFile[] }>(args)
     return files
   })
 
-  handle('push', async (_event, pathInput: unknown, dryRunInput: unknown, forceInput?: unknown) => {
+  handle('push-preview', async (_event, pathInput: unknown, forceInput?: unknown) => {
     const path = docsPath(pathInput)
-    const dryRun = booleanValue(dryRunInput, 'dry-run flag')
     const force = forceInput === undefined ? false : booleanValue(forceInput, 'force flag')
-    const args = ['cf', 'push', path]
-    if (dryRun) args.push('--dry-run')
+    const args = ['cf', 'push', path, '--dry-run']
     if (force) args.push('--force')
     const { files } = await runVdocJson<{ files: PushFile[] }>(args)
-    return files
+    const result = files[0]
+    if (!result) throw new Error('Push preview returned no file')
+    const token = randomUUID()
+    pushTickets.issue(token, { path, force, contentHash: contentHash(path) })
+    return { token, result }
+  })
+
+  handle('push-commit', async (_event, tokenInput: unknown) => {
+    const token = stringValue(tokenInput, 'push preview token', 100)
+    const pending = pushTickets.take(token)
+    if (contentHash(pending.path) !== pending.contentHash) throw new Error('File changed after the push preview; preview it again')
+    if (pending.force && !await confirmForce(
+      'Overwrite Confluence content?',
+      `Force push ${pending.path.split('/').at(-1)}?`,
+      'Remote edits will be replaced by the local document. This cannot be undone by V-DOC.',
+      'Force push',
+    )) return null
+    const args = ['cf', 'push', pending.path]
+    if (pending.force) args.push('--force')
+    const { files } = await runVdocJson<{ files: PushFile[] }>(args)
+    const result = files[0]
+    if (!result) throw new Error('Push returned no file')
+    return result
   })
 
   handle('create', (_event, pathInput: unknown, spaceInput: unknown, parentInput?: unknown) => {

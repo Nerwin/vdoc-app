@@ -97,7 +97,7 @@ Recommendation:
 
 Reference: [Electron security checklist](https://www.electronjs.org/docs/latest/tutorial/security#checklist-security-recommendations).
 
-### A-03: Privileged IPC does not enforce a renderer trust boundary [In progress]
+### A-03: Privileged IPC does not enforce a renderer trust boundary [Fixed]
 
 Severity: High
 

@@ -17,6 +17,7 @@ export interface PushPreview {
   path: string
   result: PushFile
   force: boolean
+  token: string
 }
 
 export interface PullConfirm {
@@ -335,6 +336,7 @@ export function useApp() {
   const doPull = useCallback((paths: string[], force: boolean) => runOp('pull', async () => {
     const results = await api.pull(paths, force)
     setPullConfirm(null)
+    if (!results) return
     const pulled = results.filter(result => result.status === 'pulled' || result.status === 'updated')
     // Files that did NOT update are the interesting part - say why, per file.
     const skipped = results.filter(result => !pulled.includes(result))
@@ -362,16 +364,17 @@ export function useApp() {
   }, [entries])
 
   const requestPush = useCallback((path: string, force = false) => runOp('push preview', async () => {
-    const [dry] = await api.push(path, true, force)
-    setPushPreview({ path, result: dry, force })
+    const { result, token } = await api.previewPush(path, force)
+    setPushPreview({ path, result, force, token })
   }), [api, runOp])
 
   const confirmPush = useCallback(() => {
     if (!pushPreview) return
-    const { path, force } = pushPreview
+    const { path, force, token } = pushPreview
     void runOp('push', async () => {
-      const [result] = await api.push(path, false, force)
+      const result = await api.commitPush(token)
       setPushPreview(null)
+      if (!result) return
       recordActivity('pushed', [path])
       setMessage({ kind: 'info', text: `${force ? 'Force pushed' : 'Pushed'} ${path} to v${result.version}` })
       setDiff(current => (current?.path === path ? null : current))

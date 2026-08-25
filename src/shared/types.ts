@@ -79,6 +79,11 @@ export interface PushFile {
   unresolvedLinks?: number
 }
 
+export interface PushPreviewTicket {
+  token: string
+  result: PushFile
+}
+
 export interface SyncFile {
   file: string
   status: 'linked' | 'already-linked' | 'not-found' | 'ambiguous' | 'skipped'
@@ -262,8 +267,9 @@ export interface VdocApi {
   postComment(path: string, text: string): Promise<void>
   /** Confluence label names on the page this tracked file maps to. */
   labels(path: string): Promise<string[]>
-  pull(paths: string[], force?: boolean): Promise<PullFile[]>
-  push(path: string, dryRun: boolean, force?: boolean): Promise<PushFile[]>
+  pull(paths: string[], force?: boolean): Promise<PullFile[] | null>
+  previewPush(path: string, force?: boolean): Promise<PushPreviewTicket>
+  commitPush(token: string): Promise<PushFile | null>
   create(path: string, space: string, parent?: string): Promise<CreateResult>
   /** Add missing authoring frontmatter through `vdoc md init`; existing values are preserved. */
   initFile(path: string): Promise<InitResult>
