@@ -1,4 +1,5 @@
-import { mkdtemp, mkdir, realpath, rm, symlink, writeFile } from 'node:fs/promises'
+import { realpathSync } from 'node:fs'
+import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -17,7 +18,8 @@ test('relativeAppPath rejects paths outside the internal format', () => {
 })
 
 test('resolvePathInsideRoot keeps lexical paths under the root', () => {
-  assert.equal(resolvePathInsideRoot('/repo', 'docs/file.md'), join('/repo', 'docs/file.md'))
+  const root = join(tmpdir(), 'vdoc-path-root')
+  assert.equal(resolvePathInsideRoot(root, 'docs/file.md'), join(root, 'docs/file.md'))
 })
 
 test('resolveExistingPathInsideRoot refuses symlink escapes', async () => {
@@ -29,7 +31,7 @@ test('resolveExistingPathInsideRoot refuses symlink escapes', async () => {
     await writeFile(join(outside, 'outside.md'), '# Outside')
     await symlink(join(outside, 'outside.md'), join(root, 'docs', 'linked.md'))
 
-    assert.equal(resolveExistingPathInsideRoot(root, 'docs/inside.md'), await realpath(join(root, 'docs', 'inside.md')))
+    assert.equal(resolveExistingPathInsideRoot(root, 'docs/inside.md'), realpathSync(join(root, 'docs', 'inside.md')))
     assert.throws(() => resolveExistingPathInsideRoot(root, 'docs/linked.md'), /Invalid path/)
   } finally {
     await Promise.all([rm(root, { recursive: true }), rm(outside, { recursive: true })])

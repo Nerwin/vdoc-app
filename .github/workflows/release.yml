@@ -1,6 +1,6 @@
 # Builds the platform installers on a real runner per OS and attaches them to the
 # GitHub release for the pushed tag. Local flow stays `npm run release` (bump +
-# changelog + tag); pushing the tag (`git push --follow-tags`) triggers this.
+# changelog + tag + push with tag (`git push --follow-tags`)) triggers this.
 name: Release
 
 on:
@@ -29,20 +29,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      - name: Require macOS signing credentials
-        if: runner.os == 'macOS'
-        shell: bash
-        env:
-          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
-        run: |
-          test -n "$CSC_LINK"
-          test -n "$CSC_KEY_PASSWORD"
       - name: Build release artifacts
         run: npm run dist
-        env:
-          CSC_LINK: ${{ runner.os == 'macOS' && secrets.MAC_CSC_LINK || '' }}
-          CSC_KEY_PASSWORD: ${{ runner.os == 'macOS' && secrets.MAC_CSC_KEY_PASSWORD || '' }}
       - run: npm run check:bundle
       - name: Verify macOS artifacts
         if: runner.os == 'macOS'
@@ -60,7 +48,7 @@ jobs:
       - name: Smoke test packaged Linux app
         if: runner.os == 'Linux'
         timeout-minutes: 1
-        run: xvfb-run --auto-servernum release/linux-unpacked/vdoc-app --smoke-test
+        run: xvfb-run --auto-servernum release/linux-unpacked/vdoc-app --no-sandbox --smoke-test
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-${{ matrix.os }}

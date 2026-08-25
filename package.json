@@ -27,13 +27,14 @@
     "build": "electron-vite build",
     "check:bundle": "node scripts/check-renderer-bundle.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
-    "test": "npm run typecheck && npm run knip && node --experimental-strip-types --test src/shared/__tests__/*.test.ts",
+    "test": "npm run typecheck && npm run knip && node --experimental-strip-types --test src/shared/__tests__/*.test.ts scripts/__tests__/*.test.mjs",
     "pack": "electron-vite build && electron-builder --dir",
     "dist": "electron-vite build && electron-builder --publish never",
     "dist:mac": "electron-vite build && electron-builder --mac",
     "dist:win": "electron-vite build && electron-builder --win",
     "dist:linux": "electron-vite build && electron-builder --linux",
-    "release": "commit-and-tag-version",
+    "bump": "commit-and-tag-version",
+    "release": "node scripts/release.mjs",
     "knip": "knip"
   },
   "dependencies": {
@@ -91,6 +92,7 @@
       }
     ],
     "mac": {
+      "identity": null,
       "target": [
         {
           "target": "dmg",
@@ -105,7 +107,7 @@
           ]
         }
       ],
-      "hardenedRuntime": true,
+      "hardenedRuntime": false,
       "notarize": false,
       "category": "public.app-category.developer-tools"
     },

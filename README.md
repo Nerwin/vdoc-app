@@ -123,8 +123,9 @@ Confluence-related is written through `vdoc config set`, so CLI and app always a
 
 Grab the artifact for your OS from the latest GitHub release:
 
-- **macOS** - `V-DOC-x.y.z-mac-arm64.dmg` (Apple Silicon). Release builds are signed;
-  notarization is intentionally skipped for this internal app.
+- **macOS** - `V-DOC-x.y.z-mac-arm64.dmg` (Apple Silicon). Release builds are unsigned and
+  not notarized. On first launch, macOS may require approval in System Settings under
+  Privacy & Security.
 - **Windows** - `V-DOC-x.y.z-win-x64.exe` (installer, per-user, no admin needed) or the
   `…-portable-x64.exe`. SmartScreen will warn about an unsigned app - More info → Run anyway.
 - **Linux** - `V-DOC-x.y.z-linux-x64.AppImage` (`chmod +x`, run) or the `.deb`.
@@ -305,7 +306,8 @@ npm run dev            # launch in dev mode
 npm test               # typecheck + unit tests
 npm run build          # production bundle to out/
 npm run pack           # quick unsigned app for this OS into release/
-npm run release        # bump version + CHANGELOG + release commit + tag; pushing the tag starts CI
+npm run bump           # bump version + CHANGELOG + release commit + local tag
+npm run release        # create the release and push its commit and tag; CI builds and publishes
 npm run dist           # rebuild binaries without bumping (host OS) - or dist:mac / dist:win / dist:linux
 ```
 
@@ -319,10 +321,10 @@ local development artifacts are unsigned. Version comes from `package.json` and 
 the artifacts' names, and the status bar. The app icon lives in `build/icon.png` (1024×1024 -
 electron-builder converts it per platform).
 
-The release workflow requires the `MAC_CSC_LINK` and `MAC_CSC_KEY_PASSWORD` repository secrets.
-They provide the Apple Developer ID certificate to electron-builder. A release fails instead of
-publishing a macOS build that cannot pass the updater's signature validation. Notarization is not
-part of the internal release process.
+All release artifacts are unsigned. The macOS build explicitly skips certificate lookup,
+hardened runtime, and notarization, so internal releases do not require Apple signing
+credentials. macOS Gatekeeper and Windows SmartScreen may require manual approval when the app
+is installed.
 
 Packaged builds use `electron-updater`. They check GitHub after startup and daily, download an
 available update in the background, verify its release metadata, and install it on exit or when
@@ -348,7 +350,7 @@ not a user setting: every installation of one app release has the same compatibi
 
 ### Releases
 
-`npm run release` is fully automated, driven by the conventional-commit history
+`npm run bump` is fully automated, driven by the conventional-commit history
 ([commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version)):
 
 1. Computes the semver bump from the commits since the last tag - `fix:` → patch, `feat:` → minor,
@@ -356,11 +358,12 @@ not a user setting: every installation of one app release has the same compatibi
 2. Bumps `package.json` + `package-lock.json` and prepends the notes to `CHANGELOG.md`
    (sections configured in `.versionrc.json`; `chore`/`test` commits are hidden).
 3. Commits those three files as `chore(release): X.Y.Z` and tags `vX.Y.Z`.
-4. Builds the binaries from the freshly bumped version.
 
-Pushing the tag (`git push --follow-tags`) triggers `.github/workflows/release.yml`, which builds
-the installers on a real runner per OS (macOS, Windows, Linux) and attaches them all to the
-GitHub release for that tag - that release page is what you share with the company.
+Run `npm run release` from a clean `main` synchronized with `origin/main`. The release
+script validates that state, runs the full test suite, performs the versioning steps, and pushes
+the release commit and tag. The tag triggers `.github/workflows/release.yml`, which builds the
+installers on a real runner per OS (macOS, Windows, Linux) and attaches them all to the GitHub
+release for that tag. That release page is what you share with the company.
 
 Day-to-day commits never touch the version - releasing is a deliberate act, not a git hook.
 Preview what a release would do with `npx commit-and-tag-version --dry-run`. To tag the current

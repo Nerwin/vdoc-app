@@ -5,7 +5,9 @@ import { test } from 'node:test'
 
 import { parseVdocCliRequirement } from '../app-config.ts'
 
-const PACKAGE_JSON = JSON.parse(readFileSync(join(import.meta.dirname, '../../../package.json'), 'utf8')) as Record<string, unknown>
+const PROJECT_ROOT = join(import.meta.dirname, '../../..')
+const PACKAGE_JSON = JSON.parse(readFileSync(join(PROJECT_ROOT, 'package.json'), 'utf8')) as Record<string, unknown>
+const RELEASE_WORKFLOW = readFileSync(join(PROJECT_ROOT, '.github/workflows/release.yml'), 'utf8')
 
 test('parseVdocCliRequirement accepts the release metadata', () => {
   assert.deepEqual(parseVdocCliRequirement({
@@ -42,7 +44,7 @@ test('macOS release targets are Apple Silicon only', () => {
   }
 })
 
-test('packaged updates use the GitHub feed, keep macOS signing, and skip notarization', () => {
+test('packaged updates use the GitHub feed and macOS releases stay unsigned', () => {
   const build = PACKAGE_JSON.build as {
     mac?: { identity?: string | null }
     publish?: Array<Record<string, string>>
@@ -50,10 +52,14 @@ test('packaged updates use the GitHub feed, keep macOS signing, and skip notariz
   const dependencies = PACKAGE_JSON.dependencies as Record<string, string>
 
   assert.deepEqual(build.publish, [{ provider: 'github', owner: 'Nerwin', repo: 'vdoc-app' }])
-  assert.equal(build.mac?.identity, undefined)
-  assert.equal((build.mac as Record<string, unknown>)?.hardenedRuntime, true)
+  assert.equal(build.mac?.identity, null)
+  assert.equal((build.mac as Record<string, unknown>)?.hardenedRuntime, false)
   assert.equal((build.mac as Record<string, unknown>)?.notarize, false)
   assert.match(dependencies['electron-updater'] ?? '', /^\^6\./)
+})
+
+test('release workflow applies the Linux sandbox exception only to its smoke test', () => {
+  assert.match(RELEASE_WORKFLOW, /release\/linux-unpacked\/vdoc-app --no-sandbox --smoke-test/)
 })
 
 test('packaged Electron disables permissive fuses', () => {
