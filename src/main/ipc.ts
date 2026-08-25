@@ -1,10 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync, realpathSync, statSync } from 'node:fs'
 import { isAbsolute, join, relative } from 'node:path'
-import { app, BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
 
 import type { AuthStatus, CheckFile, CommentEntry, CreateResult, CredentialKey, DiffResult, FileWriteRequest, FileWriteResult, GetPageResult, InitResult, LintFile, PullFile, PushFile, Settings, SettingsInfo, SyncFile, VersionEntry } from '../shared/types.ts'
 import { parseVdocCliRequirement, type VdocCliRequirement } from '../shared/app-config.ts'
+import { clipboardText } from '../shared/clipboard.ts'
 import { parseConfluenceSpaces } from '../shared/confluence.ts'
 import { isTrustedRendererLocation, PACKAGED_RENDERER_URL } from '../shared/electron-policy.ts'
 import { contentForGuardedWrite } from '../shared/file-write.ts'
@@ -519,6 +520,8 @@ export function registerIpc(
   })
 
   handle('vdoc-logs', () => vdocLogs())
+
+  handle('clipboard-write', (_event, input: unknown) => clipboard.writeText(clipboardText(input)))
 
   handle('vdoc-version', () => probeVersion())
 

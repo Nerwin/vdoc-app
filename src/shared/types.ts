@@ -331,6 +331,7 @@ export interface VdocApi {
   quit(): Promise<void>
   /** All recorded CLI invocations, oldest first (ring buffer of the last 200). */
   logs(): Promise<VdocLogEntry[]>
+  copyText(text: string): Promise<void>
   onFilesChanged(cb: (paths: string[]) => void): () => void
   onCheckProgress(cb: (progress: CheckProgress) => void): () => void
   onUpdateStatus(cb: (status: AppUpdateStatus) => void): () => void

@@ -63,6 +63,7 @@ const api: VdocApi = {
   closeReady: saved => ipcRenderer.invoke('close-ready', saved),
   quit: () => ipcRenderer.invoke('quit'),
   logs: () => ipcRenderer.invoke('vdoc-logs'),
+  copyText: text => ipcRenderer.invoke('clipboard-write', text),
   onFilesChanged: cb => subscribe<string[]>('files-changed', cb),
   onCheckProgress: cb => subscribe<CheckProgress>('check-progress', cb),
   onUpdateStatus: cb => subscribe<AppUpdateStatus>('update-status', cb),

@@ -34,7 +34,9 @@ export function LogsView({ notify, onClose }: { notify(text: string): void, onCl
 
   const copy = (text: string, what: string): void => {
     setMenu(null)
-    void navigator.clipboard.writeText(text).then(() => notify(`${what} copied`)).catch(() => undefined)
+    void window.vdoc.copyText(text)
+      .then(() => notify(`${what} copied`))
+      .catch(() => notify(`Could not copy ${what.toLowerCase()}`))
   }
 
   return (
