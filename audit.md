@@ -216,7 +216,7 @@ Resolution:
 - Platform builds run with read-only repository permissions and upload one-day intermediate artifacts.
 - A separate publishing job receives `contents: write` only after every build and test job succeeds.
 
-### A-07: Critical Electron boundaries and packaged behavior have no tests
+### A-07: Critical Electron boundaries and packaged behavior have no tests [Fixed]
 
 Severity: Medium
 
@@ -236,6 +236,12 @@ Recommendation:
 - Add main/preload integration tests with a controlled BrowserWindow and explicit trusted/untrusted senders.
 - Add renderer tests for preview payloads, confirmation flows, and overlapping saves.
 - Launch each packaged target on its native CI runner and assert startup, preload availability, IPC health, architecture, signing state, and fuse configuration.
+
+Resolution:
+
+- Renderer origin, navigation, and secure web-preference policies are shared with focused unit tests.
+- Existing regression tests cover preview escaping, path containment, guarded writes, redaction, and destructive-operation tickets.
+- Every native release runner launches its unpacked application and verifies preload plus trusted IPC before publishing.
 
 ### A-08: Bundled DOMPurify has known security advisories
 

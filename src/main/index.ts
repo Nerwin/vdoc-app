@@ -3,6 +3,7 @@ import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { app, BrowserWindow, Menu, nativeTheme, session } from 'electron'
 
+import { isAllowedNavigation, SECURE_WEB_PREFERENCES } from '../shared/electron-policy.ts'
 import type { Settings } from '../shared/types.ts'
 import { importLoginShellEnv, setVdocBin } from './vdoc.ts'
 import { loadSettings } from './settings.ts'
@@ -30,16 +31,25 @@ function createWindow(theme: Settings['theme']): BrowserWindow {
     backgroundColor: dark ? '#101113' : '#f2f4f7',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
+      ...SECURE_WEB_PREFERENCES,
     },
   })
 
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   window.webContents.on('will-navigate', (event, url) => {
-    if (url !== window.webContents.getURL()) event.preventDefault()
+    if (!isAllowedNavigation(window.webContents.getURL(), url)) event.preventDefault()
   })
+
+  if (process.argv.includes('--smoke-test')) {
+    window.webContents.once('did-finish-load', () => {
+      void window.webContents.executeJavaScript(
+        "window.vdoc.sentryActive().then(value => typeof value === 'boolean')",
+      ).then(healthy => app.exit(healthy ? 0 : 1), error => {
+        console.error('Packaged smoke test failed:', error)
+        app.exit(1)
+      })
+    })
+  }
 
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) window.loadURL(process.env.ELECTRON_RENDERER_URL)
   else window.loadFile(join(__dirname, '../renderer/index.html'))

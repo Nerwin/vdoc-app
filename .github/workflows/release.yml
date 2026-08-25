@@ -30,6 +30,18 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run dist
+      - name: Smoke test packaged macOS app
+        if: runner.os == 'macOS'
+        timeout-minutes: 1
+        run: 'release/mac-arm64/V-DOC.app/Contents/MacOS/V-DOC --smoke-test'
+      - name: Smoke test packaged Windows app
+        if: runner.os == 'Windows'
+        timeout-minutes: 1
+        run: '& "release/win-unpacked/V-DOC.exe" --smoke-test'
+      - name: Smoke test packaged Linux app
+        if: runner.os == 'Linux'
+        timeout-minutes: 1
+        run: xvfb-run --auto-servernum release/linux-unpacked/vdoc-app --smoke-test
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-${{ matrix.os }}

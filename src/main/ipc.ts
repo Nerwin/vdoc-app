@@ -7,6 +7,7 @@ import { app, BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent } f
 import type { AuthStatus, CheckFile, CommentEntry, CreateResult, CredentialKey, DiffResult, FileWriteRequest, FileWriteResult, GetPageResult, InitResult, LintFile, PullFile, PushFile, Settings, SettingsInfo, SyncFile, VersionEntry } from '../shared/types.ts'
 import { parseVdocCliRequirement, type VdocCliRequirement } from '../shared/app-config.ts'
 import { parseConfluenceSpaces } from '../shared/confluence.ts'
+import { isTrustedRendererLocation } from '../shared/electron-policy.ts'
 import { contentForGuardedWrite } from '../shared/file-write.ts'
 import { relativeAppPath, resolveExistingPathInsideRoot } from '../shared/path-policy.ts'
 import { maskSecret } from '../shared/secret.ts'
@@ -43,14 +44,9 @@ function assertTrustedSender(event: IpcMainInvokeEvent, window: BrowserWindow | 
     throw new Error('Refusing IPC from an untrusted renderer')
   }
 
-  const expected = new URL(rendererUrl())
-  const actual = new URL(event.senderFrame.url)
-  expected.hash = ''
-  actual.hash = ''
-  const samePage = app.isPackaged
-    ? actual.href === expected.href
-    : actual.origin === expected.origin
-  if (!samePage) throw new Error('Refusing IPC from an untrusted renderer URL')
+  if (!isTrustedRendererLocation(rendererUrl(), event.senderFrame.url, app.isPackaged)) {
+    throw new Error('Refusing IPC from an untrusted renderer URL')
+  }
 }
 
 function stringValue(value: unknown, label: string, maxLength: number, allowEmpty = false): string {
