@@ -48,7 +48,7 @@ Any JavaScript running in the renderer can download a zip from an attacker-contr
 Recommendation:
 
 1. Disable in-app replacement while artifacts are unsigned. Keep update checking and open the verified release page in the browser.
-2. For in-app updates, sign and notarize macOS artifacts and use a supported update mechanism that validates signatures and checksums.
+2. For in-app updates, sign macOS artifacts and use a supported update mechanism that validates signatures and checksums. Notarize builds intended for public distribution.
 3. Keep the selected release and asset in the main process. Expose an `installCheckedUpdate()` operation with no URL argument.
 4. Allow only the expected HTTPS release host and repository asset, enforce time and size limits, verify version, app identifier, architecture, checksum, and signature before replacing anything.
 5. Clean temporary data in `finally`, retaining the previous bundle only for the minimum rollback window.
@@ -60,7 +60,7 @@ Resolution:
 - The custom download, extraction, and application replacement code was deleted.
 - `electron-updater` owns GitHub release discovery, SHA-512 metadata verification, download, and installation in the main process.
 - Renderer IPC can request a check or installation of the already-downloaded update, but cannot supply a feed URL, artifact URL, or file path.
-- Release jobs publish `latest*.yml` and blockmaps, and macOS releases require Developer ID signing and notarization credentials.
+- Release jobs publish `latest*.yml` and blockmaps, and macOS releases require Developer ID signing. Notarization is intentionally disabled for internal distribution.
 
 ### A-02: Frontmatter status values can inject executable HTML into the preview [Fixed]
 
@@ -210,7 +210,7 @@ Recommendation:
 
 - Pin every action to a reviewed full commit SHA, especially third-party actions.
 - Separate unprivileged build jobs from the release-publishing job. Pass immutable artifacts into a minimal job with `contents: write`.
-- Sign and notarize artifacts and publish checksums or provenance that the updater verifies independently.
+- Sign artifacts and publish checksums or provenance that the updater verifies independently.
 - Add dependency review or automated notifications for action SHA updates.
 
 Reference: [GitHub Actions secure use](https://docs.github.com/en/actions/reference/security/secure-use).

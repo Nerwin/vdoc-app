@@ -59,7 +59,8 @@ Confluence-related is written through `vdoc config set`, so CLI and app always a
 
 Grab the artifact for your OS from the latest GitHub release:
 
-- **macOS** - `V-DOC-x.y.z-mac-arm64.dmg` (Apple Silicon). Release builds are signed and notarized.
+- **macOS** - `V-DOC-x.y.z-mac-arm64.dmg` (Apple Silicon). Release builds are signed;
+  notarization is intentionally skipped for this internal app.
 - **Windows** - `V-DOC-x.y.z-win-x64.exe` (installer, per-user, no admin needed) or the
   `…-portable-x64.exe`. SmartScreen will warn about an unsigned app - More info → Run anyway.
 - **Linux** - `V-DOC-x.y.z-linux-x64.AppImage` (`chmod +x`, run) or the `.deb`.
@@ -254,10 +255,10 @@ local development artifacts are unsigned. Version comes from `package.json` and 
 the artifacts' names, and the status bar. The app icon lives in `build/icon.png` (1024×1024 -
 electron-builder converts it per platform).
 
-The release workflow requires `MAC_CSC_LINK`, `MAC_CSC_KEY_PASSWORD`, `MAC_APPLE_ID`,
-`MAC_APP_SPECIFIC_PASSWORD`, and `MAC_APPLE_TEAM_ID` repository secrets. They provide the Apple
-Developer ID certificate and notarization credentials to electron-builder. A release fails instead
-of publishing a macOS build that cannot pass the updater's signature validation.
+The release workflow requires the `MAC_CSC_LINK` and `MAC_CSC_KEY_PASSWORD` repository secrets.
+They provide the Apple Developer ID certificate to electron-builder. A release fails instead of
+publishing a macOS build that cannot pass the updater's signature validation. Notarization is not
+part of the internal release process.
 
 Packaged builds use `electron-updater`. They check GitHub after startup and daily, download an
 available update in the background, verify its release metadata, and install it on exit or when
