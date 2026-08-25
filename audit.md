@@ -292,7 +292,7 @@ Resolution:
 - The README now documents Apple Silicon as the only macOS target.
 - Unit and release-workflow checks enforce the arm64 DMG and ZIP artifacts.
 
-### A-10: Monaco is loaded eagerly into an 8.7 MB startup bundle
+### A-10: Monaco is loaded eagerly into an 8.7 MB startup bundle [Fixed]
 
 Severity: Medium
 
@@ -314,6 +314,12 @@ Recommendation:
 - Keep editor state independent from the eagerly loaded app shell so Monaco is requested only when an editor or code-highlighting path needs it.
 - Recheck the bundle graph and add a startup chunk budget to CI.
 - Keep Mermaid's current lazy import, which is working as intended.
+
+Resolution:
+
+- Editor and diff components load lazily the first time their views are opened.
+- Monaco theme setup and preview colorization stay behind the same lazy module boundary.
+- The release workflow enforces a 1.25 MB uncompressed renderer entry budget after building.
 
 ### A-11: Scans and dashboard rendering perform avoidable disk and IPC work
 

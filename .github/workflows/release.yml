@@ -30,6 +30,7 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run dist
+      - run: npm run check:bundle
       - name: Verify macOS artifacts
         if: runner.os == 'macOS'
         run: |

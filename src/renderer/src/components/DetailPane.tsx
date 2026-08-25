@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 
 import type { DiffResult } from '../../../shared/types.ts'
 import { resolveRelative } from '../../../shared/links.ts'
 import { displayState, type FileEntry } from '../../../shared/status.ts'
 import { shortcutLabel, type ViewMode } from '../commands.ts'
 import { STATE_META } from '../state-meta.ts'
-import { CodeView } from './CodeView.tsx'
 import { CommentsView } from './CommentsView.tsx'
-import { DiffView } from './DiffView.tsx'
 import { PreviewView } from './PreviewView.tsx'
+
+const CodeView = lazy(() => import('./CodeView.tsx').then(module => ({ default: module.CodeView })))
+const DiffView = lazy(() => import('./DiffView.tsx').then(module => ({ default: module.DiffView })))
 
 interface Props {
   entry: FileEntry
@@ -58,9 +59,14 @@ export function DetailPane(props: Props) {
   const [content, setContent] = useState<string | null>(null)
   const [readFailed, setReadFailed] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [editorLoaded, setEditorLoaded] = useState(false)
   const actionsRef = useRef<HTMLButtonElement>(null)
 
   const path = entry.path
+
+  useEffect(() => {
+    if (view === 'content' || view === 'split') setEditorLoaded(true)
+  }, [view])
 
   const diskRef = useRef(new Map<string, string>())
   const pendingRef = useRef<{ path: string, text: string, revision: number } | null>(null)
@@ -416,7 +422,9 @@ export function DetailPane(props: Props) {
                         <span className="flex-1 border-l border-line px-4 py-1.5">Local - v{props.diff.result.localVersion ?? '-'}</span>
                       </div>
                       <div className="min-h-0 flex-1">
-                        <DiffView remote={props.diff.result.remote} local={props.diff.result.local} />
+                        <Suspense fallback={<CenterNote text="Loading diff…" tone="text-ink-faint" />}>
+                          <DiffView remote={props.diff.result.remote} local={props.diff.result.local} theme={props.theme} />
+                        </Suspense>
                       </div>
                     </div>
                   )
@@ -424,11 +432,14 @@ export function DetailPane(props: Props) {
           : content === null
             ? <CenterNote text="Loading…" tone="text-ink-faint" />
             : (
-                // Editor and preview stay mounted across tab switches so Monaco state
-                // and the reading scroll position survive Content ⇄ Preview ⇄ Split.
+                // Once loaded, editor and preview stay mounted so their state survives tab switches.
                 <div className="flex h-full">
                   <div className={`min-w-0 ${view === 'split' ? 'flex-1' : view === 'preview' ? 'hidden' : 'flex-1'}`}>
-                    <CodeView content={content} onChange={readFailed ? undefined : handleEdit} onSave={flush} />
+                    {editorLoaded && (
+                      <Suspense fallback={<CenterNote text="Loading editor…" tone="text-ink-faint" />}>
+                        <CodeView content={content} onChange={readFailed ? undefined : handleEdit} onSave={flush} theme={props.theme} />
+                      </Suspense>
+                    )}
                   </div>
                   {view === 'split' && <div className="w-px shrink-0 bg-line" />}
                   <div className={`min-w-0 ${view === 'split' ? 'flex-1' : view === 'preview' ? 'flex-1' : 'hidden'}`}>

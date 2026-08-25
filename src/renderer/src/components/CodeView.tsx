@@ -1,13 +1,14 @@
 import { useEffect, useRef } from 'react'
 
-import { EDITOR_FONT, monaco } from './monaco-setup.ts'
+import { applyMonacoTheme, EDITOR_FONT, monaco } from './monaco-setup.ts'
 
-export function CodeView({ content, onChange, onSave }: {
+export function CodeView({ content, onChange, onSave, theme }: {
   content: string
   /** Present = editable; called with the full text after every edit. */
   onChange?: (text: string) => void
   /** ⌘S - flush pending edits to disk immediately. */
   onSave?: () => void
+  theme: 'dark' | 'light'
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
@@ -44,6 +45,8 @@ export function CodeView({ content, onChange, onSave }: {
   useEffect(() => {
     editorRef.current?.updateOptions({ readOnly: !editable })
   }, [editable])
+
+  useEffect(() => applyMonacoTheme(theme), [theme])
 
   // Only push external content in - echoing the editor's own value back via
   // setValue would reset the cursor on every keystroke.

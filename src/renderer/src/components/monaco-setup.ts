@@ -45,7 +45,7 @@ export function applyMonacoTheme(theme: 'dark' | 'light'): void {
   monaco.editor.setTheme(theme === 'light' ? 'vdoc-light' : 'vdoc-dark')
 }
 
-applyMonacoTheme('dark')
+applyMonacoTheme(document.documentElement.dataset.theme === 'light' ? 'light' : 'dark')
 
 export const EDITOR_FONT = 'ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace'
 

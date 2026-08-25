@@ -121,7 +121,8 @@ export function PreviewView({ content, theme, findSeq, onOpenLink }: Props) {
       if (needsColor) {
         // Monaco is already loaded (the editor pane) - colorize emits global .mtk* spans
         // whose colours come from the active vdoc theme; a theme switch re-runs this effect.
-        const { monaco } = await import('./monaco-setup.ts')
+        const { applyMonacoTheme, monaco } = await import('./monaco-setup.ts')
+        applyMonacoTheme(theme)
         const known = new Set(monaco.languages.getLanguages().map(language => language.id))
         for (const block of doc.querySelectorAll('pre.code-block[data-lang] > code')) {
           const lang = (block.parentElement as HTMLElement).dataset.lang ?? ''

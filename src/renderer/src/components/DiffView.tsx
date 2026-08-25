@@ -1,15 +1,16 @@
 import { useEffect, useRef } from 'react'
 
-import { EDITOR_FONT, monaco } from './monaco-setup.ts'
+import { applyMonacoTheme, EDITOR_FONT, monaco } from './monaco-setup.ts'
 
 interface Props {
   /** Remote (Confluence) body - the "original" side. */
   remote: string
   /** Local file body - the "modified" side. */
   local: string
+  theme: 'dark' | 'light'
 }
 
-export function DiffView({ remote, local }: Props) {
+export function DiffView({ remote, local, theme }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<monaco.editor.IStandaloneDiffEditor | null>(null)
 
@@ -48,6 +49,8 @@ export function DiffView({ remote, local }: Props) {
     previous?.original.dispose()
     previous?.modified.dispose()
   }, [remote, local])
+
+  useEffect(() => applyMonacoTheme(theme), [theme])
 
   return <div ref={containerRef} className="h-full w-full" />
 }

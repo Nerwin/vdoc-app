@@ -16,7 +16,6 @@ import { Tour } from './components/Tour.tsx'
 import { Toast } from './components/Toast.tsx'
 import { Modal, ModalButton } from './components/Modal.tsx'
 import { CliVersionWarning } from './components/CliVersionWarning.tsx'
-import { applyMonacoTheme } from './components/monaco-setup.ts'
 import { commandFor, copy, isMod, selectionState, type CommandContext, type ViewMode } from './commands.ts'
 import { useApp } from './useApp.ts'
 import { isVersionBelowMinimum } from '../../shared/version.ts'
@@ -59,7 +58,6 @@ export function App() {
   const theme = useResolvedTheme(app.settings?.theme ?? 'system')
   useEffect(() => {
     document.documentElement.dataset.theme = theme
-    applyMonacoTheme(theme)
   }, [theme])
 
   const totals = useMemo(() => ({
