@@ -2,6 +2,39 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.14.0](https://github.com/Nerwin/vdoc-app/compare/v1.13.0...v1.14.0) (2026-08-25)
+
+### Features
+
+* show accessible Confluence spaces ([a899ac8](https://github.com/Nerwin/vdoc-app/commit/a899ac844592f0ce513c9d580c904e89f168fa3a))
+* **updater:** adopt electron-updater ([f8dec8d](https://github.com/Nerwin/vdoc-app/commit/f8dec8d187427e7ab8e33264863c42db34b9ee1c))
+
+### Bug Fixes
+
+* **ci:** harden release publishing ([81e157f](https://github.com/Nerwin/vdoc-app/commit/81e157f4a291c2c2eca3f0d3b7a5805009eb87b9))
+* **deps:** override vulnerable DOMPurify ([372aff7](https://github.com/Nerwin/vdoc-app/commit/372aff79b10b79f40ce4892868eafe4a6eb6988a))
+* **editor:** serialize guarded file saves ([0b380aa](https://github.com/Nerwin/vdoc-app/commit/0b380aa30fa6b7d5d131f7f60b472ff6b6b8755d))
+* **electron:** harden packaged runtime fuses ([054c117](https://github.com/Nerwin/vdoc-app/commit/054c1176fb8e76d32505ba8dfa2398c77ae60c13))
+* **frontmatter:** harden metadata parsing ([e8d5f15](https://github.com/Nerwin/vdoc-app/commit/e8d5f1522e5072b75f7c08167d6bc9eea60cd2e4))
+* **frontmatter:** include confluence space metadata ([1444510](https://github.com/Nerwin/vdoc-app/commit/144451024b21cb1a697e5c33f773989a0b38615e))
+* **logs:** shell-quote copied commands ([931bc32](https://github.com/Nerwin/vdoc-app/commit/931bc32bfdcd5905df6b813968bdff75b2557bc6))
+* remove Confluence email configuration ([e5113ab](https://github.com/Nerwin/vdoc-app/commit/e5113ab3ad52fd6ed4eff6e34f5a05b34ff256fa))
+* **security:** enforce sync guardrails in main ([842a362](https://github.com/Nerwin/vdoc-app/commit/842a3623e0018255b57381517333b4a19aaa3bdf))
+* **security:** harden electron renderer boundary ([7d8da23](https://github.com/Nerwin/vdoc-app/commit/7d8da237beecd31fd3253403738eee5c3cd9c433))
+* **security:** prevent preview markup injection ([fabc49f](https://github.com/Nerwin/vdoc-app/commit/fabc49f7a225e41220b416888763ac76d7feb790))
+* **security:** redact sensitive telemetry data ([30f0f6f](https://github.com/Nerwin/vdoc-app/commit/30f0f6f68c005c8e690ded2299de1c5dc2d4c560))
+* **security:** remove unsigned in-app updater ([9ab0611](https://github.com/Nerwin/vdoc-app/commit/9ab0611831f9f45e8194c4e4869daf7257ec237b))
+* **security:** validate ipc inputs and paths ([07cf8c7](https://github.com/Nerwin/vdoc-app/commit/07cf8c70cc4aa2272ba2f0085659f44a0acb8686))
+
+### Performance
+
+* **renderer:** lazy-load Monaco editor ([1e31de4](https://github.com/Nerwin/vdoc-app/commit/1e31de4ba2a81b75b7f8bf17cd6efac4c0cdb0ba))
+* **scan:** remove redundant file reads ([64bf614](https://github.com/Nerwin/vdoc-app/commit/64bf614be0e7ec9e323832e17bc8bafa11d5eefd))
+
+### Docs
+
+* **readme:** document supported features ([d3522c4](https://github.com/Nerwin/vdoc-app/commit/d3522c404b5bab219cc8f3868031674f03894657))
+* **release:** clarify Apple Silicon support ([ec9b012](https://github.com/Nerwin/vdoc-app/commit/ec9b0126d31029a8f2d32596d0f22a54d67df899))
 ## [1.13.0](https://github.com/Nerwin/vdoc-app/compare/v1.12.1...v1.13.0) (2026-08-25)
 
 ### Features
