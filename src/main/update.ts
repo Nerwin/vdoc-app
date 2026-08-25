@@ -1,20 +1,16 @@
-import { spawnSync } from 'node:child_process'
 import { app, type BrowserWindow } from 'electron'
 import electronUpdater, { type AppUpdater } from 'electron-updater'
 
 import type { AppUpdateStatus } from '../shared/types.ts'
-import { macBundlePath } from '../shared/update.ts'
 import { captureAppException, logAppEvent, traceUpdateCheck } from './sentry.ts'
 
 const STARTUP_DELAY_MS = 10_000
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000
-const UPDATE_DOWNLOAD_URL = 'https://github.com/Nerwin/vdoc-app/releases/latest'
 
 let initialized = false
 let updater: AppUpdater | null = null
 let windowProvider: (() => BrowserWindow | null) | null = null
 let checkPromise: Promise<AppUpdateStatus> | null = null
-let manualDownloadOnly = false
 let status: AppUpdateStatus = { phase: 'idle', current: app.getVersion() }
 
 function getAutoUpdater(): AppUpdater {
@@ -32,14 +28,12 @@ function versionStatus(
   phase: AppUpdateStatus['phase'],
   latest?: string,
   progress?: number,
-  url?: string,
 ): AppUpdateStatus {
   return {
     phase,
     current: app.getVersion(),
     ...(latest ? { latest } : {}),
     ...(progress === undefined ? {} : { progress }),
-    ...(url ? { url } : {}),
   }
 }
 
@@ -53,15 +47,6 @@ function updateLogAttributes(phase: AppUpdateStatus['phase'], latest?: string): 
   }
 }
 
-// function macUpdateInstallSupported(): boolean {
-//   if (process.platform !== 'darwin') return true
-//   const bundle = macBundlePath(process.execPath)
-//   if (!bundle) return false
-//   return spawnSync('/usr/bin/codesign', ['--verify', '--deep', '--strict', bundle], {
-//     stdio: 'ignore',
-//   }).status === 0
-// }
-
 export function initializeUpdater(getMainWindow: () => BrowserWindow | null): void {
   if (initialized) return
   initialized = true
@@ -73,17 +58,11 @@ export function initializeUpdater(getMainWindow: () => BrowserWindow | null): vo
   }
 
   updater = getAutoUpdater()
-  // manualDownloadOnly = !macUpdateInstallSupported()
-  manualDownloadOnly = false
-  updater.autoDownload = !manualDownloadOnly
-  updater.autoInstallOnAppQuit = !manualDownloadOnly
+  updater.autoDownload = true
+  updater.autoInstallOnAppQuit = true
   updater.allowPrerelease = false
   updater.disableWebInstaller = true
   updater.logger = null
-
-  if (manualDownloadOnly) {
-    logAppEvent('warn', 'app.update.manual-required', updateLogAttributes('manual'))
-  }
 
   updater.on('checking-for-update', () => {
     logAppEvent('info', 'app.update.checking', updateLogAttributes('checking'))
@@ -94,9 +73,8 @@ export function initializeUpdater(getMainWindow: () => BrowserWindow | null): vo
     setStatus(versionStatus('current'))
   })
   updater.on('update-available', info => {
-    const phase = manualDownloadOnly ? 'manual' : 'available'
-    logAppEvent(manualDownloadOnly ? 'warn' : 'info', `app.update.${phase}`, updateLogAttributes(phase, info.version))
-    setStatus(versionStatus(phase, info.version, undefined, manualDownloadOnly ? UPDATE_DOWNLOAD_URL : undefined))
+    logAppEvent('info', 'app.update.available', updateLogAttributes('available', info.version))
+    setStatus(versionStatus('available', info.version))
   })
   updater.on('download-progress', info => {
     const progress = Math.max(0, Math.min(100, Math.round(info.percent)))
@@ -138,7 +116,7 @@ export function checkForUpdates(notify = false): Promise<AppUpdateStatus> {
   checkPromise = (async () => {
     try {
       await traceUpdateCheck(async () => {
-        if (notify && !manualDownloadOnly) await activeUpdater.checkForUpdatesAndNotify()
+        if (notify) await activeUpdater.checkForUpdatesAndNotify()
         else await activeUpdater.checkForUpdates()
       })
       if (status.phase === 'checking') setStatus(versionStatus('current'))

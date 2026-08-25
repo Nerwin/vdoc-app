@@ -139,11 +139,10 @@ export interface LintFile {
 }
 
 export interface AppUpdateStatus {
-  phase: 'idle' | 'checking' | 'current' | 'available' | 'downloading' | 'downloaded' | 'manual' | 'error' | 'unsupported'
+  phase: 'idle' | 'checking' | 'current' | 'available' | 'downloading' | 'downloaded' | 'error' | 'unsupported'
   current: string
   latest?: string
   progress?: number
-  url?: string
 }
 
 /** The two secrets stored in the CLI config file. */

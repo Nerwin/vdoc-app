@@ -702,11 +702,6 @@ export function useApp() {
     await api.installUpdate()
   }), [api, runOp])
 
-  const downloadUpdate = useCallback(() => {
-    if (!update?.url) return
-    void api.openExternal(update.url).catch(fail)
-  }, [api, fail, update?.url])
-
   const counts = useMemo(() => {
     let attention = 0
     let behind = 0
@@ -792,7 +787,6 @@ export function useApp() {
     update,
     checkUpdateNow,
     installUpdate,
-    downloadUpdate,
     message,
     dismissMessage: () => setMessage(null),
     notify: (text: string) => setMessage({ kind: 'info', text }),

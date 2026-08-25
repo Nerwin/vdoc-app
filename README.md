@@ -320,8 +320,8 @@ The Windows arch is pinned to x64 in `package.json` (`build.win.target`): withou
 electron-builder defaults to the build host's arch, and an arm64 installer built on Apple
 Silicon silently installs an app that can't run on a normal x64 Windows machine. Windows and
 local development artifacts are unsigned. Version comes from `package.json` and stamps the bundle,
-the artifacts' names, and the status bar. `build/icon.svg` is the explicit package icon for every
-platform; `build/icon.png` is also bundled for the running window and dock.
+the artifacts' names, and the status bar. `build/icon.png` (1024×1024) is the explicit package icon
+for every platform and is also bundled for the running window and dock.
 
 macOS releases use hardened runtime, Developer ID signing, and notarization. The release repository
 must define `MAC_CSC_LINK`, `MAC_CSC_KEY_PASSWORD`, `APPLE_ID`,
@@ -333,9 +333,10 @@ require manual approval.
 Packaged builds use `electron-updater`. They check GitHub after startup and daily, download an
 available update in the background, verify its release metadata, and install it on exit or when
 the status bar's restart action is selected. The release workflow uploads the generated
-`latest*.yml` and blockmap files with every installer. An unsigned macOS build cannot apply a secure
-automatic update; it shows a manual download action instead. Users of 1.16.0 need one final manual
-replacement with the first signed release, after which automatic updates can work normally.
+`latest*.yml` and blockmap files with every installer. Squirrel.Mac refuses to install updates into
+an unsigned app: an unsigned macOS build downloads an update but cannot apply it. Users of unsigned
+builds need one manual replacement with the first signed release, after which automatic updates
+work normally.
 
 When diagnostics are enabled and the app is restarted, Sentry receives a scrubbed
 `app.lifecycle.started` log, updater lifecycle logs, `app.update.check` traces, and `app.action.*`

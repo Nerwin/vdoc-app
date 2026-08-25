@@ -19,7 +19,6 @@ interface Props {
   onCancelCheck(): void
   onCheckUpdate(): void
   onInstallUpdate(): void
-  onDownloadUpdate(): void
 }
 
 export function StatusBar(props: Props) {
@@ -108,7 +107,6 @@ export function StatusBar(props: Props) {
             status={props.update}
             onCheck={props.onCheckUpdate}
             onInstall={props.onInstallUpdate}
-            onDownload={props.onDownloadUpdate}
           />
         </>
       )}
@@ -213,7 +211,6 @@ function UpdateControl(props: {
   status: AppUpdateStatus | null
   onCheck(): void
   onInstall(): void
-  onDownload(): void
 }) {
   const { status } = props
 
@@ -225,18 +222,6 @@ function UpdateControl(props: {
         className="whitespace-nowrap rounded-[5px] px-2 py-[3px] text-accent hover:bg-hover"
       >
         Restart to update to v{status.latest ?? '?'}
-      </button>
-    )
-  }
-
-  if (status?.phase === 'manual') {
-    return (
-      <button
-        onClick={props.onDownload}
-        title="This macOS build is unsigned and cannot install updates safely"
-        className="whitespace-nowrap rounded-[5px] px-2 py-[3px] text-warn hover:bg-hover"
-      >
-        Download v{status.latest ?? '?'}
       </button>
     )
   }

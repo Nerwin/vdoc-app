@@ -11,10 +11,6 @@ export function updateCheckMessage(status: AppUpdateStatus): string {
       return status.latest
         ? `V-DOC ${status.latest} is ready to install`
         : 'A V-DOC update is ready to install'
-    case 'manual':
-      return status.latest
-        ? `V-DOC ${status.latest} requires a manual download`
-        : 'This update requires a manual download'
     case 'error':
       return 'Unable to check for updates'
     case 'unsupported':
@@ -25,10 +21,4 @@ export function updateCheckMessage(status: AppUpdateStatus): string {
     case 'current':
       return 'V-DOC is up to date'
   }
-}
-
-export function macBundlePath(executablePath: string): string | null {
-  const marker = '.app/Contents/MacOS/'
-  const index = executablePath.lastIndexOf(marker)
-  return index < 0 ? null : executablePath.slice(0, index + '.app'.length)
 }
