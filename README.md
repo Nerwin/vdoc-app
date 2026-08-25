@@ -209,7 +209,8 @@ the CLI and the app always agree. The **Config file** section shows the resolved
 - **Theme** - light or dark (UI and the Monaco editors).
 - **Docs repository** - the docs repo clone the whole app works in (`VDOC_APP_ROOT` is the fallback).
 - **Folders & spaces** - root folders, folder → space mapping, assets folder.
-- **Confluence authentication** - session token or API key.
+- **Confluence authentication** - session token or API key, plus the ID, key, and name of every
+  space accessible to the authenticated account.
 - **vdoc CLI** - explicit binary path (empty = auto-detect), with the detected and minimum
   supported versions shown. An outdated CLI warning includes the latest-version update options.
 

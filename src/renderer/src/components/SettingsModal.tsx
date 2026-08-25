@@ -250,7 +250,44 @@ function Confluence(props: Props) {
         </p>
         <Auth {...props} />
       </div>
+
+      <div className="border-t border-line-subtle pt-4">
+        <span className="mb-1 block text-[11px] tracking-[1px] text-ink-mute">ACCESSIBLE SPACES</span>
+        <p className="mb-3 max-w-[460px] text-[11.5px] leading-[1.55] text-ink-dim">
+          Spaces returned by vdoc cf whoami for the current credentials.
+        </p>
+        <AccessibleSpaces auth={props.auth} />
+      </div>
     </Section>
+  );
+}
+
+function AccessibleSpaces({ auth }: { auth: AuthStatus | null }) {
+  if (!auth) return <InfoStrip>Checking accessible spaces…</InfoStrip>;
+  if (!auth.ok) return <InfoStrip>Authenticate to list accessible spaces.</InfoStrip>;
+  if (auth.spaces.length === 0) return <InfoStrip>No accessible spaces were returned.</InfoStrip>;
+
+  return (
+    <div className="overflow-hidden rounded-md border border-control">
+      <table className="w-full table-fixed text-left">
+        <thead className="bg-sidebar text-[10.5px] tracking-[1px] text-ink-mute">
+          <tr>
+            <th className="w-[124px] px-2.5 py-[7px] font-normal">ID</th>
+            <th className="w-[104px] px-2.5 py-[7px] font-normal">KEY</th>
+            <th className="px-2.5 py-[7px] font-normal">NAME</th>
+          </tr>
+        </thead>
+        <tbody>
+          {auth.spaces.map(space => (
+            <tr key={space.id} className="border-t border-divider text-[12px]">
+              <td className="truncate px-2.5 py-[7px] font-mono text-ink-dim" title={space.id}>{space.id}</td>
+              <td className="truncate px-2.5 py-[7px] font-mono text-ink" title={space.key}>{space.key}</td>
+              <td className="truncate px-2.5 py-[7px] text-ink" title={space.name}>{space.name}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

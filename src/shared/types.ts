@@ -146,6 +146,12 @@ export interface UpdateInfo {
 /** The two secrets stored in the CLI config file. */
 export type CredentialKey = 'apiToken' | 'sessionToken'
 
+export interface ConfluenceSpace {
+  id: string
+  key: string
+  name: string
+}
+
 export interface AuthStatus {
   ok: boolean
   method: 'api-token' | 'session-token' | 'none'
@@ -156,6 +162,8 @@ export interface AuthStatus {
   hasApiKey: boolean
   /** A session token is stored in the config (regardless of the active method). */
   hasSessionToken: boolean
+  /** Spaces returned by `vdoc cf whoami` for the active credentials. */
+  spaces: ConfluenceSpace[]
   error?: string
 }
 

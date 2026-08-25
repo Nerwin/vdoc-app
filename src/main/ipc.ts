@@ -4,6 +4,7 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 
 import type { AuthStatus, CheckFile, CommentEntry, CreateResult, CredentialKey, DiffResult, GetPageResult, InitResult, LintFile, PullFile, PushFile, Settings, SettingsInfo, SyncFile, VersionEntry } from '../shared/types.ts'
 import { parseVdocCliRequirement, type VdocCliRequirement } from '../shared/app-config.ts'
+import { parseConfluenceSpaces } from '../shared/confluence.ts'
 import { maskSecret } from '../shared/secret.ts'
 import { backlinksTo, docsRoot, fileForPageId, gitDirtyFiles, resolvedVdocBin, runVdoc, runVdocJson, scanMarkdownFiles, searchContent, setVdocBin, vdocLogs } from './vdoc.ts'
 import { loadSettings, saveSettings } from './settings.ts'
@@ -346,13 +347,13 @@ async function authStatus(): Promise<AuthStatus> {
       ? 'api-token'
       : config.sessionToken ? 'session-token' : 'none'
   const tokenExp = method === 'session-token' && config.sessionToken ? decodeJwtExp(config.sessionToken) : undefined
-  const base = { method, tokenExp, hasApiKey: Boolean(config.apiToken), hasSessionToken: Boolean(config.sessionToken) }
+  const base = { method, tokenExp, hasApiKey: Boolean(config.apiToken), hasSessionToken: Boolean(config.sessionToken), spaces: [] }
 
   if (method === 'none') return { ok: false, ...base, error: 'No Confluence credentials configured' }
 
   try {
-    const whoami = await runVdocJson<{ displayName: string }>(['cf', 'whoami'])
-    return { ok: true, ...base, displayName: whoami.displayName }
+    const whoami = await runVdocJson<{ displayName: string, spaces?: unknown }>(['cf', 'whoami'])
+    return { ok: true, ...base, displayName: whoami.displayName, spaces: parseConfluenceSpaces(whoami.spaces) }
   } catch (error) {
     return { ok: false, ...base, error: error instanceof Error ? error.message : String(error) }
   }
