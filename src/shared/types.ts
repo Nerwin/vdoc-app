@@ -259,7 +259,7 @@ export interface VdocApi {
   platform: 'darwin' | 'win32' | 'linux'
   scan(): Promise<ScanResult>
   checkAll(): Promise<CheckFile[]>
-  /** Stop the running check-all after the current batch; checkAll resolves with partial results. */
+  /** Terminate the active check batch; checkAll resolves with completed batch results. */
   checkCancel(): Promise<void>
   checkFiles(paths: string[]): Promise<CheckFile[]>
   readFile(path: string): Promise<string>

@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url'
 import { app, BrowserWindow, dialog, Menu, nativeTheme, net, protocol, session } from 'electron'
 
 import { isAllowedNavigation, PACKAGED_RENDERER_URL, SECURE_WEB_PREFERENCES } from '../shared/electron-policy.ts'
+import { CloseGuardState } from '../shared/close-guard.ts'
 import type { Settings } from '../shared/types.ts'
 import { importLoginShellEnv, setVdocBin } from './vdoc.ts'
 import { loadSettings } from './settings.ts'
@@ -38,18 +39,17 @@ if (!app.isPackaged && process.env.VDOC_DEBUG_PORT) {
 
 const CLOSE_RESPONSE_TIMEOUT_MS = 10_000
 let mainWindow: BrowserWindow | null = null
-let closeApproved = false
-let closePending = false
+const closeGuard = new CloseGuardState()
 let closeResponseTimer: NodeJS.Timeout | undefined
 
 async function finishClose(saved: boolean): Promise<void> {
-  if (!closePending) return
-  closePending = false
+  const completion = closeGuard.completeSave(saved)
+  if (completion === 'ignore') return
   clearTimeout(closeResponseTimer)
 
   const window = mainWindow
   if (!window || window.isDestroyed()) return
-  if (!saved) {
+  if (completion === 'confirm-discard') {
     const { response } = await dialog.showMessageBox(window, {
       type: 'warning',
       title: 'Unsaved changes',
@@ -60,19 +60,19 @@ async function finishClose(saved: boolean): Promise<void> {
       cancelId: 0,
       noLink: true,
     })
-    if (response === 0) return
+    if (closeGuard.completeDiscard(response === 1) !== 'close') return
   }
 
-  closeApproved = true
   window.close()
 }
 
 function guardWindowClose(window: BrowserWindow): void {
   window.on('close', event => {
-    if (closeApproved || window.webContents.isDestroyed()) return
+    if (window.webContents.isDestroyed()) return
+    const request = closeGuard.requestClose()
+    if (request === 'close') return
     event.preventDefault()
-    if (closePending) return
-    closePending = true
+    if (request === 'wait') return
     window.webContents.send('close-requested')
     closeResponseTimer = setTimeout(() => void finishClose(false), CLOSE_RESPONSE_TIMEOUT_MS)
   })

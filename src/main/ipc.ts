@@ -8,11 +8,12 @@ import { parseVdocCliRequirement, type VdocCliRequirement } from '../shared/app-
 import { parseConfluenceSpaces } from '../shared/confluence.ts'
 import { isTrustedRendererLocation, PACKAGED_RENDERER_URL } from '../shared/electron-policy.ts'
 import { contentForGuardedWrite } from '../shared/file-write.ts'
+import { CancellableOperation } from '../shared/cancellable-operation.ts'
 import { relativeAppPath, resolveExistingPathInsideRoot } from '../shared/path-policy.ts'
 import { maskSecret } from '../shared/secret.ts'
 import { OperationTickets } from '../shared/operation-tickets.ts'
 import { atomicWriteFile } from './atomic-write.ts'
-import { backlinksTo, docsRoot, fileForPageId, gitDirtyFiles, resolvedVdocBin, runVdoc, runVdocJson, scanMarkdownFiles, searchContent, setVdocBin, vdocLogs } from './vdoc.ts'
+import { backlinksTo, docsRoot, fileForPageId, gitDirtyFiles, resolvedVdocBin, runVdoc, runVdocJson, scanMarkdownFiles, searchContent, setVdocBin, VdocCancelledError, vdocLogs } from './vdoc.ts'
 import { loadSettings, saveSettings } from './settings.ts'
 import { sentryActive } from './sentry.ts'
 import { checkForUpdates, getUpdateStatus, restartAndInstallUpdate } from './update.ts'
@@ -30,7 +31,7 @@ interface PendingPush {
 const pushTickets = new OperationTickets<PendingPush>(PUSH_PREVIEW_TTL_MS, 20)
 const pendingFileWrites = new Map<string, Promise<void>>()
 
-let checkCancelled = false
+const checkOperation = new CancellableOperation()
 
 type IpcHandler<Args extends unknown[], Result> = (event: IpcMainInvokeEvent, ...args: Args) => Result
 
@@ -168,28 +169,36 @@ export function registerIpc(
   })
 
   handle('check-all', async event => {
-    checkCancelled = false
-    const tracked = scanMarkdownFiles().filter(file => file.tracked && !file.ignored).map(file => file.path)
-    const results: CheckFile[] = []
-    for (let i = 0; i < tracked.length; i += CHECK_BATCH) {
-      // ponytail: cancel lands between batches - a running batch of 24 finishes first.
-      if (checkCancelled) break
-      const batch = tracked.slice(i, i + CHECK_BATCH)
-      const { files } = await runVdocJson<{ files: CheckFile[] }>(['cf', 'check', ...batch])
-      results.push(...files)
-      if (!event.sender.isDestroyed()) {
-        event.sender.send('check-progress', {
-          done: Math.min(i + CHECK_BATCH, tracked.length),
-          total: tracked.length,
-          results: files,
-        })
+    const signal = checkOperation.start()
+    try {
+      const tracked = scanMarkdownFiles().filter(file => file.tracked && !file.ignored).map(file => file.path)
+      const results: CheckFile[] = []
+      for (let i = 0; i < tracked.length; i += CHECK_BATCH) {
+        if (signal.aborted) break
+        const batch = tracked.slice(i, i + CHECK_BATCH)
+        try {
+          const { files } = await runVdocJson<{ files: CheckFile[] }>(['cf', 'check', ...batch], { signal })
+          results.push(...files)
+          if (!event.sender.isDestroyed()) {
+            event.sender.send('check-progress', {
+              done: Math.min(i + CHECK_BATCH, tracked.length),
+              total: tracked.length,
+              results: files,
+            })
+          }
+        } catch (error) {
+          if (error instanceof VdocCancelledError) break
+          throw error
+        }
       }
+      return results
+    } finally {
+      checkOperation.finish(signal)
     }
-    return results
   })
 
   handle('check-cancel', () => {
-    checkCancelled = true
+    checkOperation.cancel()
   })
 
   handle('check-files', async (_event, input: unknown) => {
@@ -544,7 +553,7 @@ function spaceMapping(): Promise<Record<string, string>> {
 
 /** First stdout line of `vdoc --version`, or null when the binary is unusable. */
 async function probeVersion(): Promise<string | null> {
-  const { exitCode, stdout } = await runVdoc(['--version'])
+  const { exitCode, stdout } = await runVdoc(['--version'], { timeoutMs: 15_000 })
   if (exitCode !== 0) return null
   return stdout.trim().split('\n')[0] || null
 }

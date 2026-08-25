@@ -66,9 +66,26 @@ export interface VdocRun {
   exitCode: number
   stdout: string
   stderr: string
+  termination?: VdocTermination
+}
+
+export interface VdocRunOptions {
+  signal?: AbortSignal
+  timeoutMs?: number
+}
+
+export type VdocTermination = 'cancelled' | 'timeout'
+
+export class VdocCancelledError extends Error {
+  constructor(command: string) {
+    super(`vdoc ${command} cancelled`)
+    this.name = 'VdocCancelledError'
+  }
 }
 
 const OUTPUT_CLIP = 8192
+const DEFAULT_VDOC_TIMEOUT_MS = 10 * 60 * 1000
+const FORCE_KILL_DELAY_MS = 5_000
 const logEntries: VdocLogEntry[] = []
 let logId = 0
 
@@ -94,10 +111,12 @@ function recordRun(args: string[], run: VdocRun, startedAt: number): void {
   for (const window of BrowserWindow.getAllWindows()) window.webContents.send('vdoc-log', entry)
 }
 
-export function runVdoc(args: string[]): Promise<VdocRun> {
+export function runVdoc(args: string[], options: VdocRunOptions = {}): Promise<VdocRun> {
   const startedAt = Date.now()
   return new Promise(resolve => {
-    execFile(
+    let termination: VdocTermination | undefined
+    let forceKillTimer: NodeJS.Timeout | undefined
+    const child = execFile(
       resolvedVdocBin(),
       args,
       {
@@ -119,21 +138,48 @@ export function runVdoc(args: string[]): Promise<VdocRun> {
         maxBuffer: 64 * 1024 * 1024,
       },
       (error, stdout, stderr) => {
-        const exitCode = error ? ((error as NodeJS.ErrnoException & { code?: number | string }).code === 'ENOENT' ? -1 : (typeof (error as { code?: unknown }).code === 'number' ? (error as { code: number }).code : 1)) : 0
-        const run = { exitCode, stdout, stderr }
+        clearTimeout(timeoutTimer)
+        clearTimeout(forceKillTimer)
+        options.signal?.removeEventListener('abort', cancel)
+        const exitCode = termination === 'cancelled'
+          ? 130
+          : termination === 'timeout'
+            ? 124
+            : error
+              ? ((error as NodeJS.ErrnoException & { code?: number | string }).code === 'ENOENT' ? -1 : (typeof (error as { code?: unknown }).code === 'number' ? (error as { code: number }).code : 1))
+              : 0
+        const run: VdocRun = { exitCode, stdout, stderr, ...(termination ? { termination } : {}) }
         recordRun(args, run, startedAt)
         resolve(run)
       },
     )
+
+    const stop = (reason: VdocTermination): void => {
+      if (termination) return
+      termination = reason
+      child.kill('SIGTERM')
+      forceKillTimer = setTimeout(() => {
+        if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL')
+      }, FORCE_KILL_DELAY_MS)
+      forceKillTimer.unref()
+    }
+    const cancel = (): void => stop('cancelled')
+    const timeoutTimer = setTimeout(() => stop('timeout'), options.timeoutMs ?? DEFAULT_VDOC_TIMEOUT_MS)
+    timeoutTimer.unref()
+    options.signal?.addEventListener('abort', cancel, { once: true })
+    if (options.signal?.aborted) cancel()
   })
 }
 
 /**
- * Run a vdoc command with --json and parse stdout. Exit code 1 with valid
- * JSON is a normal "findings" result (drift, lint errors), not a failure.
+ * Run a vdoc command with --json and parse stdout. Non-zero exit with valid
+ * data JSON is a normal findings result, not a failure.
  */
-export async function runVdocJson<T>(args: string[]): Promise<T> {
-  const { exitCode, stdout, stderr } = await runVdoc([...args, '--json'])
+export async function runVdocJson<T>(args: string[], options: VdocRunOptions = {}): Promise<T> {
+  const { exitCode, stdout, stderr, termination } = await runVdoc([...args, '--json'], options)
+
+  if (termination === 'cancelled') throw new VdocCancelledError(vdocCommandId(args))
+  if (termination === 'timeout') throw new Error(`vdoc ${vdocCommandId(args)} timed out`)
 
   if (exitCode === -1) {
     throw new Error('vdoc binary not found - is it linked (`bun link` in the vdoc repo)?')
