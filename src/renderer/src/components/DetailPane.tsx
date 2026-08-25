@@ -149,7 +149,7 @@ export function DetailPane(props: Props) {
   const [labels, setLabels] = useState<string[]>([])
   useEffect(() => {
     setLabels([])
-    if (!entry.tracked || !props.connected) return
+    if (!entry.tracked || entry.ignored || !props.connected) return
     let live = true
     void window.vdoc.labels(path)
       .then(names => live && setLabels(names))
@@ -157,7 +157,7 @@ export function DetailPane(props: Props) {
     return () => {
       live = false
     }
-  }, [path, entry.tracked, props.connected, props.reloadKey])
+  }, [path, entry.tracked, entry.ignored, props.connected, props.reloadKey])
 
   /** The split view's preview trails typing by 300ms - mermaid re-renders are not free. */
   const previewContent = useDebouncedContent(content, 300)
@@ -184,9 +184,10 @@ export function DetailPane(props: Props) {
   const meta = STATE_META[state]
   const check = entry.check
   const busy = props.busyOp !== null
+  const ignored = state === 'ignored'
   const loadingDiff = props.diffLoading === path
   const pushMode = pushModeFor(state)
-  const canPull = entry.tracked && state !== 'untracked' && state !== 'not-found'
+  const canPull = entry.tracked && !ignored && state !== 'untracked' && state !== 'not-found'
   const showDiff = view === 'diff' && diffReady && props.diff
   const segments = path.split('/')
   const name = segments.at(-1) ?? path
@@ -210,6 +211,9 @@ export function DetailPane(props: Props) {
   const notes: Array<{ text: string, error: boolean, help?: boolean }> = []
   if (meta.hint && (state === 'unverified' || state === 'no-version' || state === 'conflict' || state === 'not-found')) {
     notes.push({ text: meta.hint, error: state === 'conflict' || state === 'not-found', help: true })
+  }
+  if (ignored && meta.hint) {
+    notes.push({ text: meta.hint, error: false })
   }
   if (check?.titleMismatch) {
     notes.push({ text: 'Frontmatter title differs from the body H1 - pushes use the frontmatter title.', error: false })
@@ -270,7 +274,7 @@ export function DetailPane(props: Props) {
 
           <button
             onClick={primary.run}
-            disabled={busy || !props.connected}
+            disabled={busy || !props.connected || ignored}
             className="flex items-center gap-2 whitespace-nowrap rounded-md border border-primary-edge bg-primary px-4 py-1.5 text-[12.5px] text-primary-ink hover:bg-primary-hover disabled:opacity-40"
           >
             {primary.label}
@@ -281,7 +285,9 @@ export function DetailPane(props: Props) {
             <button
               ref={actionsRef}
               onClick={() => setMenuOpen(open => !open)}
-              className="whitespace-nowrap rounded-md border border-control bg-raised px-3 py-1.5 text-[12.5px] text-ink-body hover:bg-hover"
+              disabled={ignored}
+              title={ignored ? 'confluenceIgnore is set - Confluence actions are off for this file' : undefined}
+              className="whitespace-nowrap rounded-md border border-control bg-raised px-3 py-1.5 text-[12.5px] text-ink-body hover:bg-hover disabled:opacity-40 disabled:hover:bg-raised"
             >
               Actions ▾
             </button>
@@ -338,10 +344,10 @@ export function DetailPane(props: Props) {
         <Tab
           label={loadingDiff ? 'Diff…' : 'Diff'}
           active={Boolean(showDiff)}
-          disabled={!entry.tracked || loadingDiff}
+          disabled={!entry.tracked || ignored || loadingDiff}
           onClick={openDiffTab}
         />
-        <Tab label="Comments" active={view === 'comments'} disabled={!entry.tracked} onClick={() => onView('comments')} />
+        <Tab label="Comments" active={view === 'comments'} disabled={!entry.tracked || ignored} onClick={() => onView('comments')} />
         <div className="flex-1" />
         {labels.length > 0 && (
           <div className="hidden items-center gap-1 px-1 @min-[860px]:flex" title="Confluence labels">

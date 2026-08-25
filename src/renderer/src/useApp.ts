@@ -2,6 +2,7 @@ import { captureException } from '@sentry/electron/renderer'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { AuthStatus, CheckFile, CredentialKey, DiffResult, PushFile, ScanFile, Settings, SettingsInfo, TriageFilter, UpdateInfo, VersionEntry } from '../../shared/types.ts'
+import { setConfluenceIgnore } from '../../shared/frontmatter.ts'
 import { displayState, needsAttention, type FileEntry } from '../../shared/status.ts'
 import { STATE_META } from './state-meta.ts'
 
@@ -181,6 +182,8 @@ export function useApp() {
           tracked: file.tracked,
           gitDirty: file.gitDirty,
           title: file.title,
+          pageId: file.pageId,
+          ignored: file.ignored,
           check: file.tracked ? previous?.check : undefined,
         })
       }
@@ -265,7 +268,7 @@ export function useApp() {
         setRoot(scan.root)
         mergeScan(scan.files)
         setDiff(current => (current && changed.includes(current.path) ? null : current))
-        const tracked = new Set(scan.files.filter(file => file.tracked).map(file => file.path))
+        const tracked = new Set(scan.files.filter(file => file.tracked && !file.ignored).map(file => file.path))
         const present = changed.filter(path => tracked.has(path))
         if (present.length > 0) applyChecks(await api.checkFiles(present))
       } catch (error) {
@@ -297,6 +300,7 @@ export function useApp() {
   }, [busyOp, checkAll, entries, lastChecked, recheck])
 
   const loadDiff = useCallback(async (path: string, force = false) => {
+    if (entries.get(path)?.ignored) return
     if (!force && diff?.path === path) return
     setDiffLoading(path)
     try {
@@ -307,7 +311,7 @@ export function useApp() {
     } finally {
       setDiffLoading(current => (current === path ? null : current))
     }
-  }, [api, diff, fail])
+  }, [api, diff, entries, fail])
 
   useEffect(() => {
     if (!message) return
@@ -589,7 +593,7 @@ export function useApp() {
 
   const checkFolder = useCallback((dir: string) => {
     const targets = [...entries.values()]
-      .filter(entry => entry.tracked && entry.path.startsWith(`${dir}/`))
+      .filter(entry => entry.tracked && !entry.ignored && entry.path.startsWith(`${dir}/`))
       .map(entry => entry.path)
     if (targets.length === 0) {
       setMessage({ kind: 'info', text: `No tracked files under ${dir}` })
@@ -600,6 +604,14 @@ export function useApp() {
       setMessage({ kind: 'info', text: `Checked ${targets.length} file(s) under ${dir}` })
     })
   }, [api, applyChecks, entries, runOp])
+
+  /** Toggle `confluenceIgnore:` in the file's frontmatter - the watcher rescan updates the tree. */
+  const setIgnored = useCallback((path: string, ignored: boolean) => runOp('ignore', async () => {
+    const content = await api.readFile(path)
+    await api.writeFile(path, setConfluenceIgnore(content, ignored))
+    const name = path.split('/').at(-1)
+    setMessage({ kind: 'info', text: `${name} ${ignored ? 'excluded from' : 'included in'} Confluence checks` })
+  }), [api, runOp])
 
   const reloadVersion = useCallback(() => {
     void api.vdocVersion()
@@ -702,6 +714,7 @@ export function useApp() {
     removeFolder,
     togglePin,
     checkFolder,
+    setIgnored,
     openFolder: (path: string) => api.openFolder(path).catch(fail),
     spaceMapping,
     setSpaceMappingEntry,

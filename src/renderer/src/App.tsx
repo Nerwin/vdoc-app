@@ -16,7 +16,7 @@ import { Tour } from './components/Tour.tsx'
 import { Toast } from './components/Toast.tsx'
 import { Modal, ModalButton } from './components/Modal.tsx'
 import { applyMonacoTheme } from './components/monaco-setup.ts'
-import { commandFor, isMod, selectionState, type CommandContext, type ViewMode } from './commands.ts'
+import { commandFor, copy, isMod, selectionState, type CommandContext, type ViewMode } from './commands.ts'
 import { useApp } from './useApp.ts'
 
 const SIDEBAR_MIN = 240
@@ -75,6 +75,10 @@ export function App() {
   useEffect(() => {
     if (app.selection) setLogsOpen(false)
   }, [app.selection])
+
+  /** OS-native absolute path for pasting outside the app (app-internal paths always use '/'). */
+  const absPath = (path: string): string =>
+    app.root.includes('\\') ? `${app.root}\\${path.replaceAll('/', '\\')}` : `${app.root}/${path}`
 
   const openDiff = (): void => {
     if (!app.selection) return
@@ -201,6 +205,9 @@ export function App() {
               onTogglePin={app.togglePin}
               onOpenFolder={path => void app.openFolder(path)}
               onRemoveFolder={app.removeFolder}
+              onSetIgnore={(path, ignored) => void app.setIgnored(path, ignored)}
+              onCopyPageId={pageId => copy(ctx, pageId, 'Page ID')}
+              onCopyPath={path => copy(ctx, absPath(path), 'File path')}
             />
             <div onMouseDown={startSidebarResize} className="absolute inset-y-0 -right-0.5 z-10 w-1 cursor-col-resize" />
           </aside>

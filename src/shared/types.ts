@@ -12,8 +12,8 @@ export type SyncState =
   | 'not-found'
   | 'untracked'
 
-/** UI-level state: CLI states plus two app-derived ones. */
-export type DisplayState = SyncState | 'unverified' | 'unchecked'
+/** UI-level state: CLI states plus three app-derived ones. */
+export type DisplayState = SyncState | 'unverified' | 'unchecked' | 'ignored'
 
 /** One shared tree filter driving the sidebar chips and the status-bar counters. */
 export type TriageFilter = 'attention' | 'behind' | 'unverified' | 'dirty' | null
@@ -154,6 +154,10 @@ export interface ScanFile {
   gitDirty: boolean
   /** Frontmatter `title:` - the display name in the sidebar; filename when absent. */
   title?: string
+  /** Frontmatter `confluencePageId:` value, when present. */
+  pageId?: string
+  /** Frontmatter `confluenceIgnore: true` - the file is skipped by every Confluence operation. */
+  ignored?: boolean
 }
 
 export interface ScanResult {

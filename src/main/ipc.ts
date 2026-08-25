@@ -23,7 +23,7 @@ export function registerIpc(): void {
 
   ipcMain.handle('check-all', async event => {
     checkCancelled = false
-    const tracked = scanMarkdownFiles().filter(file => file.tracked).map(file => file.path)
+    const tracked = scanMarkdownFiles().filter(file => file.tracked && !file.ignored).map(file => file.path)
     const results: CheckFile[] = []
     for (let i = 0; i < tracked.length; i += CHECK_BATCH) {
       // ponytail: cancel lands between batches - a running batch of 24 finishes first.

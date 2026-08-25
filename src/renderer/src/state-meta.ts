@@ -31,4 +31,5 @@ export const STATE_META: Record<DisplayState, StateMeta> = {
   'untracked': { label: 'Not linked', dot: 'bg-dot-neutral', color: 'text-ink-mute', chip: CHIP_GREY, hint: 'No confluencePageId - link it with Find matching page or publish with Create' },
   'unverified': { label: 'Unverified', dot: RING, color: 'text-warn-text', chip: CHIP_AMBER, hint: 'Versions match, but the content was never compared - edits on either side would go unnoticed. Verify fetches the page: identical content records a baseline and turns this Synced; different content opens the diff so you choose (Pull takes Confluence, Push publishes local)' },
   'unchecked': { label: 'Not checked', dot: 'bg-dot-neutral', color: 'text-ink-faint', chip: CHIP_GREY },
+  'ignored': { label: 'Ignored', dot: 'bg-dot-neutral', color: 'text-ink-faint', chip: CHIP_GREY, glyph: '⊘', hint: 'confluenceIgnore is set in the frontmatter - checks, diffs and sync skip this file. Right-click it in the tree to include it again' },
 }

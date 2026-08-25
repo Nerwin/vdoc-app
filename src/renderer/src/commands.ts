@@ -72,8 +72,12 @@ const LINKED_STATES: DisplayState[] = ['in-sync', 'behind', 'ahead', 'local-edit
 
 const noFile = (ctx: CommandContext): string | undefined => (ctx.selection ? undefined : 'no file selected')
 
+const notIgnored = (ctx: CommandContext): string | undefined =>
+  (ctx.entry?.ignored ? 'file is excluded from Confluence sync' : undefined)
+
 const linked = (ctx: CommandContext): string | undefined =>
-  noFile(ctx) ?? (ctx.entry?.tracked && LINKED_STATES.includes(ctx.state!) ? undefined : 'file has no Confluence page')
+  noFile(ctx) ?? notIgnored(ctx)
+    ?? (ctx.entry?.tracked && LINKED_STATES.includes(ctx.state!) ? undefined : 'file has no Confluence page')
 
 const idle = (ctx: CommandContext): string | undefined => (ctx.busy || ctx.checking ? 'a task is running' : undefined)
 
@@ -95,7 +99,7 @@ const versions = (ctx: CommandContext): string | undefined => {
   return `v${check.localVersion ?? '-'} → v${check.remoteVersion ?? '-'}`
 }
 
-const copy = (ctx: CommandContext, text: string, what: string): void => {
+export const copy = (ctx: CommandContext, text: string, what: string): void => {
   void navigator.clipboard.writeText(text).then(
     () => ctx.app.notify(`${what} copied`),
     error => ctx.app.reportError(error),
@@ -108,7 +112,11 @@ const viewCommand = (view: ViewMode, label: string, digit: string): Command => (
   label,
   icon: '▤',
   keys: { key: digit, meta: true },
-  reason: view === 'content' ? noFile : all(noFile, ctx => (ctx.entry?.tracked || view === 'preview' || view === 'split' ? undefined : 'file is not linked')),
+  reason: view === 'content'
+    ? noFile
+    : view === 'preview' || view === 'split'
+      ? noFile
+      : all(noFile, notIgnored, ctx => (ctx.entry?.tracked ? undefined : 'file is not linked')),
   run: ctx => (view === 'diff' ? ctx.openDiff() : ctx.setView(view)),
 })
 
@@ -195,7 +203,7 @@ export const COMMANDS: Command[] = [
     icon: '+',
     tint: 'create',
     keys: { key: 'n', meta: true },
-    reason: all(noFile, ctx => (ctx.entry?.tracked ? 'file already has a page' : undefined), idle, online),
+    reason: all(noFile, notIgnored, ctx => (ctx.entry?.tracked ? 'file already has a page' : undefined), idle, online),
     run: ctx => ctx.app.setCreateForm({ path: ctx.selection! }),
   },
   {
@@ -216,7 +224,7 @@ export const COMMANDS: Command[] = [
     group: 'Sync',
     label: 'Link to existing page…',
     icon: '⚯',
-    reason: all(noFile, ctx => (ctx.entry?.tracked ? 'file already has a page' : undefined), idle, online),
+    reason: all(noFile, notIgnored, ctx => (ctx.entry?.tracked ? 'file already has a page' : undefined), idle, online),
     run: ctx => void ctx.app.syncFile(ctx.selection!),
   },
   {
@@ -310,8 +318,8 @@ export const COMMANDS: Command[] = [
     group: 'File',
     label: 'Copy page ID',
     icon: '⧉',
-    reason: all(linked, ctx => (ctx.entry?.check?.pageId ? undefined : 'page id unknown - check the file first')),
-    run: ctx => copy(ctx, ctx.entry!.check!.pageId!, 'Page ID'),
+    reason: all(noFile, ctx => (ctx.entry?.check?.pageId ?? ctx.entry?.pageId ? undefined : 'no page id in the frontmatter')),
+    run: ctx => copy(ctx, (ctx.entry!.check?.pageId ?? ctx.entry!.pageId)!, 'Page ID'),
   },
   {
     id: 'file.browser',

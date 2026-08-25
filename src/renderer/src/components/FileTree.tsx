@@ -24,12 +24,16 @@ interface Props {
   onTogglePin(path: string): void
   onOpenFolder(path: string): void
   onRemoveFolder(path: string): void
+  onSetIgnore(path: string, ignored: boolean): void
+  onCopyPageId(pageId: string): void
+  onCopyPath(path: string): void
 }
 
-interface FolderMenu {
+interface ContextMenu {
   x: number
   y: number
   path: string
+  kind: 'dir' | 'file'
 }
 
 function matchesFilter(entry: FileEntry, filter: TriageFilter): boolean {
@@ -42,7 +46,7 @@ function matchesFilter(entry: FileEntry, filter: TriageFilter): boolean {
 export function FileTree(props: Props) {
   const { entries, selection, filterText, stateFilter, pinnedDirs, totals } = props
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
-  const [menu, setMenu] = useState<FolderMenu | null>(null)
+  const [menu, setMenu] = useState<ContextMenu | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const filtering = filterText !== '' || stateFilter !== null
 
@@ -193,12 +197,10 @@ export function FileTree(props: Props) {
             pinned={pinnedDirs.includes(row.path)}
             collapsed={!filtering && collapsed.has(row.path)}
             onClick={() => (row.kind === 'dir' ? toggleDir(row.path) : props.onSelect(row.path))}
-            onContextMenu={row.kind === 'dir'
-              ? event => {
-                  event.preventDefault()
-                  setMenu({ x: event.clientX, y: event.clientY, path: row.path })
-                }
-              : undefined}
+            onContextMenu={event => {
+              event.preventDefault()
+              setMenu({ x: event.clientX, y: event.clientY, path: row.path, kind: row.kind })
+            }}
           />
         ))}
       </div>
@@ -220,28 +222,56 @@ export function FileTree(props: Props) {
             style={{ left: Math.min(menu.x, window.innerWidth - 220), top: Math.min(menu.y, window.innerHeight - 160) }}
             onClick={event => event.stopPropagation()}
           >
-            <MenuItem
-              label={pinnedDirs.includes(menu.path) ? 'Unpin' : 'Pin on top'}
-              onClick={() => { props.onTogglePin(menu.path); setMenu(null) }}
-            />
-            <MenuItem
-              label="Check this folder"
-              onClick={() => { props.onCheckFolder(menu.path); setMenu(null) }}
-            />
-            <MenuItem
-              label="Open folder"
-              onClick={() => { props.onOpenFolder(menu.path); setMenu(null) }}
-            />
-            {props.rootDirs.includes(menu.path) && (
-              <>
-                <div className="mx-2 my-1 h-px bg-line" />
-                <MenuItem
-                  label="Remove from tree"
-                  danger
-                  onClick={() => { props.onRemoveFolder(menu.path); setMenu(null) }}
-                />
-              </>
-            )}
+            {menu.kind === 'dir'
+              ? (
+                  <>
+                    <MenuItem
+                      label={pinnedDirs.includes(menu.path) ? 'Unpin' : 'Pin on top'}
+                      onClick={() => { props.onTogglePin(menu.path); setMenu(null) }}
+                    />
+                    <MenuItem
+                      label="Check this folder"
+                      onClick={() => { props.onCheckFolder(menu.path); setMenu(null) }}
+                    />
+                    <MenuItem
+                      label="Open folder"
+                      onClick={() => { props.onOpenFolder(menu.path); setMenu(null) }}
+                    />
+                    {props.rootDirs.includes(menu.path) && (
+                      <>
+                        <div className="mx-2 my-1 h-px bg-line" />
+                        <MenuItem
+                          label="Remove from tree"
+                          danger
+                          onClick={() => { props.onRemoveFolder(menu.path); setMenu(null) }}
+                        />
+                      </>
+                    )}
+                  </>
+                )
+              : (() => {
+                  const entry = entries.get(menu.path)
+                  const pageId = entry?.check?.pageId ?? entry?.pageId
+                  return (
+                    <>
+                      <MenuItem
+                        label={entry?.ignored ? 'Include in Confluence check' : 'Exclude from Confluence check'}
+                        onClick={() => { props.onSetIgnore(menu.path, !entry?.ignored); setMenu(null) }}
+                      />
+                      <div className="mx-2 my-1 h-px bg-line" />
+                      {pageId && (
+                        <MenuItem
+                          label="Copy page ID"
+                          onClick={() => { props.onCopyPageId(pageId); setMenu(null) }}
+                        />
+                      )}
+                      <MenuItem
+                        label="Copy file path"
+                        onClick={() => { props.onCopyPath(menu.path); setMenu(null) }}
+                      />
+                    </>
+                  )
+                })()}
           </div>
         </div>
       )}
@@ -345,6 +375,7 @@ function Row({ node, entries, selected, dimmed, pinned, collapsed, onClick, onCo
     <button
       data-path={node.path}
       onClick={onClick}
+      onContextMenu={onContextMenu}
       title={`${node.path}${meta.hint ? ` - ${meta.hint}` : ''}`}
       style={indent}
       className={`flex w-full shrink-0 items-center gap-[9px] rounded-[5px] py-[5px] pr-2 text-left ${

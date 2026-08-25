@@ -7,6 +7,10 @@ export interface FileEntry {
   gitDirty?: boolean
   /** Frontmatter `title:` - shown in the sidebar instead of the filename when present. */
   title?: string
+  /** Frontmatter `confluencePageId:` value, when present. */
+  pageId?: string
+  /** Frontmatter `confluenceIgnore: true` - excluded from every Confluence operation. */
+  ignored?: boolean
   check?: CheckFile
 }
 
@@ -16,6 +20,7 @@ export interface FileEntry {
  * cannot prove the local body was not edited (state.json has no entry).
  */
 export function displayState(entry: FileEntry): DisplayState {
+  if (entry.ignored) return 'ignored'
   if (!entry.tracked) return 'untracked'
   if (!entry.check) return 'unchecked'
   if (entry.check.state === 'in-sync' && entry.check.localEdits === undefined) return 'unverified'

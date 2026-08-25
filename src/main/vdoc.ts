@@ -183,9 +183,16 @@ export function gitDirtyFiles(): Set<string> {
   }
 }
 
+interface FileMeta {
+  tracked: boolean
+  title?: string
+  pageId?: string
+  ignored?: boolean
+}
+
 /** Relative paths of all Markdown files in the content dirs, tracked = has confluencePageId frontmatter. */
-export function scanMarkdownFiles(): Array<{ path: string, tracked: boolean, title?: string }> {
-  const files: Array<{ path: string, tracked: boolean, title?: string }> = []
+export function scanMarkdownFiles(): Array<FileMeta & { path: string }> {
+  const files: Array<FileMeta & { path: string }> = []
 
   const root = docsRoot()
   const walk = (relDir: string): void => {
@@ -241,30 +248,22 @@ export function backlinksTo(target: string): string[] {
 // ponytail: full rescan per call, same trade as backlinksTo.
 export function fileForPageId(pageId: string): string | null {
   if (!/^\d+$/.test(pageId)) return null
-  const idLine = new RegExp(`^confluencePageId\\s*:\\s*['"]?${pageId}['"]?\\s*$`, 'm')
-  for (const { path, tracked } of scanMarkdownFiles()) {
-    if (!tracked) continue
-    try {
-      const head = readFileSync(join(docsRoot(), path), 'utf8').slice(0, 2048)
-      const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(head)
-      if (frontmatter && idLine.test(frontmatter[1])) return path
-    } catch {
-      // Unreadable file: not a match.
-    }
-  }
-  return null
+  return scanMarkdownFiles().find(file => file.pageId === pageId)?.path ?? null
 }
 
 // ponytail: frontmatter regex approximates the CLI's parsePublishDoc; the CLI
 // re-verifies on every command, so a miss only costs a stale badge.
-function fileMeta(absPath: string): { tracked: boolean, title?: string } {
+function fileMeta(absPath: string): FileMeta {
   try {
     const head = readFileSync(absPath, 'utf8').slice(0, 2048)
     const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(head)
     if (!frontmatter) return { tracked: false }
+    const { title, confluencePageId, confluenceIgnore } = parseFrontmatter(head)
     return {
       tracked: /^confluencePageId\s*:/m.test(frontmatter[1]),
-      title: parseFrontmatter(head).title,
+      title,
+      pageId: confluencePageId,
+      ignored: confluenceIgnore,
     }
   } catch {
     return { tracked: false }
