@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 
 import type { DisplayState, VersionEntry } from '../../../shared/types.ts'
-import { parseFrontmatter } from '../../../shared/frontmatter.ts'
 import { timeAgo } from '../../../shared/time.ts'
 import { displayState, needsAttention, type FileEntry } from '../../../shared/status.ts'
 import { shortcutLabel } from '../commands.ts'
@@ -59,26 +58,6 @@ export function Dashboard(props: Props) {
     [props.entries, props.recents],
   )
 
-  // Doc titles come from the files' frontmatter - a filename is the fallback, never the goal.
-  const [titles, setTitles] = useState<Map<string, string>>(new Map())
-  useEffect(() => {
-    const missing = recents.filter(visit => !titles.has(visit.path))
-    if (missing.length === 0) return
-    let live = true
-    void (async () => {
-      const found = await Promise.all(missing.map(async visit => {
-        const title = await window.vdoc.readFile(visit.path)
-          .then(text => parseFrontmatter(text).title)
-          .catch(() => undefined)
-        return [visit.path, title ?? visit.path.split('/').at(-1) ?? visit.path] as const
-      }))
-      if (live) setTitles(prev => new Map([...prev, ...found]))
-    })()
-    return () => {
-      live = false
-    }
-  }, [recents, titles])
-
   const folders = useMemo(() => props.rootDirs.map(dir => ({
     dir,
     count: [...props.entries.keys()].filter(path => path.startsWith(`${dir}/`)).length,
@@ -120,7 +99,7 @@ export function Dashboard(props: Props) {
                                 <StateDot state={displayState(entry)} />
                                 <span className="min-w-0 flex-1">
                                   <span className="block truncate font-sans text-[13px] font-medium text-ink">
-                                    {titles.get(visit.path) ?? visit.path.split('/').at(-1)}
+                                    {entry.title ?? visit.path.split('/').at(-1)}
                                   </span>
                                   <span className="block truncate font-mono text-[10.5px] text-ink-faint">{visit.path}</span>
                                 </span>
@@ -254,4 +233,3 @@ function QuickAction({ label, keycap, onClick }: { label: string, keycap?: strin
 function displayAuthor(author: string): string {
   return /^\w+:[\w-]{20,}$/.test(author) ? 'unmapped user' : author
 }
-

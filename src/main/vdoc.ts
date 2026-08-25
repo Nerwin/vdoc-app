@@ -1,5 +1,5 @@
 import { execFile, execFileSync } from 'node:child_process'
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { closeSync, existsSync, openSync, readdirSync, readFileSync, readSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
 import { BrowserWindow } from 'electron'
@@ -259,7 +259,15 @@ export function fileForPageId(pageId: string): string | null {
 // re-verifies on every command, so a miss only costs a stale badge.
 function fileMeta(absPath: string): FileMeta {
   try {
-    const head = readFileSync(absPath, 'utf8').slice(0, 2048)
+    const file = openSync(absPath, 'r')
+    const buffer = Buffer.allocUnsafe(8192)
+    let head: string
+    try {
+      const bytes = readSync(file, buffer, 0, buffer.length, 0)
+      head = buffer.toString('utf8', 0, bytes)
+    } finally {
+      closeSync(file)
+    }
     const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(head)
     if (!frontmatter) return { tracked: false }
     const { title, confluencePageId, confluenceIgnore } = parseFrontmatter(head)

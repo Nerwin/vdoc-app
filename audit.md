@@ -321,7 +321,7 @@ Resolution:
 - Monaco theme setup and preview colorization stay behind the same lazy module boundary.
 - The release workflow enforces a 1.25 MB uncompressed renderer entry budget after building.
 
-### A-11: Scans and dashboard rendering perform avoidable disk and IPC work
+### A-11: Scans and dashboard rendering perform avoidable disk and IPC work [Fixed]
 
 Severity: Low
 
@@ -342,6 +342,12 @@ Recommendation:
 - Read only the required initial bytes with a file descriptor.
 - Apply `EXCLUDED_DIRS` in the watcher callback before scheduling a rescan.
 - If the corpus grows materially, maintain a metadata index rather than adding more full rescans.
+
+Resolution:
+
+- Dashboard recents use the title already returned by the scan.
+- Metadata scans read at most the first 8 KB of each Markdown file.
+- Watcher callbacks discard hidden and excluded paths before notifying the renderer.
 
 ### A-12: The packaged application retains permissive Electron fuses
 
