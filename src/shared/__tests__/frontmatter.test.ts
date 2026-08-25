@@ -12,6 +12,7 @@ test('parseFrontmatter reads scalars, quoted values, and inline tag lists', () =
     'updated: 2026-01-01',
     'tags: [guidelines, eda, kafka]',
     'confluencePageId: "5697306635"',
+    'confluencePageVersion: 42',
     'confluenceIgnore: true',
     '---',
     '',
@@ -24,6 +25,7 @@ test('parseFrontmatter reads scalars, quoted values, and inline tag lists', () =
     updated: '2026-01-01',
     tags: ['guidelines', 'eda', 'kafka'],
     confluencePageId: '5697306635',
+    confluencePageVersion: 42,
     confluenceIgnore: true,
   })
 })
@@ -36,6 +38,7 @@ test('parseFrontmatter tolerates missing frontmatter and missing keys', () => {
     updated: undefined,
     tags: undefined,
     confluencePageId: undefined,
+    confluencePageVersion: undefined,
     confluenceIgnore: undefined,
   })
 })
@@ -43,6 +46,13 @@ test('parseFrontmatter tolerates missing frontmatter and missing keys', () => {
 test('parseFrontmatter only reads confluenceIgnore: true as ignored', () => {
   assert.equal(parseFrontmatter('---\nconfluenceIgnore: false\n---\n').confluenceIgnore, undefined)
   assert.equal(parseFrontmatter('---\nconfluenceIgnore: yes\n---\n').confluenceIgnore, undefined)
+})
+
+test('parseFrontmatter rejects malformed versions, lists, and closing delimiters', () => {
+  assert.equal(parseFrontmatter('---\nconfluencePageVersion: 0\n---\n').confluencePageVersion, undefined)
+  assert.equal(parseFrontmatter('---\nconfluencePageVersion: "4"\n---\n').confluencePageVersion, undefined)
+  assert.equal(parseFrontmatter('---\ntags: [one, two\n---\n').tags, undefined)
+  assert.deepEqual(parseFrontmatter('---\ntitle: Doc\n---oops\nBody\n'), {})
 })
 
 test('parseFrontmatter only reads the leading block and ignores nested yaml', () => {
@@ -62,6 +72,16 @@ test('setConfluenceIgnore inserts into an existing block without touching other 
 test('setConfluenceIgnore replaces an existing value', () => {
   const md = '---\nconfluenceIgnore: true\ntitle: Doc\n---\nBody\n'
   assert.equal(setConfluenceIgnore(md, false), '---\nconfluenceIgnore: false\ntitle: Doc\n---\nBody\n')
+})
+
+test('setConfluenceIgnore removes duplicate values', () => {
+  const md = '---\nconfluenceIgnore: false\ntitle: Doc\nconfluenceIgnore: true\n---\nBody\n'
+  assert.equal(setConfluenceIgnore(md, false), '---\nconfluenceIgnore: false\ntitle: Doc\n---\nBody\n')
+  assert.equal(parseFrontmatter(setConfluenceIgnore(md, false)).confluenceIgnore, undefined)
+})
+
+test('setConfluenceIgnore handles an empty frontmatter block', () => {
+  assert.equal(setConfluenceIgnore('---\n---\nBody\n', true), '---\nconfluenceIgnore: true\n---\nBody\n')
 })
 
 test('setConfluenceIgnore creates the block when the file has none', () => {
