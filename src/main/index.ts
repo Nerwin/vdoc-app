@@ -32,7 +32,7 @@ function registerRendererProtocol(): void {
   })
 }
 
-// Automation hook: VDOC_DEBUG_PORT=9222 npm run dev exposes CDP for driving the app.
+// Automation hook: VDOC_DEBUG_PORT=9222 bun run dev exposes CDP for driving the app.
 if (!app.isPackaged && process.env.VDOC_DEBUG_PORT) {
   app.commandLine.appendSwitch('remote-debugging-port', process.env.VDOC_DEBUG_PORT)
 }

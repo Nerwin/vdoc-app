@@ -7,6 +7,7 @@ import { parseVdocCliRequirement } from '../app-config.ts'
 
 const PROJECT_ROOT = join(import.meta.dirname, '../../..')
 const PACKAGE_JSON = JSON.parse(readFileSync(join(PROJECT_ROOT, 'package.json'), 'utf8')) as Record<string, unknown>
+const CI_WORKFLOW = readFileSync(join(PROJECT_ROOT, '.github/workflows/ci.yml'), 'utf8')
 const RELEASE_WORKFLOW = readFileSync(join(PROJECT_ROOT, '.github/workflows/release.yml'), 'utf8')
 
 test('parseVdocCliRequirement accepts the release metadata', () => {
@@ -60,6 +61,14 @@ test('packaged updates use the GitHub feed and macOS releases stay unsigned', ()
 
 test('release workflow applies the Linux sandbox exception only to its smoke test', () => {
   assert.match(RELEASE_WORKFLOW, /release\/linux-unpacked\/vdoc-app --no-sandbox --smoke-test/)
+})
+
+test('CI workflows use the pinned Bun package manager with frozen installs', () => {
+  assert.equal(PACKAGE_JSON.packageManager, 'bun@1.4.0')
+  for (const workflow of [CI_WORKFLOW, RELEASE_WORKFLOW]) {
+    assert.match(workflow, /oven-sh\/setup-bun@[0-9a-f]{40}/)
+    assert.match(workflow, /- run: bun ci/)
+  }
 })
 
 test('packaged Electron disables permissive fuses', () => {

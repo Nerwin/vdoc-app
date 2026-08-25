@@ -293,7 +293,7 @@ the CLI and the app always agree. The **Config file** section shows the resolved
   refuses to overwrite). Inspect the diff, then push, or force-pull to discard local changes.
 - **Something behaves oddly** - status bar → **Logs**: the exact CLI commands, stderr and
   stdout. Right-click to copy a command and reproduce it in a terminal.
-- **`npm run dev` quits instantly** - a packaged V-DOC.app is running and holds the
+- **`bun run dev` quits instantly** - a packaged V-DOC.app is running and holds the
   single-instance lock; quit it first.
 - **Known formatting loss** - blank lines between list items don't survive Confluence's format
   round trip; such a file genuinely differs until force-pulled once.
@@ -302,17 +302,20 @@ the CLI and the app always agree. The **Config file** section shows the resolved
 ## Development
 
 ```sh
-npm run dev            # launch in dev mode
-npm test               # typecheck + unit tests
-npm run build          # production bundle to out/
-npm run pack           # quick unsigned app for this OS into release/
-npm run bump           # bump version + CHANGELOG + release commit + local tag
-npm run release        # create the release and push its commit and tag; CI builds and publishes
-npm run dist           # rebuild binaries without bumping (host OS) - or dist:mac / dist:win / dist:linux
+bun run dev            # launch in dev mode
+bun run test           # typecheck + dead-code check + unit tests
+bun run build          # production bundle to out/
+bun run pack           # quick unsigned app for this OS into release/
+bun run bump           # bump version + CHANGELOG + release commit + local tag
+bun run release        # create the release and push its commit and tag; CI builds and publishes
+bun run dist           # rebuild binaries without bumping (host OS) - or dist:mac / dist:win / dist:linux
 ```
 
+This repo uses Bun 1.4.0 and commits `bun.lock`. Install dependencies with `bun install`; CI uses
+`bun ci` so any mismatch between `package.json` and the frozen lockfile fails immediately.
+
 `dist` builds the host platform (macOS targets Apple Silicon); the release workflow covers
-the rest. To generate a Windows release from the Mac, run `npm run dist:win` - it cross-builds
+the rest. To generate a Windows release from the Mac, run `bun run dist:win` - it cross-builds
 `V-DOC-x.y.z-win-x64.exe` (NSIS installer, per-user) and `…-portable-x64.exe` into `release/`.
 The Windows arch is pinned to x64 in `package.json` (`build.win.target`): without the pin,
 electron-builder defaults to the build host's arch, and an arm64 installer built on Apple
@@ -350,24 +353,24 @@ not a user setting: every installation of one app release has the same compatibi
 
 ### Releases
 
-`npm run bump` is fully automated, driven by the conventional-commit history
+`bun run bump` is fully automated, driven by the conventional-commit history
 ([commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version)):
 
 1. Computes the semver bump from the commits since the last tag - `fix:` → patch, `feat:` → minor,
    `feat!:` / `BREAKING CHANGE` → major.
-2. Bumps `package.json` + `package-lock.json` and prepends the notes to `CHANGELOG.md`
+2. Bumps `package.json` and prepends the notes to `CHANGELOG.md`
    (sections configured in `.versionrc.json`; `chore`/`test` commits are hidden).
-3. Commits those three files as `chore(release): X.Y.Z` and tags `vX.Y.Z`.
+3. Commits those two files as `chore(release): X.Y.Z` and tags `vX.Y.Z`.
 
-Run `npm run release` from a clean `main` synchronized with `origin/main`. The release
+Run `bun run release` from a clean `main` synchronized with `origin/main`. The release
 script validates that state, runs the full test suite, performs the versioning steps, and pushes
 the release commit and tag. The tag triggers `.github/workflows/release.yml`, which builds the
 installers on a real runner per OS (macOS, Windows, Linux) and attaches them all to the GitHub
 release for that tag. That release page is what you share with the company.
 
 Day-to-day commits never touch the version - releasing is a deliberate act, not a git hook.
-Preview what a release would do with `npx commit-and-tag-version --dry-run`. To tag the current
-version as-is (no bump), use `npx commit-and-tag-version --first-release && npm run dist`.
+Preview what a release would do with `bunx commit-and-tag-version --dry-run`. To tag the current
+version as-is (no bump), use `bunx commit-and-tag-version --first-release && bun run dist`.
 
 ## Environment
 

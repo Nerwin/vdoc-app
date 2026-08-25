@@ -1,5 +1,5 @@
 # Builds the platform installers on a real runner per OS and attaches them to the
-# GitHub release for the pushed tag. Local flow stays `npm run release` (bump +
+# GitHub release for the pushed tag. Local flow stays `bun run release` (bump +
 # changelog + tag + push with tag (`git push --follow-tags`)) triggers this.
 name: Release
 
@@ -26,12 +26,12 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npm test
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - run: bun ci
+      - run: bun run test
       - name: Build release artifacts
-        run: npm run dist
-      - run: npm run check:bundle
+        run: bun run dist
+      - run: bun run check:bundle
       - name: Verify macOS artifacts
         if: runner.os == 'macOS'
         run: |

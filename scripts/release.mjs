@@ -4,12 +4,8 @@ import { fileURLToPath } from 'node:url'
 
 const PROJECT_ROOT = fileURLToPath(new URL('..', import.meta.url))
 
-function executable(command) {
-  return command === 'npm' && process.platform === 'win32' ? 'npm.cmd' : command
-}
-
 export function executeCommand(command, args, { capture = false } = {}) {
-  const result = spawnSync(executable(command), args, {
+  const result = spawnSync(command, args, {
     cwd: PROJECT_ROOT,
     encoding: 'utf8',
     stdio: capture ? ['ignore', 'pipe', 'pipe'] : 'inherit'
@@ -41,9 +37,9 @@ export function validateRelease(execute = executeCommand) {
 
 export function publishRelease(execute = executeCommand) {
   validateRelease(execute)
-  execute('npm', ['test'])
+  execute('bun', ['run', 'test'])
   ensureCleanWorkingTree(execute)
-  execute('npm', ['run', 'bump'])
+  execute('bun', ['run', 'bump'])
   execute('git', ['push', '--atomic', '--follow-tags', 'origin', 'main'])
 }
 

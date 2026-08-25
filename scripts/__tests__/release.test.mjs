@@ -50,9 +50,9 @@ test('publishRelease tests, rechecks, versions, and atomically pushes after vali
   publishRelease(execute)
 
   assert.deepEqual(calls.map(({ label }) => label).slice(-4), [
-    'npm test',
+    'bun run test',
     'git status --porcelain',
-    'npm run bump',
+    'bun run bump',
     'git push --atomic --follow-tags origin main'
   ])
 })
@@ -64,5 +64,5 @@ test('publishRelease stops if tests modify the working tree', () => {
   })
 
   assert.throws(() => publishRelease(execute), /working tree must be clean/)
-  assert.equal(calls.some(({ label }) => label === 'npm run release'), false)
+  assert.equal(calls.some(({ label }) => label === 'bun run release'), false)
 })
