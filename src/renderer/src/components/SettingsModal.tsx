@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import type { AuthStatus, CredentialKey, Settings, SettingsInfo } from "../../../shared/types.ts";
 import { humanTtl } from "../../../shared/time.ts";
+import { extractVersion, isVersionBelowMinimum } from "../../../shared/version.ts";
 import { ModalButton } from "./Modal.tsx";
 
 interface Props {
@@ -354,7 +355,20 @@ function StoredSecret({ name, secretKey, busy, onPreview, onRemove }: {
 
 function Cli({ settings, busy, onUpdate, onReloadVersion }: Props) {
   const [bin, setBin] = useState(settings.vdocBin ?? "");
+  const [copied, setCopied] = useState(false);
   const dirty = (bin.trim() || null) !== settings.vdocBin;
+  const currentVersion = settings.version ? (extractVersion(settings.version) ?? settings.version) : null;
+  const outdated = Boolean(
+    settings.version
+    && settings.cliRequirement
+    && isVersionBelowMinimum(settings.version, settings.cliRequirement.minimumVersion),
+  );
+
+  const copyUpdateCommand = (): void => {
+    const command = settings.cliRequirement?.updateCommand;
+    if (!command) return;
+    void navigator.clipboard.writeText(command).then(() => setCopied(true)).catch(() => undefined);
+  };
 
   return (
     <Section title="vdoc CLI" description="The binary every action runs through. Leave the path empty to auto-detect it.">
@@ -364,20 +378,52 @@ function Cli({ settings, busy, onUpdate, onReloadVersion }: Props) {
           <ModalButton label="Apply" disabled={!dirty || busy} onClick={() => onUpdate({ vdocBin: bin.trim() || null })} />
         </div>
       </Field>
-      <p className="flex items-center gap-2 font-mono text-[11.5px]">
-        {settings.version ? (
-          <span className="text-ink-dim">{settings.version}</span>
+      <div className="flex items-center gap-2 font-mono text-[11.5px]">
+        {currentVersion ? (
+          <span className={outdated ? "text-warn-text" : "text-ink-dim"}>Detected v{currentVersion}</span>
         ) : (
           <span className="text-conflict">cannot run {settings.resolvedBin} - check the path (and that bun is installed)</span>
         )}
+        {settings.cliRequirement && (
+          <span className="text-ink-faint">· minimum v{settings.cliRequirement.minimumVersion}</span>
+        )}
         <button
-          onClick={onReloadVersion}
+          onClick={() => {
+            setCopied(false);
+            onReloadVersion();
+          }}
           title="Reload version"
           className="rounded border border-control px-1.5 py-0.5 text-ink-dim hover:bg-hover hover:text-ink"
         >
           ↻
         </button>
-      </p>
+      </div>
+      {outdated && settings.cliRequirement && (
+        <div role="alert" className="flex flex-col gap-2 rounded-md border border-banner-edge bg-banner-bg px-3 py-2.5 text-[11.5px] leading-[1.55] text-banner-ink">
+          <p>
+            This CLI is older than the version this app expects. You can continue, but some actions may fail or behave incorrectly.
+            {' '}Update to the latest version, then reload the version above.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            {settings.cliRequirement.updateCommand && (
+              <>
+                <code className="rounded bg-hover px-2 py-1 font-mono text-[11px] text-ink">{settings.cliRequirement.updateCommand}</code>
+                <button onClick={copyUpdateCommand} className="rounded border border-banner-edge px-2 py-1 hover:bg-hover">
+                  {copied ? "Copied" : "Copy"}
+                </button>
+              </>
+            )}
+            {settings.cliRequirement.downloadUrl && (
+              <button
+                onClick={() => void window.vdoc.openExternal(settings.cliRequirement!.downloadUrl!).catch(() => undefined)}
+                className="rounded border border-banner-edge px-2 py-1 hover:bg-hover"
+              >
+                Download latest
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </Section>
   );
 }

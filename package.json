@@ -14,6 +14,11 @@
     "type": "git",
     "url": "https://github.com/Nerwin/vdoc-app.git"
   },
+  "vdocCli": {
+    "minimumVersion": "1.6.0",
+    "updateCommand": "bun install -g @vosker/vdoc@latest",
+    "downloadUrl": "https://bitbucket.org/spypoint/vdoc/downloads/"
+  },
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",

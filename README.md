@@ -17,7 +17,7 @@ operation spawns `vdoc … --json`, so the CLI and the app can never disagree.
 The app requires the `vdoc` binary. Pick one:
 
 - **From the private registry** (requires CodeArtifact auth in your `.npmrc` - see the CLI
-  repo's README): `bun install -g @vosker/vdoc`
+  repo's README): `bun install -g @vosker/vdoc@latest`
 - **From source**: clone the vdoc repo, then `bun install && bun run dev:link` (builds and
   `bun link`s it).
 - **Standalone binary** (no bun needed): download `vdoc-<version>-<os>-<arch>` from the CLI
@@ -25,6 +25,9 @@ The app requires the `vdoc` binary. Pick one:
   (Settings → vdoc CLI → binary path).
 
 bun-based installs land in `~/.bun/bin`, which the app auto-detects - zero configuration.
+Each app release declares its minimum supported CLI version in `package.json`. When the detected
+CLI is older, the app stays fully usable but shows a persistent warning with an update command
+and a link to the latest standalone downloads.
 
 **Validate:** `vdoc status` - one-shot health check printing the CLI version, the resolved
 config file, the Confluence authentication state, and CI detection.
@@ -207,7 +210,8 @@ the CLI and the app always agree. The **Config file** section shows the resolved
 - **Docs repository** - the docs repo clone the whole app works in (`VDOC_APP_ROOT` is the fallback).
 - **Folders & spaces** - root folders, folder → space mapping, assets folder.
 - **Confluence authentication** - session token or API key.
-- **vdoc CLI** - explicit binary path (empty = auto-detect), with the resolved `--version` shown.
+- **vdoc CLI** - explicit binary path (empty = auto-detect), with the detected and minimum
+  supported versions shown. An outdated CLI warning includes the latest-version update options.
 
 ## Troubleshooting
 
@@ -215,6 +219,9 @@ the CLI and the app always agree. The **Config file** section shows the resolved
   run. Set the path explicitly in Settings → vdoc CLI. The app already extends PATH with
   `~/.bun/bin` (plus `/opt/homebrew/bin` and `/usr/local/bin` on macOS/Linux) and imports your
   login shell's environment, so shell installs normally just work.
+- **Outdated CLI warning** - the app does not block any action, but features added after the
+  installed CLI may fail or return an unexpected result. Run the displayed `@latest` install
+  command (or download the newest standalone binary), then use ↻ in Settings → vdoc CLI.
 - **Everything shows Unverified after first setup** - normal: versions match but no baseline
   exists yet. Use the dashboard's "Verify all" - identical files turn green in one pass.
 - **A pull skipped files** - the toast lists the per-file reasons (usually local edits the CLI
@@ -251,6 +258,19 @@ electron-builder converts it per platform).
 Everything ships bundled by Vite, so all npm packages are devDependencies and the package
 contains `out/` only (33 MB asar) - no `node_modules`. See [CLAUDE.md](./CLAUDE.md) for the
 architecture and contribution guardrails.
+
+The app/CLI compatibility contract is release metadata in `package.json`:
+
+```json
+"vdocCli": {
+  "minimumVersion": "x.y.z",
+  "updateCommand": "bun install -g @vosker/vdoc@latest",
+  "downloadUrl": "https://bitbucket.org/spypoint/vdoc/downloads/"
+}
+```
+
+Raise `minimumVersion` in the app change that first depends on a newer CLI. This is intentionally
+not a user setting: every installation of one app release has the same compatibility contract.
 
 ### Releases
 

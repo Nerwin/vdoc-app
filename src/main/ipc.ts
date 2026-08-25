@@ -3,6 +3,7 @@ import { join, relative } from 'node:path'
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 
 import type { AuthStatus, CheckFile, CommentEntry, CreateResult, CredentialKey, DiffResult, GetPageResult, InitResult, LintFile, PullFile, PushFile, Settings, SettingsInfo, SyncFile, VersionEntry } from '../shared/types.ts'
+import { parseVdocCliRequirement, type VdocCliRequirement } from '../shared/app-config.ts'
 import { maskSecret } from '../shared/secret.ts'
 import { backlinksTo, docsRoot, fileForPageId, gitDirtyFiles, resolvedVdocBin, runVdoc, runVdocJson, scanMarkdownFiles, searchContent, setVdocBin, vdocLogs } from './vdoc.ts'
 import { loadSettings, saveSettings } from './settings.ts'
@@ -274,7 +275,27 @@ export function registerIpc(): void {
 async function settingsInfo(): Promise<SettingsInfo> {
   const configPath = await runVdocJson<{ path: string }>(['config', 'path']).then(r => r.path).catch(() => null)
   const [assetsDir, site] = await Promise.all([configScalar('confluence.assetsDir'), configScalar('confluence.site')])
-  return { ...loadSettings(), resolvedBin: resolvedVdocBin(), resolvedRoot: docsRoot(), version: await probeVersion(), appVersion: app.getVersion(), configPath, assetsDir, site }
+  return {
+    ...loadSettings(),
+    resolvedBin: resolvedVdocBin(),
+    resolvedRoot: docsRoot(),
+    version: await probeVersion(),
+    cliRequirement: loadCliRequirement(),
+    appVersion: app.getVersion(),
+    configPath,
+    assetsDir,
+    site,
+  }
+}
+
+/** Compatibility metadata is app release config, deliberately separate from user settings. */
+function loadCliRequirement(): VdocCliRequirement | null {
+  try {
+    const packageJson = JSON.parse(readFileSync(join(app.getAppPath(), 'package.json'), 'utf8')) as unknown
+    return parseVdocCliRequirement(packageJson)
+  } catch {
+    return null
+  }
 }
 
 /** One string value from the config file - `config get <key> --json` wraps scalars as { "<key>": value }. */

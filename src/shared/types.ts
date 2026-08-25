@@ -1,6 +1,7 @@
 /** JSON shapes returned by the vdoc CLI (`--json`), plus the IPC api surface. */
 
 import type { SearchHit } from './search.ts'
+import type { VdocCliRequirement } from './app-config.ts'
 
 export type SyncState =
   | 'in-sync'
@@ -222,6 +223,8 @@ export interface SettingsInfo extends Settings {
   resolvedRoot: string
   /** `vdoc --version` output, null when the binary cannot be run. */
   version: string | null
+  /** Release-owned compatibility requirement from package.json; null when not configured. */
+  cliRequirement: VdocCliRequirement | null
   /** This app's own version (package.json / bundle). */
   appVersion: string
   /** The CLI config file in use - shared between the CLI and the app. */

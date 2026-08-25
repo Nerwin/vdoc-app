@@ -15,9 +15,11 @@ import { HelpModal } from './components/HelpModal.tsx'
 import { Tour } from './components/Tour.tsx'
 import { Toast } from './components/Toast.tsx'
 import { Modal, ModalButton } from './components/Modal.tsx'
+import { CliVersionWarning } from './components/CliVersionWarning.tsx'
 import { applyMonacoTheme } from './components/monaco-setup.ts'
 import { commandFor, copy, isMod, selectionState, type CommandContext, type ViewMode } from './commands.ts'
 import { useApp } from './useApp.ts'
+import { isVersionBelowMinimum } from '../../shared/version.ts'
 
 const SIDEBAR_MIN = 240
 const SIDEBAR_MAX = 480
@@ -67,6 +69,11 @@ export function App() {
   const selected = app.selection ? app.entries.get(app.selection) ?? null : null
   const taskRunning = app.checking !== null || app.busyOp !== null
   const connected = app.auth?.ok === true
+  const cliOutdated = Boolean(
+    app.settings?.version
+    && app.settings.cliRequirement
+    && isVersionBelowMinimum(app.settings.version, app.settings.cliRequirement.minimumVersion),
+  )
 
   // A new selection starts on Preview - reading is the common case; ⌘1 drops into
   // the editor. A freshly loaded diff takes the stage (see DetailPane).
@@ -185,6 +192,16 @@ export function App() {
           app.setSelection(null)
         }}
       />
+
+      {cliOutdated && app.settings?.version && app.settings.cliRequirement && (
+        <CliVersionWarning
+          currentVersion={app.settings.version}
+          requirement={app.settings.cliRequirement}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onNotify={app.notify}
+          onOpenExternal={url => void window.vdoc.openExternal(url).catch(app.reportError)}
+        />
+      )}
 
       <div className="flex min-h-0 flex-1">
         {sidebarOpen && (
