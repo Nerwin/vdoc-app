@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.15.0](https://github.com/Nerwin/vdoc-app/compare/v1.14.4...v1.15.0) (2026-08-25)
+
+### Features
+
+* **scripts:** improve release script to automate actions ([9758cde](https://github.com/Nerwin/vdoc-app/commit/9758cdedb03311178c455c382a08822580b5e144))
 ## [1.14.4](https://github.com/Nerwin/vdoc-app/compare/v1.14.3...v1.14.4) (2026-08-25)
 
 ### Bug Fixes
