@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { hidesVdocOutput, redactVdocArgs, scrubSentryEvent, vdocCommandId } from '../privacy.ts'
+import { hidesVdocOutput, redactVdocArgs, scrubSentryEvent, scrubSentryTransaction, sentryActionName, vdocCommandId } from '../privacy.ts'
 
 test('redactVdocArgs hides credentials and comment bodies', () => {
   assert.deepEqual(
@@ -48,4 +48,30 @@ test('scrubSentryEvent removes user content and file paths', () => {
   assert.doesNotMatch(serialized, /secret|private|person@example/)
   assert.match(serialized, /saveFile/)
   assert.match(serialized, /Application error/)
+})
+
+test('Sentry action names accept only stable internal identifiers', () => {
+  assert.equal(sentryActionName('push-preview'), 'app.action.push-preview')
+  assert.equal(sentryActionName('docs/private.md'), 'app.action.unknown')
+  assert.equal(sentryActionName('Push private page'), 'app.action.unknown')
+})
+
+test('scrubSentryTransaction removes action span metadata', () => {
+  const scrubbed = scrubSentryTransaction({
+    transaction: 'app.action.push-commit',
+    request: { url: 'https://company.atlassian.net/private' },
+    extra: { path: 'docs/private.md' },
+    spans: [{
+      span_id: 'span-id',
+      op: 'file.read',
+      description: '/Users/person/docs/private.md',
+      data: { content: 'secret document content' },
+      tags: { pageId: '123456' },
+    }],
+  })
+
+  const serialized = JSON.stringify(scrubbed)
+  assert.match(serialized, /app\.action\.push-commit/)
+  assert.match(serialized, /span-id/)
+  assert.doesNotMatch(serialized, /secret|private|person|123456/)
 })

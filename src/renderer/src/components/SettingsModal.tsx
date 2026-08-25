@@ -111,7 +111,7 @@ function Appearance({ settings, onUpdate }: Props) {
           onPick={(theme) => onUpdate({ theme })}
         />
       </Section>
-      <Section title="Crash reports" description="Privacy-filtered error and crash reports (Sentry) help fix bugs. Reports are off by default; changing this takes effect after restarting the app.">
+      <Section title="Diagnostics" description="Privacy-filtered errors, crashes, and action timings (Sentry) help find failures and slow operations. Reports are off by default; changing this takes effect after restarting the app.">
         <Segmented
           options={[
             ["on", "On"],

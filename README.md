@@ -51,8 +51,8 @@ operation spawns `vdoc … --json`, so the CLI and the app can never disagree.
   cookie, switch methods in Settings, and renew expiring session credentials in-app.
 - **Encrypted credentials** - tokens are stored through `vdoc config set --encrypt`; the app
   redacts credentials, decrypted config output, and comment bodies from its command history.
-- **Opt-in Sentry analytics** - privacy-filtered error and crash reporting is disabled by
-  default and can be enabled in Settings for packaged builds.
+- **Opt-in Sentry diagnostics** - privacy-filtered errors, crashes, and action timings are
+  disabled by default and can be enabled in Settings for packaged builds.
 - **Built-in CLI logs** - inspect the last 200 commands and their output, with sensitive values
   hidden, then copy a safely shell-quoted command for terminal reproduction.
 - **Guarded Electron surface** - context isolation, a narrow typed preload API, sender and path

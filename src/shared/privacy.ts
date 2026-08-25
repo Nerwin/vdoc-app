@@ -1,4 +1,5 @@
 const HIDDEN = '•••'
+export const SENTRY_ACTION_PREFIX = 'app.action.'
 
 export function redactVdocArgs(args: string[]): string[] {
   const commentBody = args[0] === 'cf' && args[1] === 'comment' ? 3 : -1
@@ -42,8 +43,26 @@ interface SentryEventLike {
   [key: string]: unknown
 }
 
+interface SentrySpanLike {
+  description?: unknown
+  data?: unknown
+  tags?: unknown
+  [key: string]: unknown
+}
+
+interface SentryTransactionLike extends SentryEventLike {
+  transaction?: unknown
+  spans?: SentrySpanLike[]
+}
+
 function safeErrorType(type: unknown): string {
   return typeof type === 'string' && /^[A-Za-z][A-Za-z0-9_.]{0,63}$/.test(type) ? type : 'ApplicationError'
+}
+
+export function sentryActionName(action: unknown): string {
+  return typeof action === 'string' && /^[a-z][a-z0-9-]{0,63}$/.test(action)
+    ? `${SENTRY_ACTION_PREFIX}${action}`
+    : `${SENTRY_ACTION_PREFIX}unknown`
 }
 
 export function scrubSentryEvent<Event>(event: Event): Event {
@@ -80,5 +99,23 @@ export function scrubSentryEvent<Event>(event: Event): Event {
     user: undefined,
     extra: undefined,
     logentry: undefined,
+  } as Event
+}
+
+export function scrubSentryTransaction<Event>(event: Event): Event {
+  const scrubbed = scrubSentryEvent(event) as SentryTransactionLike
+  const action = typeof scrubbed.transaction === 'string' && scrubbed.transaction.startsWith(SENTRY_ACTION_PREFIX)
+    ? scrubbed.transaction.slice(SENTRY_ACTION_PREFIX.length)
+    : undefined
+
+  return {
+    ...scrubbed,
+    transaction: sentryActionName(action),
+    spans: scrubbed.spans?.map(span => ({
+      ...span,
+      description: undefined,
+      data: undefined,
+      tags: undefined,
+    })),
   } as Event
 }

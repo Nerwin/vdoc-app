@@ -17,7 +17,7 @@ import { OperationTickets } from '../shared/operation-tickets.ts'
 import { atomicWriteFile } from './atomic-write.ts'
 import { backlinksTo, docsRoot, fileForPageId, gitDirtyFiles, resolvedVdocBin, runVdoc, runVdocJson, scanMarkdownFiles, searchContent, setVdocBin, VdocCancelledError, vdocLogs } from './vdoc.ts'
 import { loadSettings, saveSettings } from './settings.ts'
-import { sentryActive } from './sentry.ts'
+import { sentryActive, traceAppAction } from './sentry.ts'
 import { checkForUpdates, getUpdateStatus, restartAndInstallUpdate } from './update.ts'
 import { watchDocs } from './watcher.ts'
 
@@ -126,7 +126,7 @@ function settingsPatch(value: unknown): Partial<Settings> {
   }
   if ('contentDirs' in patch) result.contentDirs = settingPaths(patch.contentDirs, 'content directories')
   if ('pinnedDirs' in patch) result.pinnedDirs = settingPaths(patch.pinnedDirs, 'pinned directories')
-  if ('crashReports' in patch) result.crashReports = booleanValue(patch.crashReports, 'crash reports setting')
+  if ('crashReports' in patch) result.crashReports = booleanValue(patch.crashReports, 'diagnostics setting')
   return result
 }
 
@@ -146,7 +146,7 @@ export function registerIpc(
   const handle = <Args extends unknown[], Result>(channel: string, handler: IpcHandler<Args, Result>): void => {
     ipcMain.handle(channel, (event, ...args) => {
       assertTrustedSender(event, getMainWindow())
-      return handler(event, ...args as Args)
+      return traceAppAction(channel, () => handler(event, ...args as Args))
     })
   }
 
