@@ -139,8 +139,6 @@ export interface UpdateInfo {
   latest: string
   /** Release page to open in the browser - installers are attached there. */
   url: string
-  /** Installer zip for this platform/arch - present when in-app install is possible (macOS). */
-  assetUrl?: string
 }
 
 /** The two secrets stored in the CLI config file. */
@@ -296,8 +294,6 @@ export interface VdocApi {
   vdocVersion(): Promise<string | null>
   /** Newer GitHub release than the running app, or null (also null when offline/no releases). */
   checkUpdate(): Promise<UpdateInfo | null>
-  /** Download the installer zip, swap the app bundle, relaunch (macOS in-app update). */
-  installUpdate(assetUrl: string): Promise<void>
   /** True when the main process initialized Sentry - the renderer inits its side only then. */
   sentryActive(): Promise<boolean>
   /** Native folder picker rooted at the docs repo; returns a relative path or null. */

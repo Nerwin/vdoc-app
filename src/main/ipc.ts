@@ -9,7 +9,7 @@ import { maskSecret } from '../shared/secret.ts'
 import { backlinksTo, docsRoot, fileForPageId, gitDirtyFiles, resolvedVdocBin, runVdoc, runVdocJson, scanMarkdownFiles, searchContent, setVdocBin, vdocLogs } from './vdoc.ts'
 import { loadSettings, saveSettings } from './settings.ts'
 import { sentryActive } from './sentry.ts'
-import { checkUpdate, installUpdate } from './update.ts'
+import { checkUpdate } from './update.ts'
 import { watchDocs } from './watcher.ts'
 
 const CHECK_BATCH = 24
@@ -262,8 +262,6 @@ export function registerIpc(): void {
   ipcMain.handle('vdoc-version', () => probeVersion())
 
   ipcMain.handle('check-update', () => checkUpdate())
-
-  ipcMain.handle('install-update', (_event, assetUrl: string) => installUpdate(assetUrl))
 
   ipcMain.handle('sentry-active', () => sentryActive)
 

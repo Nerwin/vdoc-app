@@ -749,9 +749,7 @@ export function useApp() {
     checkUpdateNow,
     openUpdate: () => {
       if (!update) return
-      // In-app install when the release ships a matching installer; release page otherwise.
-      if (update.assetUrl) void runOp('install update', () => api.installUpdate(update.assetUrl!))
-      else void api.openExternal(update.url).catch(fail)
+      void api.openExternal(update.url).catch(fail)
     },
     message,
     dismissMessage: () => setMessage(null),

@@ -48,7 +48,6 @@ const api: VdocApi = {
   setSite: site => ipcRenderer.invoke('set-site', site),
   vdocVersion: () => ipcRenderer.invoke('vdoc-version'),
   checkUpdate: () => ipcRenderer.invoke('check-update'),
-  installUpdate: (assetUrl: string) => ipcRenderer.invoke('install-update', assetUrl),
   sentryActive: () => ipcRenderer.invoke('sentry-active'),
   pickFolder: () => ipcRenderer.invoke('pick-folder'),
   pickDocsRoot: () => ipcRenderer.invoke('pick-docs-root'),
