@@ -19,6 +19,7 @@ interface Props {
   busyOp: string | null
   theme: 'dark' | 'light'
   connected: boolean
+  allowLossyPush: boolean
   /** The active tab - owned by App so the ⌘1–4 commands can drive it. */
   view: ViewMode
   /** Bumped by the Reload-from-disk command to re-read the file. */
@@ -38,7 +39,7 @@ interface Props {
   onPull(path: string): void
   /** Opens the red confirm - pull that overwrites local content. */
   onForcePull(path: string): void
-  onPush(path: string, force: boolean): void
+  onPush(path: string, force: boolean, allowLossy?: boolean): void
   onLint(path: string): void
   onSync(path: string): void
   onCreate(path: string): void
@@ -322,6 +323,7 @@ export function DetailPane(props: Props) {
                 primaryLabel={primary.label}
                 canPull={canPull}
                 pushMode={pushMode}
+                allowLossyPush={props.allowLossyPush}
                 busy={busy}
                 connected={props.connected}
                 onClose={() => {
@@ -331,6 +333,7 @@ export function DetailPane(props: Props) {
                 onPull={() => props.onPull(path)}
                 onForcePull={() => props.onForcePull(path)}
                 onPush={force => props.onPush(path, force)}
+                onLossyPush={() => props.onPush(path, pushMode === 'force', true)}
                 onSync={() => props.onSync(path)}
                 onCreate={() => props.onCreate(path)}
                 onOpenConfluence={() => props.onOpenConfluence(path)}
@@ -491,17 +494,19 @@ function relationGlyph(state: ReturnType<typeof displayState>): string {
   return '='
 }
 
-function ActionsMenu({ entry, primaryLabel, canPull, pushMode, busy, connected, onClose, onPull, onForcePull, onPush, onSync, onCreate, onOpenConfluence }: {
+function ActionsMenu({ entry, primaryLabel, canPull, pushMode, allowLossyPush, busy, connected, onClose, onPull, onForcePull, onPush, onLossyPush, onSync, onCreate, onOpenConfluence }: {
   entry: FileEntry
   primaryLabel: string
   canPull: boolean
   pushMode: PushMode
+  allowLossyPush: boolean
   busy: boolean
   connected: boolean
   onClose(): void
   onPull(): void
   onForcePull(): void
   onPush(force: boolean): void
+  onLossyPush(): void
   onSync(): void
   onCreate(): void
   onOpenConfluence(): void
@@ -569,6 +574,14 @@ function ActionsMenu({ entry, primaryLabel, canPull, pushMode, busy, connected, 
           shortcut={shortcutLabel('sync.push')}
           disabled={pushMode === 'disabled' || confluenceOff}
           onClick={item(() => onPush(pushMode === 'force'))}
+        />
+      )}
+      {entry.tracked && (
+        <ActionItem
+          label="Push force (overwrite remote)"
+          disabled={!allowLossyPush || confluenceOff}
+          reason={!allowLossyPush ? 'after blocked push' : undefined}
+          onClick={item(onLossyPush)}
         />
       )}
       <ActionItem

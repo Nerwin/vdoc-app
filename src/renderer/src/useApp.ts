@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { AppUpdateStatus, AuthStatus, CheckFile, CredentialKey, DiffResult, PushFile, ScanFile, Settings, SettingsInfo, TriageFilter, VersionEntry } from '../../shared/types.ts'
 import { setConfluenceIgnore } from '../../shared/frontmatter.ts'
 import { initMessage } from '../../shared/init.ts'
+import { isLossyPushError } from '../../shared/lossy-push.ts'
 import { displayState, needsAttention, type FileEntry } from '../../shared/status.ts'
 import { updateCheckMessage } from '../../shared/update.ts'
 import { verifyBatch } from '../../shared/verification.ts'
@@ -19,6 +20,7 @@ export interface PushPreview {
   path: string
   result: PushFile
   force: boolean
+  allowLossy: boolean
   token: string
 }
 
@@ -87,6 +89,7 @@ export function useApp() {
   const [diff, setDiff] = useState<{ path: string, result: DiffResult } | null>(null)
   const [diffLoading, setDiffLoading] = useState<string | null>(null)
   const [pushPreview, setPushPreview] = useState<PushPreview | null>(null)
+  const [lossyPushPaths, setLossyPushPaths] = useState<Set<string>>(() => new Set())
   const [pullConfirm, setPullConfirm] = useState<PullConfirm | null>(null)
   const [createForm, setCreateForm] = useState<{ path: string } | null>(null)
   const [getForm, setGetForm] = useState(false)
@@ -366,20 +369,41 @@ export function useApp() {
     if (behind.length > 0) setPullConfirm({ paths: behind, force: false })
   }, [entries])
 
-  const requestPush = useCallback((path: string, force = false) => runOp('push preview', async () => {
-    const { result, token } = await api.previewPush(path, force)
-    setPushPreview({ path, result, force, token })
+  const requestPush = useCallback((path: string, force = false, allowLossy = false) => runOp('push preview', async () => {
+    try {
+      const { result, token } = await api.previewPush(path, force, allowLossy)
+      setPushPreview({ path, result, force, allowLossy, token })
+    } catch (error) {
+      if (!allowLossy && isLossyPushError(error)) {
+        setLossyPushPaths(paths => new Set(paths).add(path))
+      }
+      throw error
+    }
   }), [api, runOp])
 
   const confirmPush = useCallback(() => {
     if (!pushPreview) return
-    const { path, force, token } = pushPreview
+    const { path, force, allowLossy, token } = pushPreview
     void runOp('push', async () => {
-      const result = await api.commitPush(token)
+      let result: PushFile | null
+      try {
+        result = await api.commitPush(token)
+      } catch (error) {
+        if (!allowLossy && isLossyPushError(error)) {
+          setLossyPushPaths(paths => new Set(paths).add(path))
+        }
+        throw error
+      }
       setPushPreview(null)
       if (!result) return
+      setLossyPushPaths(paths => {
+        if (!paths.has(path)) return paths
+        const next = new Set(paths)
+        next.delete(path)
+        return next
+      })
       recordActivity('pushed', [path])
-      setMessage({ kind: 'info', text: `${force ? 'Force pushed' : 'Pushed'} ${path} to v${result.version}` })
+      setMessage({ kind: 'info', text: `${allowLossy ? 'Push force completed for' : force ? 'Force pushed' : 'Pushed'} ${path} to v${result.version}` })
       setDiff(current => (current?.path === path ? null : current))
       await recheck([path])
     })
@@ -720,6 +744,7 @@ export function useApp() {
     diffLoading,
     pushPreview,
     setPushPreview,
+    lossyPushPaths,
     pullConfirm,
     setPullConfirm,
     createForm,

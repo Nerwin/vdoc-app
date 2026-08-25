@@ -10,6 +10,7 @@ import { isTrustedRendererLocation, PACKAGED_RENDERER_URL } from '../shared/elec
 import { contentForGuardedWrite } from '../shared/file-write.ts'
 import { CancellableOperation } from '../shared/cancellable-operation.ts'
 import { relativeAppPath, resolveExistingPathInsideRoot } from '../shared/path-policy.ts'
+import { LossyPushAccess } from '../shared/lossy-push.ts'
 import { maskSecret } from '../shared/secret.ts'
 import { OperationTickets } from '../shared/operation-tickets.ts'
 import { atomicWriteFile } from './atomic-write.ts'
@@ -25,10 +26,12 @@ const PUSH_PREVIEW_TTL_MS = 5 * 60 * 1000
 interface PendingPush {
   path: string
   force: boolean
+  allowLossy: boolean
   contentHash: string
 }
 
 const pushTickets = new OperationTickets<PendingPush>(PUSH_PREVIEW_TTL_MS, 20)
+const lossyPushAccess = new LossyPushAccess()
 const pendingFileWrites = new Map<string, Promise<void>>()
 
 const checkOperation = new CancellableOperation()
@@ -276,16 +279,25 @@ export function registerIpc(
     return files
   })
 
-  handle('push-preview', async (_event, pathInput: unknown, forceInput?: unknown) => {
+  handle('push-preview', async (_event, pathInput: unknown, forceInput?: unknown, allowLossyInput?: unknown) => {
     const path = docsPath(pathInput)
     const force = forceInput === undefined ? false : booleanValue(forceInput, 'force flag')
+    const allowLossy = allowLossyInput === undefined ? false : booleanValue(allowLossyInput, 'allow lossy flag')
+    if (allowLossy && !lossyPushAccess.allows(path)) throw new Error('Push force is not available for this file')
     const args = ['cf', 'push', path, '--dry-run']
     if (force) args.push('--force')
-    const { files } = await runVdocJson<{ files: PushFile[] }>(args)
+    if (allowLossy) args.push('--allow-lossy')
+    let files: PushFile[]
+    try {
+      ({ files } = await runVdocJson<{ files: PushFile[] }>(args))
+    } catch (error) {
+      if (!allowLossy) lossyPushAccess.grantAfterError(path, error)
+      throw error
+    }
     const result = files[0]
     if (!result) throw new Error('Push preview returned no file')
     const token = randomUUID()
-    pushTickets.issue(token, { path, force, contentHash: contentHash(path) })
+    pushTickets.issue(token, { path, force, allowLossy, contentHash: contentHash(path) })
     return { token, result }
   })
 
@@ -293,7 +305,14 @@ export function registerIpc(
     const token = stringValue(tokenInput, 'push preview token', 100)
     const pending = pushTickets.take(token)
     if (contentHash(pending.path) !== pending.contentHash) throw new Error('File changed after the push preview; preview it again')
-    if (pending.force && !await confirmForce(
+    if (pending.allowLossy && !lossyPushAccess.allows(pending.path)) throw new Error('Push force is no longer available for this file')
+    if (pending.allowLossy && !await confirmForce(
+      'Completely overwrite remote content?',
+      `Push force ${pending.path.split('/').at(-1)}?`,
+      'The remote page will be completely overwritten by this local file. Unsupported layouts, media, or macros will be deleted. This cannot be undone by V-DOC.',
+      'Overwrite remote',
+    )) return null
+    if (!pending.allowLossy && pending.force && !await confirmForce(
       'Overwrite Confluence content?',
       `Force push ${pending.path.split('/').at(-1)}?`,
       'Remote edits will be replaced by the local document. This cannot be undone by V-DOC.',
@@ -301,9 +320,17 @@ export function registerIpc(
     )) return null
     const args = ['cf', 'push', pending.path]
     if (pending.force) args.push('--force')
-    const { files } = await runVdocJson<{ files: PushFile[] }>(args)
+    if (pending.allowLossy) args.push('--allow-lossy')
+    let files: PushFile[]
+    try {
+      ({ files } = await runVdocJson<{ files: PushFile[] }>(args))
+    } catch (error) {
+      if (!pending.allowLossy) lossyPushAccess.grantAfterError(pending.path, error)
+      throw error
+    }
     const result = files[0]
     if (!result) throw new Error('Push returned no file')
+    lossyPushAccess.revoke(pending.path)
     return result
   })
 

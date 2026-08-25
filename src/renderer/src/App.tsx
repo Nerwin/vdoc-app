@@ -256,6 +256,7 @@ export function App() {
                   busyOp={app.busyOp}
                   theme={theme}
                   connected={connected}
+                  allowLossyPush={app.lossyPushPaths.has(selected.path)}
                   view={view}
                   reloadKey={reloadKey}
                   findSeq={findSeq}
@@ -272,7 +273,7 @@ export function App() {
                   onMarkVerified={path => void app.markVerified(path)}
                   onPull={app.requestPull}
                   onForcePull={path => app.setPullConfirm({ paths: [path], force: true })}
-                  onPush={(path, force) => void app.requestPush(path, force)}
+                  onPush={(path, force, allowLossy) => void app.requestPush(path, force, allowLossy)}
                   onLint={path => void app.runLint(path)}
                   onSync={path => void app.syncFile(path)}
                   onCreate={path => app.setCreateForm({ path })}
@@ -368,22 +369,27 @@ export function App() {
 
       {app.pushPreview && (
         <Modal
-          title={`${app.pushPreview.force ? 'Force push' : 'Push'} ${app.pushPreview.path.split('/').at(-1)}`}
+          title={`${app.pushPreview.allowLossy ? 'Push force' : app.pushPreview.force ? 'Force push' : 'Push'} ${app.pushPreview.path.split('/').at(-1)}`}
           onClose={() => app.setPushPreview(null)}
           actions={(
             <>
               <ModalButton label="Cancel" onClick={() => app.setPushPreview(null)} />
               <ModalButton
-                label={app.pushPreview.force ? 'Force push - overwrite remote' : 'Push to Confluence'}
-                primary={!app.pushPreview.force}
-                danger={app.pushPreview.force}
+                label={app.pushPreview.allowLossy ? 'Push force - overwrite remote' : app.pushPreview.force ? 'Force push - overwrite remote' : 'Push to Confluence'}
+                primary={!app.pushPreview.force && !app.pushPreview.allowLossy}
+                danger={app.pushPreview.force || app.pushPreview.allowLossy}
                 disabled={app.busyOp === 'push'}
                 onClick={app.confirmPush}
               />
             </>
           )}
         >
-          {app.pushPreview.force && (
+          {app.pushPreview.allowLossy ? (
+            <p className="mb-2 text-conflict">
+              Push force will completely overwrite the remote page with this local file.
+              Unsupported layouts, media, or macros not preserved locally will be deleted. This cannot be undone by V-DOC.
+            </p>
+          ) : app.pushPreview.force && (
             <p className="mb-2 text-conflict">
               Confluence moved to v{app.pushPreview.result.version} since this file was last pulled
               (it records v{app.entries.get(app.pushPreview.path)?.check?.localVersion ?? '-'}).
