@@ -267,7 +267,7 @@ Resolution:
 - npm overrides the transitive DOMPurify copy to 3.4.13, above every affected range reported by the audit.
 - The full dependency audit runs clean after lockfile regeneration.
 
-### A-09: Intel macOS artifacts are documented but not built
+### A-09: Intel macOS artifacts are documented but not built [Fixed]
 
 Severity: Medium
 
@@ -285,6 +285,12 @@ The documented Intel installation path cannot be fulfilled by the release workfl
 Recommendation:
 
 Build both x64 and arm64, or publish a universal binary, and verify the artifact matrix in CI. If Intel support is intentionally dropped, remove it from the README and release expectations.
+
+Resolution:
+
+- Intel macOS support is intentionally out of scope.
+- The README now documents Apple Silicon as the only macOS target.
+- Unit and release-workflow checks enforce the arm64 DMG and ZIP artifacts.
 
 ### A-10: Monaco is loaded eagerly into an 8.7 MB startup bundle
 

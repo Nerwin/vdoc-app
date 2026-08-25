@@ -30,6 +30,11 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run dist
+      - name: Verify macOS artifacts
+        if: runner.os == 'macOS'
+        run: |
+          find release -maxdepth 1 -name '*-mac-arm64.dmg' -print -quit | grep -q .
+          find release -maxdepth 1 -name '*-mac-arm64.zip' -print -quit | grep -q .
       - name: Smoke test packaged macOS app
         if: runner.os == 'macOS'
         timeout-minutes: 1

@@ -5,6 +5,8 @@ import { test } from 'node:test'
 
 import { parseVdocCliRequirement } from '../app-config.ts'
 
+const PACKAGE_JSON = JSON.parse(readFileSync(join(import.meta.dirname, '../../../package.json'), 'utf8')) as Record<string, unknown>
+
 test('parseVdocCliRequirement accepts the release metadata', () => {
   assert.deepEqual(parseVdocCliRequirement({
     vdocCli: {
@@ -25,9 +27,17 @@ test('parseVdocCliRequirement rejects a missing or invalid minimum', () => {
 })
 
 test('package.json carries valid CLI compatibility metadata', () => {
-  const packageJson = JSON.parse(readFileSync(join(import.meta.dirname, '../../../package.json'), 'utf8')) as unknown
-  const requirement = parseVdocCliRequirement(packageJson)
+  const requirement = parseVdocCliRequirement(PACKAGE_JSON)
   assert.ok(requirement)
   assert.match(requirement.minimumVersion, /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/)
   assert.ok(requirement.updateCommand?.includes('@vosker/vdoc@latest'))
+})
+
+test('macOS release targets are Apple Silicon only', () => {
+  const build = PACKAGE_JSON.build as { mac?: { target?: Array<{ target?: string, arch?: string[] }> } }
+  const targets = build.mac?.target ?? []
+  for (const name of ['dmg', 'zip']) {
+    const target = targets.find(entry => entry.target === name)
+    assert.deepEqual(target?.arch, ['arm64'])
+  }
 })

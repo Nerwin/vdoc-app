@@ -59,7 +59,7 @@ Confluence-related is written through `vdoc config set`, so CLI and app always a
 
 Grab the artifact for your OS from the latest GitHub release:
 
-- **macOS** - `V-DOC-x.y.z-mac-arm64.dmg` (Apple Silicon) or `…-mac-x64.dmg` (Intel). The app is
+- **macOS** - `V-DOC-x.y.z-mac-arm64.dmg` (Apple Silicon). The app is
   unsigned: on first launch right-click → Open, or clear the quarantine flag with
   `xattr -cr /Applications/V-DOC.app`.
 - **Windows** - `V-DOC-x.y.z-win-x64.exe` (installer, per-user, no admin needed) or the
@@ -246,7 +246,7 @@ npm run release        # bump version + changelog + tag, then build this OS's bi
 npm run dist           # rebuild binaries without bumping (host OS) - or dist:mac / dist:win / dist:linux
 ```
 
-`dist` builds the host platform (macOS builds both arm64 and x64); the release workflow covers
+`dist` builds the host platform (macOS targets Apple Silicon); the release workflow covers
 the rest. To generate a Windows release from the Mac, run `npm run dist:win` - it cross-builds
 `V-DOC-x.y.z-win-x64.exe` (NSIS installer, per-user) and `…-portable-x64.exe` into `release/`.
 The Windows arch is pinned to x64 in `package.json` (`build.win.target`): without the pin,
