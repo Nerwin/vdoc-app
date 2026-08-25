@@ -144,10 +144,7 @@ export function registerIpc(): void {
     return authStatus()
   })
 
-  ipcMain.handle('save-api-key', async (_event, email: string, apiToken: string) => {
-    // Service-account keys carry no email - clear any stale one so the CLI doesn't combine them.
-    if (email.trim() === '') await runVdocJson(['config', 'set', 'confluence.email', '--delete'])
-    else await runVdocJson(['config', 'set', 'confluence.email', email.trim()])
+  ipcMain.handle('save-api-key', async (_event, apiToken: string) => {
     await runVdocJson(['config', 'set', 'confluence.apiToken', '--encrypt', apiToken.trim()])
     await runVdocJson(['config', 'set', 'confluence.authMethod', 'api-token'])
     return authStatus()
@@ -326,7 +323,6 @@ interface ConfluenceConfig {
   apiToken?: string
   sessionToken?: string
   authMethod?: 'api-token' | 'session-token'
-  email?: string
 }
 
 function assertCredentialKey(key: string): void {
@@ -350,7 +346,7 @@ async function authStatus(): Promise<AuthStatus> {
       ? 'api-token'
       : config.sessionToken ? 'session-token' : 'none'
   const tokenExp = method === 'session-token' && config.sessionToken ? decodeJwtExp(config.sessionToken) : undefined
-  const base = { method, tokenExp, hasApiKey: Boolean(config.apiToken), hasSessionToken: Boolean(config.sessionToken), email: config.email }
+  const base = { method, tokenExp, hasApiKey: Boolean(config.apiToken), hasSessionToken: Boolean(config.sessionToken) }
 
   if (method === 'none') return { ok: false, ...base, error: 'No Confluence credentials configured' }
 

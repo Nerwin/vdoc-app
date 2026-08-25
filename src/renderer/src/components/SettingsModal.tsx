@@ -14,7 +14,7 @@ interface Props {
   onSetAssetsDir(dir: string | null): void;
   onSetSite(site: string | null): void;
   onReloadVersion(): void;
-  onSaveApiKey(email: string, apiToken: string): void;
+  onSaveApiKey(apiToken: string): void;
   onSetAuthMethod(method: "api-token" | "session-token"): void;
   onCredentialPreview(key: CredentialKey): Promise<string | null>;
   onClearCredential(key: CredentialKey): void;
@@ -256,7 +256,6 @@ function Confluence(props: Props) {
 
 function Auth({ auth, busy, onSaveApiKey, onSetAuthMethod, onRenewToken, onCredentialPreview, onClearCredential }: Props) {
   const [method, setMethod] = useState<"api-token" | "session-token">(auth?.method === "api-token" ? "api-token" : "session-token");
-  const [email, setEmail] = useState(auth?.email ?? "");
   const [apiToken, setApiToken] = useState("");
 
   const pickMethod = (next: "api-token" | "session-token"): void => {
@@ -298,9 +297,6 @@ function Auth({ auth, busy, onSaveApiKey, onSetAuthMethod, onRenewToken, onCrede
 
       {method === "api-token" && (
         <>
-          <Field label="EMAIL">
-            <TextInput value={email} onChange={setEmail} placeholder="you@company.com - leave empty for a service account" />
-          </Field>
           <Field label="API TOKEN">
             <div className="flex items-center gap-2">
               <TextInput
@@ -313,7 +309,7 @@ function Auth({ auth, busy, onSaveApiKey, onSetAuthMethod, onRenewToken, onCrede
                 label="Save key"
                 disabled={apiToken.trim() === "" || busy}
                 onClick={() => {
-                  onSaveApiKey(email, apiToken);
+                  onSaveApiKey(apiToken);
                   setApiToken("");
                 }}
               />

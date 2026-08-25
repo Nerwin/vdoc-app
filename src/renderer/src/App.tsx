@@ -388,7 +388,7 @@ export function App() {
           onSetAssetsDir={app.setAssetsDir}
           onSetSite={app.setSite}
           onReloadVersion={app.reloadVersion}
-          onSaveApiKey={(email, token) => void app.saveApiKey(email, token)}
+          onSaveApiKey={token => void app.saveApiKey(token)}
           onSetAuthMethod={method => void app.setAuthMethod(method)}
           onCredentialPreview={app.credentialPreview}
           onClearCredential={key => void app.clearCredential(key)}

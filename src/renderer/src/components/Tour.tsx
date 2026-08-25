@@ -84,7 +84,7 @@ function SetupChecks({ ctx }: { ctx: CommandContext }) {
         label="Confluence"
         detail={auth
           ? auth.ok
-            ? `connected as ${auth.displayName ?? auth.email ?? 'unknown'} (${auth.method})`
+            ? `connected as ${auth.displayName ?? 'unknown'} (${auth.method})`
             : auth.error ?? 'not connected - add credentials in Settings'
           : 'checking…'}
       />

@@ -506,11 +506,11 @@ export function useApp() {
     })()
   }, [api, authors])
 
-  const saveApiKey = useCallback((email: string, apiToken: string) => runOp('save API key', async () => {
-    const status = await api.saveApiKey(email, apiToken)
+  const saveApiKey = useCallback((apiToken: string) => runOp('save API key', async () => {
+    const status = await api.saveApiKey(apiToken)
     setAuth(status)
     setMessage(status.ok
-      ? { kind: 'info', text: `API key saved - authenticated as ${status.displayName ?? email}` }
+      ? { kind: 'info', text: `API key saved - authenticated as ${status.displayName ?? 'unknown'}` }
       : { kind: 'error', text: status.error ?? 'API key rejected' })
   }), [api, runOp])
 

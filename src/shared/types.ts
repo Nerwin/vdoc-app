@@ -156,7 +156,6 @@ export interface AuthStatus {
   hasApiKey: boolean
   /** A session token is stored in the config (regardless of the active method). */
   hasSessionToken: boolean
-  email?: string
   error?: string
 }
 
@@ -270,8 +269,7 @@ export interface VdocApi {
   lint(path: string): Promise<LintFile[]>
   authStatus(): Promise<AuthStatus>
   setToken(token: string): Promise<AuthStatus>
-  /** Empty email = service account key (the CLI needs no confluence.email then). */
-  saveApiKey(email: string, apiToken: string): Promise<AuthStatus>
+  saveApiKey(apiToken: string): Promise<AuthStatus>
   setAuthMethod(method: 'api-token' | 'session-token'): Promise<AuthStatus>
   /** Masked stored credential (first 4 + last 4 chars), or null when none is set. */
   credentialPreview(key: CredentialKey): Promise<string | null>
