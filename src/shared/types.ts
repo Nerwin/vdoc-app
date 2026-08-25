@@ -257,6 +257,7 @@ export interface FileWriteResult {
 }
 
 export interface VdocApi {
+  platform: 'darwin' | 'win32' | 'linux'
   scan(): Promise<ScanResult>
   checkAll(): Promise<CheckFile[]>
   /** Stop the running check-all after the current batch; checkAll resolves with partial results. */

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { LOG_MAX, type VdocLogEntry } from '../../../shared/types.ts'
+import { shellCommand, type ShellKind } from '../../../shared/shell-command.ts'
 
 /** Every CLI command the app spawned this session, newest first - the debugging trail. */
 export function LogsView({ notify, onClose }: { notify(text: string): void, onClose(): void }) {
@@ -29,6 +30,7 @@ export function LogsView({ notify, onClose }: { notify(text: string): void, onCl
   }, [menu, onClose])
 
   const shown = [...entries].reverse().filter(entry => !errorsOnly || entry.exitCode !== 0)
+  const shell: ShellKind = window.vdoc.platform === 'win32' ? 'powershell' : 'posix'
 
   const copy = (text: string, what: string): void => {
     setMenu(null)
@@ -64,6 +66,7 @@ export function LogsView({ notify, onClose }: { notify(text: string): void, onCl
                 entry={entry}
                 open={openId === entry.id}
                 onToggle={() => setOpenId(current => (current === entry.id ? null : entry.id))}
+                shell={shell}
                 onMenu={event => {
                   event.preventDefault()
                   setMenu({ x: event.clientX, y: event.clientY, entry })
@@ -79,7 +82,7 @@ export function LogsView({ notify, onClose }: { notify(text: string): void, onCl
             style={{ left: Math.min(menu.x, window.innerWidth - 200), top: Math.min(menu.y, window.innerHeight - 130) }}
             onClick={event => event.stopPropagation()}
           >
-            <CopyItem label="Copy command" onClick={() => copy(`vdoc ${menu.entry.args.join(' ')}`, 'Command')} />
+            <CopyItem label="Copy command" onClick={() => copy(shellCommand(['vdoc', ...menu.entry.args], shell), 'Command')} />
             <CopyItem label="Copy stderr" disabled={menu.entry.stderr.trim() === ''} onClick={() => copy(menu.entry.stderr, 'stderr')} />
             <CopyItem label="Copy stdout" disabled={menu.entry.stdout.trim() === ''} onClick={() => copy(menu.entry.stdout, 'stdout')} />
           </div>
@@ -101,7 +104,7 @@ function CopyItem({ label, disabled, onClick }: { label: string, disabled?: bool
   )
 }
 
-function LogRow({ entry, open, onToggle, onMenu }: { entry: VdocLogEntry, open: boolean, onToggle(): void, onMenu(event: React.MouseEvent): void }) {
+function LogRow({ entry, open, shell, onToggle, onMenu }: { entry: VdocLogEntry, open: boolean, shell: ShellKind, onToggle(): void, onMenu(event: React.MouseEvent): void }) {
   const failed = entry.exitCode !== 0
   return (
     <div className="border-b border-line">
@@ -110,7 +113,7 @@ function LogRow({ entry, open, onToggle, onMenu }: { entry: VdocLogEntry, open: 
         <span className={`w-14 shrink-0 text-[11px] ${failed ? 'text-conflict' : 'text-sync-text'}`}>
           {failed ? `exit ${entry.exitCode}` : 'ok'}
         </span>
-        <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-ink-body">vdoc {entry.args.join(' ')}</span>
+        <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-ink-body">{shellCommand(['vdoc', ...entry.args], shell)}</span>
         <span className="shrink-0 text-[11px] text-ink-ghost">{entry.durationMs} ms</span>
       </button>
       {open && (

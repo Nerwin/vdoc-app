@@ -386,7 +386,7 @@ Resolution:
 - Package configuration tests prevent these fuse values from silently regressing.
 - The packaged arm64 executable was inspected with `@electron/fuses` and passed the packaged smoke test.
 
-### A-13: Copied CLI commands are not shell-escaped
+### A-13: Copied CLI commands are not shell-escaped [Fixed]
 
 Severity: Low
 
@@ -403,6 +403,12 @@ The app itself executes safely through `execFile`, but a user who pastes a copie
 Recommendation:
 
 Copy a platform-specific safely quoted command, or copy an argv JSON representation and label it as non-executable. Apply A-04's redaction before either form.
+
+Resolution:
+
+- macOS and Linux commands use POSIX single-quote escaping.
+- Windows commands use PowerShell single-quote escaping.
+- Copied and displayed commands share the same tested formatter after argument redaction.
 
 ### A-14: Secret-like files are not covered by `.gitignore`
 
