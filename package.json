@@ -33,8 +33,7 @@
     "dist:mac": "electron-vite build && electron-builder --mac",
     "dist:win": "electron-vite build && electron-builder --win",
     "dist:linux": "electron-vite build && electron-builder --linux",
-    "release": "commit-and-tag-version",
-    "knip": "knip"
+    "release": "commit-and-tag-version"
   },
   "dependencies": {
     "@sentry/electron": "^7.17.0",
