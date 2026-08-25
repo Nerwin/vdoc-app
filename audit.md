@@ -349,7 +349,7 @@ Resolution:
 - Metadata scans read at most the first 8 KB of each Markdown file.
 - Watcher callbacks discard hidden and excluded paths before notifying the renderer.
 
-### A-12: The packaged application retains permissive Electron fuses
+### A-12: The packaged application retains permissive Electron fuses [Fixed]
 
 Severity: Low
 
@@ -378,6 +378,13 @@ Recommendation:
 - Make fuse assertions part of packaged-artifact CI.
 
 Reference: [Electron fuses](https://www.electronjs.org/docs/latest/tutorial/fuses).
+
+Resolution:
+
+- Node mode, Node options, CLI inspection, and extra file-protocol privileges are disabled.
+- Embedded ASAR integrity validation and ASAR-only application loading are enabled.
+- Package configuration tests prevent these fuse values from silently regressing.
+- The packaged arm64 executable was inspected with `@electron/fuses` and passed the packaged smoke test.
 
 ### A-13: Copied CLI commands are not shell-escaped
 

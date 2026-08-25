@@ -41,3 +41,15 @@ test('macOS release targets are Apple Silicon only', () => {
     assert.deepEqual(target?.arch, ['arm64'])
   }
 })
+
+test('packaged Electron disables permissive fuses', () => {
+  const build = PACKAGE_JSON.build as { electronFuses?: Record<string, boolean> }
+  assert.deepEqual(build.electronFuses, {
+    runAsNode: false,
+    enableNodeOptionsEnvironmentVariable: false,
+    enableNodeCliInspectArguments: false,
+    enableEmbeddedAsarIntegrityValidation: true,
+    onlyLoadAppFromAsar: true,
+    grantFileProtocolExtraPrivileges: false,
+  })
+})

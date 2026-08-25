@@ -59,6 +59,14 @@
     "productName": "V-DOC",
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "npmRebuild": false,
+    "electronFuses": {
+      "runAsNode": false,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true,
+      "grantFileProtocolExtraPrivileges": false
+    },
     "directories": {
       "output": "release",
       "buildResources": "build"
