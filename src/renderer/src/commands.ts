@@ -100,7 +100,7 @@ const versions = (ctx: CommandContext): string | undefined => {
 }
 
 export const copy = (ctx: CommandContext, text: string, what: string): void => {
-  void navigator.clipboard.writeText(text).then(
+  void window.vdoc.copyText(text).then(
     () => ctx.app.notify(`${what} copied`),
     error => ctx.app.reportError(error),
   )
