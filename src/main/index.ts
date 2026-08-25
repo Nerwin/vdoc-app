@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { app, BrowserWindow, Menu, nativeTheme, net, protocol, session } from 'electron'
+import { app, BrowserWindow, dialog, Menu, nativeTheme, net, protocol, session } from 'electron'
 
 import { isAllowedNavigation, PACKAGED_RENDERER_URL, SECURE_WEB_PREFERENCES } from '../shared/electron-policy.ts'
 import type { Settings } from '../shared/types.ts'
@@ -36,6 +36,49 @@ if (!app.isPackaged && process.env.VDOC_DEBUG_PORT) {
   app.commandLine.appendSwitch('remote-debugging-port', process.env.VDOC_DEBUG_PORT)
 }
 
+const CLOSE_RESPONSE_TIMEOUT_MS = 10_000
+let mainWindow: BrowserWindow | null = null
+let closeApproved = false
+let closePending = false
+let closeResponseTimer: NodeJS.Timeout | undefined
+
+async function finishClose(saved: boolean): Promise<void> {
+  if (!closePending) return
+  closePending = false
+  clearTimeout(closeResponseTimer)
+
+  const window = mainWindow
+  if (!window || window.isDestroyed()) return
+  if (!saved) {
+    const { response } = await dialog.showMessageBox(window, {
+      type: 'warning',
+      title: 'Unsaved changes',
+      message: 'The latest editor changes could not be saved.',
+      detail: 'Keep V-DOC open to resolve the save error, or close and discard those changes.',
+      buttons: ['Keep open', 'Close without saving'],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+    })
+    if (response === 0) return
+  }
+
+  closeApproved = true
+  window.close()
+}
+
+function guardWindowClose(window: BrowserWindow): void {
+  window.on('close', event => {
+    if (closeApproved || window.webContents.isDestroyed()) return
+    event.preventDefault()
+    if (closePending) return
+    closePending = true
+    window.webContents.send('close-requested')
+    closeResponseTimer = setTimeout(() => void finishClose(false), CLOSE_RESPONSE_TIMEOUT_MS)
+  })
+  window.on('closed', () => clearTimeout(closeResponseTimer))
+}
+
 function createWindow(theme: Settings['theme']): BrowserWindow {
   const dark = theme === 'system' ? nativeTheme.shouldUseDarkColors : theme === 'dark'
   const icon = join(__dirname, '../../build/icon.png')
@@ -59,6 +102,7 @@ function createWindow(theme: Settings['theme']): BrowserWindow {
   window.webContents.on('will-navigate', (event, url) => {
     if (!isAllowedNavigation(window.webContents.getURL(), url)) event.preventDefault()
   })
+  guardWindowClose(window)
 
   if (process.argv.includes('--smoke-test')) {
     window.webContents.once('did-fail-load', (_event, code, description, url, isMainFrame) => {
@@ -94,8 +138,6 @@ function createWindow(theme: Settings['theme']): BrowserWindow {
 app.setName('V-DOC')
 initSentry()
 
-let mainWindow: BrowserWindow | null = null
-
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
@@ -130,7 +172,7 @@ if (!app.requestSingleInstanceLock()) {
     session.defaultSession.setPermissionCheckHandler(() => false)
     session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false))
 
-    registerIpc(() => mainWindow)
+    registerIpc(() => mainWindow, finishClose)
     mainWindow = createWindow(settings.theme)
     watchDocs(mainWindow)
     initializeUpdater(() => mainWindow)

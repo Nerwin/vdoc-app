@@ -6,6 +6,7 @@ import { setConfluenceIgnore } from '../../shared/frontmatter.ts'
 import { initMessage } from '../../shared/init.ts'
 import { displayState, needsAttention, type FileEntry } from '../../shared/status.ts'
 import { updateCheckMessage } from '../../shared/update.ts'
+import { verifyBatch } from '../../shared/verification.ts'
 import { STATE_META } from './state-meta.ts'
 
 export interface Message {
@@ -38,6 +39,11 @@ export interface SyncEvent {
 }
 
 const normalize = (path: string): string => path.replace(/^\.\//, '')
+
+function errorText(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error)
+  return raw.replace(/^Error invoking remote method '[^']+': (?:\w*Error: )?/, '')
+}
 
 function loadJson<T>(key: string, fallback: T): T {
   try {
@@ -149,10 +155,7 @@ export function useApp() {
 
   const fail = useCallback((error: unknown) => {
     captureException(error)
-    const raw = error instanceof Error ? error.message : String(error)
-    // Electron wraps IPC rejections: "Error invoking remote method 'x': Error: <real message>"
-    const text = raw.replace(/^Error invoking remote method '[^']+': (?:\w*Error: )?/, '')
-    setMessage({ kind: 'error', text })
+    setMessage({ kind: 'error', text: errorText(error) })
   }, [])
 
   // Anything that escapes the per-action catches still surfaces as a toast.
@@ -483,18 +486,27 @@ export function useApp() {
     const targets = [...entries.values()].filter(entry => displayState(entry) === 'unverified').map(entry => entry.path)
     if (targets.length === 0) return
     void runOp('verify', async () => {
-      const verified: string[] = []
-      let differing = 0
-      for (const [index, path] of targets.entries()) {
-        setBusyOp(`verify ${index + 1}/${targets.length}`)
-        const result = await api.recordBaseline(path).catch(() => null)
-        if (result?.baselineRecorded) verified.push(path)
-        else differing += 1
-      }
-      if (verified.length > 0) await recheck(verified)
-      setMessage(differing > 0
-        ? { kind: 'error', text: `${verified.length} verified; ${differing} differ from Confluence - review them` }
-        : { kind: 'info', text: `${verified.length} file(s) verified - baselines recorded` })
+      const result = await verifyBatch(
+        targets,
+        path => api.recordBaseline(path),
+        (done, total) => setBusyOp(`verify ${done}/${total}`),
+      )
+      if (result.verified.length > 0) await recheck(result.verified)
+      for (const failure of result.failed) captureException(failure.error)
+
+      const detail = [
+        ...result.different.map(path => `${path.split('/').at(-1)} - content differs from Confluence`),
+        ...result.failed.map(failure => `${failure.path.split('/').at(-1)} - ${errorText(failure.error)}`),
+      ].slice(0, 5)
+      const hidden = result.different.length + result.failed.length - detail.length
+      if (hidden > 0) detail.push(`… and ${hidden} more`)
+
+      const text = `Verify: ${result.verified.length} verified, ${result.different.length} different, ${result.failed.length} failed`
+      setMessage({
+        kind: result.different.length > 0 || result.failed.length > 0 ? 'error' : 'info',
+        text,
+        detail: detail.length > 0 ? detail : undefined,
+      })
     })
   }, [api, entries, recheck, runOp])
 

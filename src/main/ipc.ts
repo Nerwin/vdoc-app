@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs'
+import { readFileSync, realpathSync, statSync } from 'node:fs'
 import { isAbsolute, join, relative } from 'node:path'
 import { app, BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
 
@@ -11,6 +11,7 @@ import { contentForGuardedWrite } from '../shared/file-write.ts'
 import { relativeAppPath, resolveExistingPathInsideRoot } from '../shared/path-policy.ts'
 import { maskSecret } from '../shared/secret.ts'
 import { OperationTickets } from '../shared/operation-tickets.ts'
+import { atomicWriteFile } from './atomic-write.ts'
 import { backlinksTo, docsRoot, fileForPageId, gitDirtyFiles, resolvedVdocBin, runVdoc, runVdocJson, scanMarkdownFiles, searchContent, setVdocBin, vdocLogs } from './vdoc.ts'
 import { loadSettings, saveSettings } from './settings.ts'
 import { sentryActive } from './sentry.ts'
@@ -133,7 +134,10 @@ function settingPaths(value: unknown, label: string): string[] {
   })
 }
 
-export function registerIpc(getMainWindow: () => BrowserWindow | null): void {
+export function registerIpc(
+  getMainWindow: () => BrowserWindow | null,
+  finishClose: (saved: boolean) => Promise<void>,
+): void {
   const handle = <Args extends unknown[], Result>(channel: string, handler: IpcHandler<Args, Result>): void => {
     ipcMain.handle(channel, (event, ...args) => {
       assertTrustedSender(event, getMainWindow())
@@ -214,7 +218,7 @@ export function registerIpc(getMainWindow: () => BrowserWindow | null): void {
     const path = resolveExistingPathInsideRoot(docsRoot(), request.path)
     return serializeFileWrite(path, () => {
       const current = readFileSync(path, 'utf8')
-      writeFileSync(path, contentForGuardedWrite(current, request.expected, request.next), 'utf8')
+      atomicWriteFile(path, contentForGuardedWrite(current, request.expected, request.next))
       return { revision: request.revision }
     })
   })
@@ -489,6 +493,8 @@ export function registerIpc(getMainWindow: () => BrowserWindow | null): void {
   handle('install-update', () => restartAndInstallUpdate())
 
   handle('sentry-active', () => sentryActive)
+
+  handle('close-ready', (_event, input: unknown) => finishClose(booleanValue(input, 'save result')))
 
   handle('quit', () => app.quit())
 }

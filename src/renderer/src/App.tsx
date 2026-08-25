@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { FileTree } from './components/FileTree.tsx'
 import { DetailPane } from './components/DetailPane.tsx'
@@ -54,6 +54,23 @@ export function App() {
     return saved >= SIDEBAR_MIN && saved <= SIDEBAR_MAX ? saved : 306
   })
   const filterRef = useRef<HTMLInputElement>(null)
+  const editorFlushRef = useRef<() => Promise<boolean>>(async () => true)
+
+  const registerEditorFlush = useCallback((flush: (() => Promise<boolean>) | null) => {
+    editorFlushRef.current = flush ?? (async () => true)
+  }, [])
+
+  useEffect(() => window.vdoc.onCloseRequested(() => {
+    void (async () => {
+      let saved = false
+      try {
+        saved = await editorFlushRef.current()
+      } catch (error) {
+        app.reportError(error)
+      }
+      await window.vdoc.closeReady(saved).catch(app.reportError)
+    })()
+  }), [app.reportError])
 
   const theme = useResolvedTheme(app.settings?.theme ?? 'system')
   useEffect(() => {
@@ -244,6 +261,7 @@ export function App() {
                   findSeq={findSeq}
                   onView={setView}
                   onError={app.reportError}
+                  onRegisterFlush={registerEditorFlush}
                   onHelp={() => setHelpOpen(true)}
                   onSelect={path => {
                     if (app.entries.has(path)) app.setSelection(path)

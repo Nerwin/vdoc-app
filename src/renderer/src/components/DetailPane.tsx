@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 
 import type { DiffResult } from '../../../shared/types.ts'
 import { resolveRelative } from '../../../shared/links.ts'
+import { GuardedSaveQueue } from '../../../shared/save-queue.ts'
 import { displayState, type FileEntry } from '../../../shared/status.ts'
 import { shortcutLabel, type ViewMode } from '../commands.ts'
 import { STATE_META } from '../state-meta.ts'
@@ -26,6 +27,7 @@ interface Props {
   findSeq: number
   onView(view: ViewMode): void
   onError(error: unknown): void
+  onRegisterFlush(flush: (() => Promise<boolean>) | null): void
   /** Open the sync-concepts help modal (the state banners link to it). */
   onHelp(): void
   /** Navigate to another file in the tree (backlink row, local link in the preview). */
@@ -60,6 +62,7 @@ export function DetailPane(props: Props) {
   const [readFailed, setReadFailed] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [editorLoaded, setEditorLoaded] = useState(false)
+  const [saveState, setSaveState] = useState<'saved' | 'unsaved' | 'saving' | 'blocked'>('saved')
   const actionsRef = useRef<HTMLButtonElement>(null)
 
   const path = entry.path
@@ -68,63 +71,55 @@ export function DetailPane(props: Props) {
     if (view === 'content' || view === 'split') setEditorLoaded(true)
   }, [view])
 
-  const diskRef = useRef(new Map<string, string>())
-  const pendingRef = useRef<{ path: string, text: string, revision: number } | null>(null)
-  const activeSaveRef = useRef<string | null>(null)
+  const saveQueueRef = useRef<GuardedSaveQueue | null>(null)
+  if (!saveQueueRef.current) saveQueueRef.current = new GuardedSaveQueue(request => window.vdoc.writeFile(request))
+  const saveQueue = saveQueueRef.current
   const activePathRef = useRef(path)
-  const revisionRef = useRef(0)
+  const loadedRef = useRef({ path, reloadKey: props.reloadKey })
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   activePathRef.current = path
 
-  const drainSaves = useCallback(async () => {
-    if (activeSaveRef.current) return
-    while (pendingRef.current) {
-      const pending = pendingRef.current
-      pendingRef.current = null
-      const expected = diskRef.current.get(pending.path)
-      if (expected === undefined) {
-        onError(new Error(`Could not save ${pending.path.split('/').at(-1)} because its disk version is unknown.`))
-        continue
-      }
-      if (expected === pending.text) continue
-
-      activeSaveRef.current = pending.path
-      try {
-        const result = await window.vdoc.writeFile({
-          path: pending.path,
-          expected,
-          next: pending.text,
-          revision: pending.revision,
-        })
-        if (result.revision === pending.revision) diskRef.current.set(pending.path, pending.text)
-      } catch (error) {
-        if (activePathRef.current === pending.path && !pendingRef.current) pendingRef.current = pending
-        onError(error)
-        if (!pendingRef.current || pendingRef.current.path === pending.path) return
-      } finally {
-        activeSaveRef.current = null
-      }
-    }
-  }, [onError])
-
-  const flush = useCallback(() => {
+  const flush = useCallback(async (): Promise<boolean> => {
     clearTimeout(timerRef.current)
-    void drainSaves()
-  }, [drainSaves])
+    if (activePathRef.current === path && (saveQueue.hasPending(path) || saveQueue.isSaving(path))) {
+      setSaveState('saving')
+    }
+    const result = await saveQueue.flush()
+    for (const failure of result.failures) onError(failure.error)
+    if (activePathRef.current === path) setSaveState(saveQueue.hasPending(path) ? 'blocked' : 'saved')
+    return result.saved
+  }, [onError, path, saveQueue])
 
   const handleEdit = useCallback((text: string) => {
     setContent(text)
-    pendingRef.current = { path, text, revision: ++revisionRef.current }
+    try {
+      saveQueue.queue(path, text)
+      setSaveState('unsaved')
+    } catch (error) {
+      setSaveState('blocked')
+      onError(error)
+      return
+    }
     clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(flush, 800)
-  }, [flush, path])
+    timerRef.current = setTimeout(() => void flush(), 800)
+  }, [flush, onError, path, saveQueue])
 
   // Flush the draft before switching files and on unmount.
-  useEffect(() => flush, [path, flush])
+  useEffect(() => () => {
+    void flush()
+  }, [path, flush])
+
+  useEffect(() => {
+    props.onRegisterFlush(flush)
+    return () => props.onRegisterFlush(null)
+  }, [flush, props.onRegisterFlush])
 
   useEffect(() => {
     // Reload (⌘⌥R) is an explicit "take the disk version": drop any pending draft.
-    pendingRef.current = null
+    const previous = loadedRef.current
+    const explicitReload = previous.path === path && previous.reloadKey !== props.reloadKey
+    loadedRef.current = { path, reloadKey: props.reloadKey }
+    if (explicitReload) saveQueue.discard(path)
     clearTimeout(timerRef.current)
     setContent(null)
     setReadFailed(false)
@@ -133,8 +128,15 @@ export function DetailPane(props: Props) {
     window.vdoc.readFile(path)
       .then(text => {
         if (!live) return
-        diskRef.current.set(path, text)
-        setContent(text)
+        const draft = explicitReload ? undefined : saveQueue.draft(path)
+        if (draft === undefined) {
+          saveQueue.setDisk(path, text)
+          setContent(text)
+          setSaveState('saved')
+        } else {
+          setContent(draft)
+          setSaveState('unsaved')
+        }
       })
       .catch(() => {
         if (!live) return
@@ -144,18 +146,18 @@ export function DetailPane(props: Props) {
     return () => {
       live = false
     }
-  }, [path, props.reloadKey])
+  }, [path, props.reloadKey, saveQueue])
 
   // Disk changed under us (external editor, pull, own save echo): refresh the
   // buffer when there is no active draft to protect.
   useEffect(() => window.vdoc.onFilesChanged(changed => {
-    if (!changed.includes(path) || pendingRef.current?.path === path || activeSaveRef.current === path) return
+    if (!changed.includes(path) || saveQueue.hasPending(path) || saveQueue.isSaving(path)) return
     void window.vdoc.readFile(path).then(text => {
-      if (pendingRef.current?.path === path || activeSaveRef.current === path || text === diskRef.current.get(path)) return
-      diskRef.current.set(path, text)
+      if (saveQueue.hasPending(path) || saveQueue.isSaving(path)) return
+      saveQueue.setDisk(path, text)
       setContent(text)
     }).catch(() => undefined)
-  }), [path])
+  }), [path, saveQueue])
 
   const [backlinks, setBacklinks] = useState<string[]>([])
   useEffect(() => {
@@ -372,6 +374,11 @@ export function DetailPane(props: Props) {
         />
         <Tab label="Comments" active={view === 'comments'} disabled={!entry.tracked || ignored} onClick={() => onView('comments')} />
         <div className="flex-1" />
+        {saveState !== 'saved' && (
+          <span className={`px-2 text-[11px] ${saveState === 'blocked' ? 'text-conflict' : 'text-ink-faint'}`}>
+            {saveState === 'unsaved' ? 'Unsaved' : saveState === 'saving' ? 'Saving…' : 'Save blocked'}
+          </span>
+        )}
         {labels.length > 0 && (
           <div className="hidden items-center gap-1 px-1 @min-[860px]:flex" title="Confluence labels">
             {labels.map(label => (

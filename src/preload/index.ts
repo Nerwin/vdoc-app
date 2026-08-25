@@ -60,12 +60,14 @@ const api: VdocApi = {
   spaceMappingSet: (dir, space) => ipcRenderer.invoke('space-mapping-set', dir, space),
   revealConfig: () => ipcRenderer.invoke('reveal-config'),
   editConfig: () => ipcRenderer.invoke('edit-config'),
+  closeReady: saved => ipcRenderer.invoke('close-ready', saved),
   quit: () => ipcRenderer.invoke('quit'),
   logs: () => ipcRenderer.invoke('vdoc-logs'),
   onFilesChanged: cb => subscribe<string[]>('files-changed', cb),
   onCheckProgress: cb => subscribe<CheckProgress>('check-progress', cb),
   onUpdateStatus: cb => subscribe<AppUpdateStatus>('update-status', cb),
   onVdocLog: cb => subscribe<VdocLogEntry>('vdoc-log', cb),
+  onCloseRequested: cb => subscribe('close-requested', cb),
 }
 
 contextBridge.exposeInMainWorld('vdoc', api)

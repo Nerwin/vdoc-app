@@ -326,6 +326,8 @@ export interface VdocApi {
   revealConfig(): Promise<void>
   /** Open the CLI config file in the OS default editor. */
   editConfig(): Promise<void>
+  /** Complete a main-process close request after pending editor saves settle. */
+  closeReady(saved: boolean): Promise<void>
   quit(): Promise<void>
   /** All recorded CLI invocations, oldest first (ring buffer of the last 200). */
   logs(): Promise<VdocLogEntry[]>
@@ -333,4 +335,5 @@ export interface VdocApi {
   onCheckProgress(cb: (progress: CheckProgress) => void): () => void
   onUpdateStatus(cb: (status: AppUpdateStatus) => void): () => void
   onVdocLog(cb: (entry: VdocLogEntry) => void): () => void
+  onCloseRequested(cb: () => void): () => void
 }
