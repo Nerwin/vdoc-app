@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.16.0](https://github.com/Nerwin/vdoc-app/compare/v1.15.1...v1.16.0) (2026-08-25)
+
+### Features
+
+* add tracing using Sentry ([58e9280](https://github.com/Nerwin/vdoc-app/commit/58e9280273017be74d5dfb3f3328c795251f73c1))
+* **sync:** gate lossy force pushes ([a844692](https://github.com/Nerwin/vdoc-app/commit/a844692a4efa12b3464d5668e36acd5509829983))
+
+### Bug Fixes
+
+* **logs:** restore clipboard actions ([c86ed33](https://github.com/Nerwin/vdoc-app/commit/c86ed33207be1874d744db5f1ccf447083d1cca7))
+* **tree:** restore clipboard actions ([e5bc930](https://github.com/Nerwin/vdoc-app/commit/e5bc930340c57565358eacff2f37ab007da2fd5e))
 ## [1.15.1](https://github.com/Nerwin/vdoc-app/compare/v1.15.0...v1.15.1) (2026-08-25)
 ## [1.15.0](https://github.com/Nerwin/vdoc-app/compare/v1.14.4...v1.15.0) (2026-08-25)
 
