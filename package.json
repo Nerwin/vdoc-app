@@ -99,7 +99,7 @@
       }
     ],
     "mac": {
-      "icon": "build/icon.svg",
+      "icon": "build/icon.png",
       "target": [
         {
           "target": "dmg",
@@ -114,15 +114,15 @@
           ]
         }
       ],
-      "hardenedRuntime": false,
-      "notarize": false,
+      "hardenedRuntime": true,
+      "notarize": true,
       "category": "public.app-category.developer-tools"
     },
     "dmg": {
       "title": "${productName} ${version}"
     },
     "win": {
-      "icon": "build/icon.svg",
+      "icon": "build/icon.png",
       "target": [
         {
           "target": "nsis",
@@ -139,7 +139,7 @@
       ]
     },
     "linux": {
-      "icon": "build/icon.svg",
+      "icon": "build/icon.png",
       "target": [
         "AppImage",
         "deb"

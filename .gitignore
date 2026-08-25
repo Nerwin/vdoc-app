@@ -20,3 +20,4 @@ tsconfig.web.tsbuildinfo
 .claude/
 CLAUDE.md
 docs/
+!/build
