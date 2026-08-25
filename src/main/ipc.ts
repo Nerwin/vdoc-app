@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { pathToFileURL } from 'node:url'
+import { app, BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
 
 import type { AuthStatus, CheckFile, CommentEntry, CreateResult, CredentialKey, DiffResult, GetPageResult, InitResult, LintFile, PullFile, PushFile, Settings, SettingsInfo, SyncFile, VersionEntry } from '../shared/types.ts'
 import { parseVdocCliRequirement, type VdocCliRequirement } from '../shared/app-config.ts'
@@ -16,14 +17,43 @@ const CHECK_BATCH = 24
 
 let checkCancelled = false
 
-export function registerIpc(): void {
-  ipcMain.handle('scan', () => {
+type IpcHandler<Args extends unknown[], Result> = (event: IpcMainInvokeEvent, ...args: Args) => Result
+
+function rendererUrl(): string {
+  if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) return process.env.ELECTRON_RENDERER_URL
+  return pathToFileURL(join(__dirname, '../renderer/index.html')).href
+}
+
+function assertTrustedSender(event: IpcMainInvokeEvent, window: BrowserWindow | null): void {
+  if (!window || event.sender !== window.webContents || event.senderFrame !== event.sender.mainFrame) {
+    throw new Error('Refusing IPC from an untrusted renderer')
+  }
+
+  const expected = new URL(rendererUrl())
+  const actual = new URL(event.senderFrame.url)
+  expected.hash = ''
+  actual.hash = ''
+  const samePage = app.isPackaged
+    ? actual.href === expected.href
+    : actual.origin === expected.origin
+  if (!samePage) throw new Error('Refusing IPC from an untrusted renderer URL')
+}
+
+export function registerIpc(getMainWindow: () => BrowserWindow | null): void {
+  const handle = <Args extends unknown[], Result>(channel: string, handler: IpcHandler<Args, Result>): void => {
+    ipcMain.handle(channel, (event, ...args) => {
+      assertTrustedSender(event, getMainWindow())
+      return handler(event, ...args as Args)
+    })
+  }
+
+  handle('scan', () => {
     const dirty = gitDirtyFiles()
     const files = scanMarkdownFiles().map(file => ({ ...file, gitDirty: dirty.has(file.path) }))
     return { root: docsRoot(), files }
   })
 
-  ipcMain.handle('check-all', async event => {
+  handle('check-all', async event => {
     checkCancelled = false
     const tracked = scanMarkdownFiles().filter(file => file.tracked && !file.ignored).map(file => file.path)
     const results: CheckFile[] = []
@@ -44,65 +74,65 @@ export function registerIpc(): void {
     return results
   })
 
-  ipcMain.handle('check-cancel', () => {
+  handle('check-cancel', () => {
     checkCancelled = true
   })
 
-  ipcMain.handle('check-files', async (_event, paths: string[]) => {
+  handle('check-files', async (_event, paths: string[]) => {
     if (paths.length === 0) return []
     const { files } = await runVdocJson<{ files: CheckFile[] }>(['cf', 'check', ...paths])
     return files
   })
 
-  ipcMain.handle('read-file', (_event, path: string) => readFileSync(join(docsRoot(), path), 'utf8'))
+  handle('read-file', (_event, path: string) => readFileSync(join(docsRoot(), path), 'utf8'))
 
-  ipcMain.handle('backlinks', (_event, path: string) => backlinksTo(path))
+  handle('backlinks', (_event, path: string) => backlinksTo(path))
 
-  ipcMain.handle('search-content', (_event, query: string) => searchContent(query))
+  handle('search-content', (_event, query: string) => searchContent(query))
 
-  ipcMain.handle('open-external', (_event, url: string) => {
+  handle('open-external', (_event, url: string) => {
     if (!/^https?:\/\//i.test(url)) throw new Error(`Refusing to open non-http URL: ${url}`)
     return shell.openExternal(url)
   })
 
-  ipcMain.handle('write-file', (_event, path: string, content: string) => {
+  handle('write-file', (_event, path: string, content: string) => {
     const abs = join(docsRoot(), path)
     if (relative(docsRoot(), abs).startsWith('..')) throw new Error(`Refusing to write outside the docs root: ${path}`)
     writeFileSync(abs, content, 'utf8')
   })
 
-  ipcMain.handle('diff', (_event, path: string) => runVdocJson<DiffResult>(['cf', 'diff', path]))
+  handle('diff', (_event, path: string) => runVdocJson<DiffResult>(['cf', 'diff', path]))
 
-  ipcMain.handle('record-baseline', (_event, path: string) =>
+  handle('record-baseline', (_event, path: string) =>
     runVdocJson<DiffResult>(['cf', 'diff', path, '--record']))
 
-  ipcMain.handle('last-version', async (_event, path: string) => {
+  handle('last-version', async (_event, path: string) => {
     const { versions } = await runVdocJson<{ versions: VersionEntry[] }>(['cf', 'versions', path, '--limit', '1'])
     return versions[0] ?? null
   })
 
-  ipcMain.handle('comments', async (_event, path: string) => {
+  handle('comments', async (_event, path: string) => {
     const { comments } = await runVdocJson<{ comments: CommentEntry[] }>(['cf', 'comments', path])
     return comments
   })
 
-  ipcMain.handle('post-comment', async (_event, path: string, text: string) => {
+  handle('post-comment', async (_event, path: string, text: string) => {
     await runVdocJson(['cf', 'comment', path, text])
   })
 
-  ipcMain.handle('labels', async (_event, path: string) => {
+  handle('labels', async (_event, path: string) => {
     const { labels } = await runVdocJson<{ labels: string[] }>(['cf', 'labels', path])
     return labels
   })
 
-  ipcMain.handle('pull', async (_event, paths: string[], force?: boolean) => {
+  handle('pull', async (_event, paths: string[], force?: boolean) => {
     const args = ['cf', 'pull', ...paths]
     if (force) args.push('--force')
     const { files } = await runVdocJson<{ files: PullFile[] }>(args)
     return files
   })
 
-  ipcMain.handle('push', async (_event, path: string, dryRun: boolean, force?: boolean) => {
+  handle('push', async (_event, path: string, dryRun: boolean, force?: boolean) => {
     const args = ['cf', 'push', path]
     if (dryRun) args.push('--dry-run')
     if (force) args.push('--force')
@@ -110,81 +140,81 @@ export function registerIpc(): void {
     return files
   })
 
-  ipcMain.handle('create', (_event, path: string, space: string, parent?: string) => {
+  handle('create', (_event, path: string, space: string, parent?: string) => {
     const args = ['cf', 'push', path, '--create', '--space', space]
     if (parent) args.push('--parent', parent)
     return runVdocJson<CreateResult>(args)
   })
 
-  ipcMain.handle('md-init', (_event, path: string) =>
+  handle('md-init', (_event, path: string) =>
     runVdocJson<InitResult>(['md', 'init', path]))
 
-  ipcMain.handle('get-page', (_event, input: string, dir: string) => {
+  handle('get-page', (_event, input: string, dir: string) => {
     if (relative(docsRoot(), join(docsRoot(), dir)).startsWith('..')) throw new Error(`Refusing to write outside the docs root: ${dir}`)
     return runVdocJson<GetPageResult>(['cf', 'get', input, '--out', dir])
   })
 
-  ipcMain.handle('file-for-page-id', (_event, pageId: string) => fileForPageId(pageId))
+  handle('file-for-page-id', (_event, pageId: string) => fileForPageId(pageId))
 
-  ipcMain.handle('sync', async (_event, path: string, space?: string) => {
+  handle('sync', async (_event, path: string, space?: string) => {
     const args = ['cf', 'sync', path]
     if (space) args.push('--space', space)
     const { files } = await runVdocJson<{ files: SyncFile[] }>(args)
     return files
   })
 
-  ipcMain.handle('lint', async (_event, path: string) => {
+  handle('lint', async (_event, path: string) => {
     const { files } = await runVdocJson<{ files: LintFile[] }>(['cf', 'lint', path])
     return files
   })
 
-  ipcMain.handle('auth-status', () => authStatus())
+  handle('auth-status', () => authStatus())
 
-  ipcMain.handle('set-token', async (_event, token: string) => {
+  handle('set-token', async (_event, token: string) => {
     await runVdocJson(['config', 'set', 'confluence.sessionToken', '--encrypt', token.trim()])
     return authStatus()
   })
 
-  ipcMain.handle('save-api-key', async (_event, apiToken: string) => {
+  handle('save-api-key', async (_event, apiToken: string) => {
     await runVdocJson(['config', 'set', 'confluence.apiToken', '--encrypt', apiToken.trim()])
     await runVdocJson(['config', 'set', 'confluence.authMethod', 'api-token'])
     return authStatus()
   })
 
-  ipcMain.handle('credential-preview', async (_event, key: CredentialKey) => {
+  handle('credential-preview', async (_event, key: CredentialKey) => {
     assertCredentialKey(key)
     const value = (await confluenceConfig())[key]
     return value ? maskSecret(value) : null
   })
 
-  ipcMain.handle('credential-clear', async (_event, key: CredentialKey) => {
+  handle('credential-clear', async (_event, key: CredentialKey) => {
     assertCredentialKey(key)
     await runVdocJson(['config', 'set', `confluence.${key}`, ''])
     return authStatus()
   })
 
-  ipcMain.handle('set-auth-method', async (_event, method: 'api-token' | 'session-token') => {
+  handle('set-auth-method', async (_event, method: 'api-token' | 'session-token') => {
     await runVdocJson(['config', 'set', 'confluence.authMethod', method])
     return authStatus()
   })
 
-  ipcMain.handle('confluence-url', async (_event, path: string) => {
+  handle('confluence-url', async (_event, path: string) => {
     const { url } = await runVdocJson<{ url: string }>(['cf', 'open', path, '--print'])
     return url
   })
 
-  ipcMain.handle('open-editor', async (_event, path: string) => {
+  handle('open-editor', async (_event, path: string) => {
     const error = await shell.openPath(join(docsRoot(), path))
     if (error) throw new Error(error)
   })
 
-  ipcMain.handle('reveal-finder', (_event, path: string) => {
+  handle('reveal-finder', (_event, path: string) => {
     shell.showItemInFolder(join(docsRoot(), path))
   })
 
-  ipcMain.handle('settings-get', () => settingsInfo())
+  handle('settings-get', () => settingsInfo())
 
-  ipcMain.handle('settings-set', (event, patch: Partial<Settings>) => {
+  handle('settings-set', (event, patch: Partial<Settings>) => {
     const settings = { ...loadSettings(), ...patch }
     saveSettings(settings)
     setVdocBin(settings.vdocBin)
@@ -195,7 +225,7 @@ export function registerIpc(): void {
     return settingsInfo()
   })
 
-  ipcMain.handle('pick-folder', async event => {
+  handle('pick-folder', async event => {
     const window = BrowserWindow.fromWebContents(event.sender)
     if (!window) return null
     const result = await dialog.showOpenDialog(window, {
@@ -212,7 +242,7 @@ export function registerIpc(): void {
     return rel.replaceAll('\\', '/')
   })
 
-  ipcMain.handle('pick-docs-root', async event => {
+  handle('pick-docs-root', async event => {
     const window = BrowserWindow.fromWebContents(event.sender)
     if (!window) return null
     const result = await dialog.showOpenDialog(window, {
@@ -223,49 +253,49 @@ export function registerIpc(): void {
     return result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0]
   })
 
-  ipcMain.handle('open-folder', (_event, path: string) => shell.openPath(join(docsRoot(), path)).then(() => undefined))
+  handle('open-folder', (_event, path: string) => shell.openPath(join(docsRoot(), path)).then(() => undefined))
 
-  ipcMain.handle('set-assets-dir', async (_event, dir: string | null) => {
+  handle('set-assets-dir', async (_event, dir: string | null) => {
     if (dir === null) await runVdocJson(['config', 'set', 'confluence.assetsDir', '--delete'])
     else await runVdocJson(['config', 'set', 'confluence.assetsDir', dir])
     return settingsInfo()
   })
 
-  ipcMain.handle('set-site', async (_event, site: string | null) => {
+  handle('set-site', async (_event, site: string | null) => {
     if (site === null) await runVdocJson(['config', 'set', 'confluence.site', '--delete'])
     else await runVdocJson(['config', 'set', 'confluence.site', site])
     return settingsInfo()
   })
 
-  ipcMain.handle('space-mapping-get', () => spaceMapping())
+  handle('space-mapping-get', () => spaceMapping())
 
-  ipcMain.handle('space-mapping-set', async (_event, dir: string, space: string | null) => {
+  handle('space-mapping-set', async (_event, dir: string, space: string | null) => {
     const key = `confluence.spaceMapping.${dir}`
     if (space === null) await runVdocJson(['config', 'set', key, '--delete'])
     else await runVdocJson(['config', 'set', key, space])
     return spaceMapping()
   })
 
-  ipcMain.handle('reveal-config', async () => {
+  handle('reveal-config', async () => {
     const { path } = await runVdocJson<{ path: string }>(['config', 'path'])
     shell.showItemInFolder(path)
   })
 
-  ipcMain.handle('edit-config', async () => {
+  handle('edit-config', async () => {
     const { path } = await runVdocJson<{ path: string }>(['config', 'path'])
     const error = await shell.openPath(path)
     if (error) throw new Error(error)
   })
 
-  ipcMain.handle('vdoc-logs', () => vdocLogs())
+  handle('vdoc-logs', () => vdocLogs())
 
-  ipcMain.handle('vdoc-version', () => probeVersion())
+  handle('vdoc-version', () => probeVersion())
 
-  ipcMain.handle('check-update', () => checkUpdate())
+  handle('check-update', () => checkUpdate())
 
-  ipcMain.handle('sentry-active', () => sentryActive)
+  handle('sentry-active', () => sentryActive)
 
-  ipcMain.handle('quit', () => app.quit())
+  handle('quit', () => app.quit())
 }
 
 async function settingsInfo(): Promise<SettingsInfo> {

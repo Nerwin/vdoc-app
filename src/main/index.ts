@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { app, BrowserWindow, Menu, nativeTheme } from 'electron'
+import { app, BrowserWindow, Menu, nativeTheme, session } from 'electron'
 
 import type { Settings } from '../shared/types.ts'
 import { importLoginShellEnv, setVdocBin } from './vdoc.ts'
@@ -11,7 +11,7 @@ import { initSentry } from './sentry.ts'
 import { watchDocs } from './watcher.ts'
 
 // Automation hook: VDOC_DEBUG_PORT=9222 npm run dev exposes CDP for driving the app.
-if (process.env.VDOC_DEBUG_PORT) {
+if (!app.isPackaged && process.env.VDOC_DEBUG_PORT) {
   app.commandLine.appendSwitch('remote-debugging-port', process.env.VDOC_DEBUG_PORT)
 }
 
@@ -28,10 +28,20 @@ function createWindow(theme: Settings['theme']): BrowserWindow {
       ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 16, y: 14 } }
       : existsSync(icon) ? { icon } : {}),
     backgroundColor: dark ? '#101113' : '#f2f4f7',
-    webPreferences: { preload: join(__dirname, '../preload/index.js') },
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
   })
 
-  if (process.env.ELECTRON_RENDERER_URL) window.loadURL(process.env.ELECTRON_RENDERER_URL)
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  window.webContents.on('will-navigate', (event, url) => {
+    if (url !== window.webContents.getURL()) event.preventDefault()
+  })
+
+  if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) window.loadURL(process.env.ELECTRON_RENDERER_URL)
   else window.loadFile(join(__dirname, '../renderer/index.html'))
 
   return window
@@ -72,14 +82,17 @@ if (!app.requestSingleInstanceLock()) {
       Menu.setApplicationMenu(null)
     }
 
-    registerIpc()
+    session.defaultSession.setPermissionCheckHandler(() => false)
+    session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false))
+
+    registerIpc(() => mainWindow)
     mainWindow = createWindow(settings.theme)
     watchDocs(mainWindow)
 
     // Automation hook: VDOC_SHOT=/path.png captures the window via the compositor
     // (no macOS screen-recording permission needed) and quits. VDOC_SHOT_DELAY_MS tunes the
     // wait; VDOC_SHOT_JS runs a script in the renderer (e.g. to select a file) 2.5s before capture.
-    if (process.env.VDOC_SHOT) {
+    if (!app.isPackaged && process.env.VDOC_SHOT) {
       const shotPath = process.env.VDOC_SHOT
       const script = process.env.VDOC_SHOT_JS
       setTimeout(() => {
