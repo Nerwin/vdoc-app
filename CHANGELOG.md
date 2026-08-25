@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.14.4](https://github.com/Nerwin/vdoc-app/compare/v1.14.3...v1.14.4) (2026-08-25)
+
+### Bug Fixes
+
+* **ci:** repair bundled dependency lock entries ([75966f4](https://github.com/Nerwin/vdoc-app/commit/75966f428901307a9d3e629387347e0dd108fc73))
+* make CLI operations cancellable ([2aa82e3](https://github.com/Nerwin/vdoc-app/commit/2aa82e370ca67ffbd25e30e05417ca23c876315f))
 ## [1.14.3](https://github.com/Nerwin/vdoc-app/compare/v1.14.2...v1.14.3) (2026-08-25)
 
 ### Bug Fixes
