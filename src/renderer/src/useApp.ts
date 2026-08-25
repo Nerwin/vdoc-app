@@ -556,15 +556,18 @@ export function useApp() {
 
   const pickDocsRoot = useCallback(async () => {
     try {
-      const picked = await api.pickDocsRoot()
-      if (!picked) return
+      const nextSettings = await api.pickDocsRoot()
+      if (!nextSettings) return
       setSelection(null)
-      await applyFolderSettings({ docsRoot: picked })
-      setMessage({ kind: 'info', text: `Docs repository is now ${picked}` })
+      setSettings(nextSettings)
+      const scan = await api.scan()
+      setRoot(scan.root)
+      mergeScan(scan.files)
+      setMessage({ kind: 'info', text: `Docs repository is now ${nextSettings.resolvedRoot}` })
     } catch (error) {
       fail(error)
     }
-  }, [api, applyFolderSettings, fail])
+  }, [api, fail, mergeScan])
 
   const addFolder = useCallback(async () => {
     try {

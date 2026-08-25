@@ -1,11 +1,12 @@
-import { readFileSync, writeFileSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs'
+import { isAbsolute, join, relative } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { app, BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
 
 import type { AuthStatus, CheckFile, CommentEntry, CreateResult, CredentialKey, DiffResult, GetPageResult, InitResult, LintFile, PullFile, PushFile, Settings, SettingsInfo, SyncFile, VersionEntry } from '../shared/types.ts'
 import { parseVdocCliRequirement, type VdocCliRequirement } from '../shared/app-config.ts'
 import { parseConfluenceSpaces } from '../shared/confluence.ts'
+import { relativeAppPath, resolveExistingPathInsideRoot } from '../shared/path-policy.ts'
 import { maskSecret } from '../shared/secret.ts'
 import { backlinksTo, docsRoot, fileForPageId, gitDirtyFiles, resolvedVdocBin, runVdoc, runVdocJson, scanMarkdownFiles, searchContent, setVdocBin, vdocLogs } from './vdoc.ts'
 import { loadSettings, saveSettings } from './settings.ts'
@@ -37,6 +38,61 @@ function assertTrustedSender(event: IpcMainInvokeEvent, window: BrowserWindow | 
     ? actual.href === expected.href
     : actual.origin === expected.origin
   if (!samePage) throw new Error('Refusing IPC from an untrusted renderer URL')
+}
+
+function stringValue(value: unknown, label: string, maxLength: number, allowEmpty = false): string {
+  if (typeof value !== 'string' || value.length > maxLength || (!allowEmpty && value.trim() === '')) {
+    throw new Error(`Invalid ${label}`)
+  }
+  return value
+}
+
+function booleanValue(value: unknown, label: string): boolean {
+  if (typeof value !== 'boolean') throw new Error(`Invalid ${label}`)
+  return value
+}
+
+function docsPath(value: unknown, label = 'path'): string {
+  const path = relativeAppPath(value, label)
+  resolveExistingPathInsideRoot(docsRoot(), path, label)
+  return path
+}
+
+function docsPaths(value: unknown, label = 'paths'): string[] {
+  if (!Array.isArray(value) || value.length > 5000) throw new Error(`Invalid ${label}`)
+  return value.map((path, index) => docsPath(path, `${label}[${index}]`))
+}
+
+function settingsPatch(value: unknown): Partial<Settings> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid settings patch')
+  const patch = value as Record<string, unknown>
+  const allowed = new Set(['theme', 'vdocBin', 'contentDirs', 'pinnedDirs', 'crashReports'])
+  if (Object.keys(patch).some(key => !allowed.has(key))) throw new Error('Invalid settings patch')
+
+  const result: Partial<Settings> = {}
+  if ('theme' in patch) {
+    if (patch.theme !== 'dark' && patch.theme !== 'light' && patch.theme !== 'system') throw new Error('Invalid theme')
+    result.theme = patch.theme
+  }
+  if ('vdocBin' in patch) {
+    if (patch.vdocBin !== null && (typeof patch.vdocBin !== 'string' || patch.vdocBin.length > 4096 || patch.vdocBin.includes('\0'))) {
+      throw new Error('Invalid vdoc binary')
+    }
+    result.vdocBin = patch.vdocBin as string | null
+  }
+  if ('contentDirs' in patch) result.contentDirs = settingPaths(patch.contentDirs, 'content directories')
+  if ('pinnedDirs' in patch) result.pinnedDirs = settingPaths(patch.pinnedDirs, 'pinned directories')
+  if ('crashReports' in patch) result.crashReports = booleanValue(patch.crashReports, 'crash reports setting')
+  return result
+}
+
+function settingPaths(value: unknown, label: string): string[] {
+  if (!Array.isArray(value) || value.length > 100) throw new Error(`Invalid ${label}`)
+  return value.map((path, index) => {
+    const validated = docsPath(path, `${label}[${index}]`)
+    if (!statSync(resolveExistingPathInsideRoot(docsRoot(), validated)).isDirectory()) throw new Error(`Invalid ${label}`)
+    return validated
+  })
 }
 
 export function registerIpc(getMainWindow: () => BrowserWindow | null): void {
@@ -78,61 +134,75 @@ export function registerIpc(getMainWindow: () => BrowserWindow | null): void {
     checkCancelled = true
   })
 
-  handle('check-files', async (_event, paths: string[]) => {
+  handle('check-files', async (_event, input: unknown) => {
+    const paths = docsPaths(input)
     if (paths.length === 0) return []
     const { files } = await runVdocJson<{ files: CheckFile[] }>(['cf', 'check', ...paths])
     return files
   })
 
-  handle('read-file', (_event, path: string) => readFileSync(join(docsRoot(), path), 'utf8'))
+  handle('read-file', (_event, input: unknown) => readFileSync(resolveExistingPathInsideRoot(docsRoot(), input), 'utf8'))
 
-  handle('backlinks', (_event, path: string) => backlinksTo(path))
+  handle('backlinks', (_event, input: unknown) => backlinksTo(docsPath(input)))
 
-  handle('search-content', (_event, query: string) => searchContent(query))
+  handle('search-content', (_event, input: unknown) => searchContent(stringValue(input, 'search query', 500, true)))
 
-  handle('open-external', (_event, url: string) => {
-    if (!/^https?:\/\//i.test(url)) throw new Error(`Refusing to open non-http URL: ${url}`)
-    return shell.openExternal(url)
+  handle('open-external', (_event, input: unknown) => {
+    const url = new URL(stringValue(input, 'external URL', 2048))
+    if ((url.protocol !== 'http:' && url.protocol !== 'https:') || url.username || url.password) {
+      throw new Error('Refusing to open an invalid external URL')
+    }
+    return shell.openExternal(url.href)
   })
 
-  handle('write-file', (_event, path: string, content: string) => {
-    const abs = join(docsRoot(), path)
-    if (relative(docsRoot(), abs).startsWith('..')) throw new Error(`Refusing to write outside the docs root: ${path}`)
-    writeFileSync(abs, content, 'utf8')
+  handle('write-file', (_event, pathInput: unknown, contentInput: unknown) => {
+    const path = resolveExistingPathInsideRoot(docsRoot(), pathInput)
+    const content = stringValue(contentInput, 'file content', 32 * 1024 * 1024, true)
+    writeFileSync(path, content, 'utf8')
   })
 
-  handle('diff', (_event, path: string) => runVdocJson<DiffResult>(['cf', 'diff', path]))
+  handle('diff', (_event, input: unknown) => runVdocJson<DiffResult>(['cf', 'diff', docsPath(input)]))
 
-  handle('record-baseline', (_event, path: string) =>
-    runVdocJson<DiffResult>(['cf', 'diff', path, '--record']))
+  handle('record-baseline', (_event, input: unknown) =>
+    runVdocJson<DiffResult>(['cf', 'diff', docsPath(input), '--record']))
 
-  handle('last-version', async (_event, path: string) => {
+  handle('last-version', async (_event, input: unknown) => {
+    const path = docsPath(input)
     const { versions } = await runVdocJson<{ versions: VersionEntry[] }>(['cf', 'versions', path, '--limit', '1'])
     return versions[0] ?? null
   })
 
-  handle('comments', async (_event, path: string) => {
+  handle('comments', async (_event, input: unknown) => {
+    const path = docsPath(input)
     const { comments } = await runVdocJson<{ comments: CommentEntry[] }>(['cf', 'comments', path])
     return comments
   })
 
-  handle('post-comment', async (_event, path: string, text: string) => {
+  handle('post-comment', async (_event, pathInput: unknown, textInput: unknown) => {
+    const path = docsPath(pathInput)
+    const text = stringValue(textInput, 'comment', 32_000)
     await runVdocJson(['cf', 'comment', path, text])
   })
 
-  handle('labels', async (_event, path: string) => {
+  handle('labels', async (_event, input: unknown) => {
+    const path = docsPath(input)
     const { labels } = await runVdocJson<{ labels: string[] }>(['cf', 'labels', path])
     return labels
   })
 
-  handle('pull', async (_event, paths: string[], force?: boolean) => {
+  handle('pull', async (_event, pathsInput: unknown, forceInput?: unknown) => {
+    const paths = docsPaths(pathsInput)
+    const force = forceInput === undefined ? false : booleanValue(forceInput, 'force flag')
     const args = ['cf', 'pull', ...paths]
     if (force) args.push('--force')
     const { files } = await runVdocJson<{ files: PullFile[] }>(args)
     return files
   })
 
-  handle('push', async (_event, path: string, dryRun: boolean, force?: boolean) => {
+  handle('push', async (_event, pathInput: unknown, dryRunInput: unknown, forceInput?: unknown) => {
+    const path = docsPath(pathInput)
+    const dryRun = booleanValue(dryRunInput, 'dry-run flag')
+    const force = forceInput === undefined ? false : booleanValue(forceInput, 'force flag')
     const args = ['cf', 'push', path]
     if (dryRun) args.push('--dry-run')
     if (force) args.push('--force')
@@ -140,81 +210,99 @@ export function registerIpc(getMainWindow: () => BrowserWindow | null): void {
     return files
   })
 
-  handle('create', (_event, path: string, space: string, parent?: string) => {
+  handle('create', (_event, pathInput: unknown, spaceInput: unknown, parentInput?: unknown) => {
+    const path = docsPath(pathInput)
+    const space = stringValue(spaceInput, 'space key', 255)
+    if (!/^[A-Za-z0-9_-]+$/.test(space)) throw new Error('Invalid space key')
+    const parent = parentInput === undefined ? undefined : stringValue(parentInput, 'parent page', 2048)
     const args = ['cf', 'push', path, '--create', '--space', space]
     if (parent) args.push('--parent', parent)
     return runVdocJson<CreateResult>(args)
   })
 
-  handle('md-init', (_event, path: string) =>
-    runVdocJson<InitResult>(['md', 'init', path]))
+  handle('md-init', (_event, input: unknown) =>
+    runVdocJson<InitResult>(['md', 'init', docsPath(input)]))
 
-  handle('get-page', (_event, input: string, dir: string) => {
-    if (relative(docsRoot(), join(docsRoot(), dir)).startsWith('..')) throw new Error(`Refusing to write outside the docs root: ${dir}`)
+  handle('get-page', (_event, pageInput: unknown, dirInput: unknown) => {
+    const input = stringValue(pageInput, 'page URL or id', 2048)
+    const dir = docsPath(dirInput, 'output directory')
+    if (!statSync(resolveExistingPathInsideRoot(docsRoot(), dir)).isDirectory()) throw new Error('Invalid output directory')
     return runVdocJson<GetPageResult>(['cf', 'get', input, '--out', dir])
   })
 
-  handle('file-for-page-id', (_event, pageId: string) => fileForPageId(pageId))
+  handle('file-for-page-id', (_event, input: unknown) => fileForPageId(stringValue(input, 'page id', 32)))
 
-  handle('sync', async (_event, path: string, space?: string) => {
+  handle('sync', async (_event, pathInput: unknown, spaceInput?: unknown) => {
+    const path = docsPath(pathInput)
+    const space = spaceInput === undefined ? undefined : stringValue(spaceInput, 'space key', 255)
+    if (space && !/^[A-Za-z0-9_-]+$/.test(space)) throw new Error('Invalid space key')
     const args = ['cf', 'sync', path]
     if (space) args.push('--space', space)
     const { files } = await runVdocJson<{ files: SyncFile[] }>(args)
     return files
   })
 
-  handle('lint', async (_event, path: string) => {
+  handle('lint', async (_event, input: unknown) => {
+    const path = docsPath(input)
     const { files } = await runVdocJson<{ files: LintFile[] }>(['cf', 'lint', path])
     return files
   })
 
   handle('auth-status', () => authStatus())
 
-  handle('set-token', async (_event, token: string) => {
+  handle('set-token', async (_event, input: unknown) => {
+    const token = stringValue(input, 'session token', 64 * 1024)
     await runVdocJson(['config', 'set', 'confluence.sessionToken', '--encrypt', token.trim()])
     return authStatus()
   })
 
-  handle('save-api-key', async (_event, apiToken: string) => {
+  handle('save-api-key', async (_event, input: unknown) => {
+    const apiToken = stringValue(input, 'API token', 64 * 1024)
     await runVdocJson(['config', 'set', 'confluence.apiToken', '--encrypt', apiToken.trim()])
     await runVdocJson(['config', 'set', 'confluence.authMethod', 'api-token'])
     return authStatus()
   })
 
-  handle('credential-preview', async (_event, key: CredentialKey) => {
+  handle('credential-preview', async (_event, input: unknown) => {
+    const key = stringValue(input, 'credential key', 32) as CredentialKey
     assertCredentialKey(key)
     const value = (await confluenceConfig())[key]
     return value ? maskSecret(value) : null
   })
 
-  handle('credential-clear', async (_event, key: CredentialKey) => {
+  handle('credential-clear', async (_event, input: unknown) => {
+    const key = stringValue(input, 'credential key', 32) as CredentialKey
     assertCredentialKey(key)
     await runVdocJson(['config', 'set', `confluence.${key}`, ''])
     return authStatus()
   })
 
-  handle('set-auth-method', async (_event, method: 'api-token' | 'session-token') => {
+  handle('set-auth-method', async (_event, input: unknown) => {
+    if (input !== 'api-token' && input !== 'session-token') throw new Error('Invalid authentication method')
+    const method = input
     await runVdocJson(['config', 'set', 'confluence.authMethod', method])
     return authStatus()
   })
 
-  handle('confluence-url', async (_event, path: string) => {
+  handle('confluence-url', async (_event, input: unknown) => {
+    const path = docsPath(input)
     const { url } = await runVdocJson<{ url: string }>(['cf', 'open', path, '--print'])
     return url
   })
 
-  handle('open-editor', async (_event, path: string) => {
-    const error = await shell.openPath(join(docsRoot(), path))
+  handle('open-editor', async (_event, input: unknown) => {
+    const error = await shell.openPath(resolveExistingPathInsideRoot(docsRoot(), input))
     if (error) throw new Error(error)
   })
 
-  handle('reveal-finder', (_event, path: string) => {
-    shell.showItemInFolder(join(docsRoot(), path))
+  handle('reveal-finder', (_event, input: unknown) => {
+    shell.showItemInFolder(resolveExistingPathInsideRoot(docsRoot(), input))
   })
 
   handle('settings-get', () => settingsInfo())
 
-  handle('settings-set', (event, patch: Partial<Settings>) => {
+  handle('settings-set', (event, input: unknown) => {
+    const patch = settingsPatch(input)
     const settings = { ...loadSettings(), ...patch }
     saveSettings(settings)
     setVdocBin(settings.vdocBin)
@@ -234,12 +322,14 @@ export function registerIpc(getMainWindow: () => BrowserWindow | null): void {
       message: 'Pick a folder inside the docs repository',
     })
     if (result.canceled || result.filePaths.length === 0) return null
-    const rel = relative(docsRoot(), result.filePaths[0])
-    if (rel === '' || rel.startsWith('..')) {
+    const root = realpathSync(docsRoot())
+    const selected = realpathSync(result.filePaths[0])
+    const rel = relative(root, selected)
+    if (rel === '' || rel === '..' || rel.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`) || isAbsolute(rel)) {
       throw new Error('The folder must be inside the docs repository')
     }
     // App-internal paths always use forward slashes, whatever the OS.
-    return rel.replaceAll('\\', '/')
+    return relativeAppPath(rel.replaceAll('\\', '/'), 'content directory')
   })
 
   handle('pick-docs-root', async event => {
@@ -250,18 +340,31 @@ export function registerIpc(getMainWindow: () => BrowserWindow | null): void {
       properties: ['openDirectory'],
       message: 'Pick the docs repository root',
     })
-    return result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0]
+    if (result.canceled || result.filePaths.length === 0) return null
+    const root = realpathSync(result.filePaths[0])
+    if (!statSync(root).isDirectory() || !isAbsolute(root)) throw new Error('Invalid docs repository root')
+    saveSettings({ ...loadSettings(), docsRoot: root })
+    watchDocs(window)
+    return settingsInfo()
   })
 
-  handle('open-folder', (_event, path: string) => shell.openPath(join(docsRoot(), path)).then(() => undefined))
+  handle('open-folder', async (_event, input: unknown) => {
+    const error = await shell.openPath(resolveExistingPathInsideRoot(docsRoot(), input))
+    if (error) throw new Error(error)
+  })
 
-  handle('set-assets-dir', async (_event, dir: string | null) => {
+  handle('set-assets-dir', async (_event, input: unknown) => {
+    const dir = input === null ? null : relativeAppPath(input, 'assets directory')
     if (dir === null) await runVdocJson(['config', 'set', 'confluence.assetsDir', '--delete'])
     else await runVdocJson(['config', 'set', 'confluence.assetsDir', dir])
     return settingsInfo()
   })
 
-  handle('set-site', async (_event, site: string | null) => {
+  handle('set-site', async (_event, input: unknown) => {
+    const site = input === null ? null : stringValue(input, 'Confluence site', 253)
+    if (site && !/^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$/.test(site)) {
+      throw new Error('Invalid Confluence site')
+    }
     if (site === null) await runVdocJson(['config', 'set', 'confluence.site', '--delete'])
     else await runVdocJson(['config', 'set', 'confluence.site', site])
     return settingsInfo()
@@ -269,7 +372,11 @@ export function registerIpc(getMainWindow: () => BrowserWindow | null): void {
 
   handle('space-mapping-get', () => spaceMapping())
 
-  handle('space-mapping-set', async (_event, dir: string, space: string | null) => {
+  handle('space-mapping-set', async (_event, dirInput: unknown, spaceInput: unknown) => {
+    const dir = docsPath(dirInput, 'mapping directory')
+    if (!statSync(resolveExistingPathInsideRoot(docsRoot(), dir)).isDirectory()) throw new Error('Invalid mapping directory')
+    const space = spaceInput === null ? null : stringValue(spaceInput, 'space key', 255)
+    if (space && !/^[A-Za-z0-9_-]+$/.test(space)) throw new Error('Invalid space key')
     const key = `confluence.spaceMapping.${dir}`
     if (space === null) await runVdocJson(['config', 'set', key, '--delete'])
     else await runVdocJson(['config', 'set', key, space])

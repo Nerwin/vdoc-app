@@ -298,8 +298,8 @@ export interface VdocApi {
   sentryActive(): Promise<boolean>
   /** Native folder picker rooted at the docs repo; returns a relative path or null. */
   pickFolder(): Promise<string | null>
-  /** Native folder picker for the docs repository itself; returns an absolute path or null. */
-  pickDocsRoot(): Promise<string | null>
+  /** Pick and apply the docs repository root; returns fresh settings or null when cancelled. */
+  pickDocsRoot(): Promise<SettingsInfo | null>
   openFolder(path: string): Promise<void>
   /** Folder → Confluence space mapping, stored in the shared config file. */
   spaceMappingGet(): Promise<Record<string, string>>
