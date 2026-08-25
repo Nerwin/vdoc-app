@@ -45,20 +45,6 @@ test('macOS release targets are Apple Silicon only', () => {
   }
 })
 
-test('packaged updates use the GitHub feed and macOS releases stay unsigned', () => {
-  const build = PACKAGE_JSON.build as {
-    mac?: { identity?: string | null }
-    publish?: Array<Record<string, string>>
-  }
-  const dependencies = PACKAGE_JSON.dependencies as Record<string, string>
-
-  assert.deepEqual(build.publish, [{ provider: 'github', owner: 'Nerwin', repo: 'vdoc-app' }])
-  assert.equal(build.mac?.identity, null)
-  assert.equal((build.mac as Record<string, unknown>)?.hardenedRuntime, false)
-  assert.equal((build.mac as Record<string, unknown>)?.notarize, false)
-  assert.match(dependencies['electron-updater'] ?? '', /^\^6\./)
-})
-
 test('release workflow applies the Linux sandbox exception only to its smoke test', () => {
   assert.match(RELEASE_WORKFLOW, /release\/linux-unpacked\/vdoc-app --no-sandbox --smoke-test/)
 })

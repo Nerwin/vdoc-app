@@ -51,8 +51,8 @@ operation spawns `vdoc … --json`, so the CLI and the app can never disagree.
   cookie, switch methods in Settings, and renew expiring session credentials in-app.
 - **Encrypted credentials** - tokens are stored through `vdoc config set --encrypt`; the app
   redacts credentials, decrypted config output, and comment bodies from its command history.
-- **Opt-in Sentry diagnostics** - privacy-filtered errors, crashes, and action timings are
-  disabled by default and can be enabled in Settings for packaged builds.
+- **Opt-in Sentry diagnostics** - privacy-filtered errors, crashes, lifecycle and updater logs,
+  and action timings are disabled by default and can be enabled in Settings for packaged builds.
 - **Built-in CLI logs** - inspect the last 200 commands and their output, with sensitive values
   hidden, then copy a safely shell-quoted command for terminal reproduction.
 - **Guarded Electron surface** - context isolation, a narrow typed preload API, sender and path
@@ -68,8 +68,8 @@ operation spawns `vdoc … --json`, so the CLI and the app can never disagree.
   appearance, including automatic OS theme changes.
 - **Command palette** - every action is discoverable from one keyboard-first command bar, with
   platform-correct shortcuts and inline reasons when an action is unavailable.
-- **Automatic updates** - packaged builds check GitHub after startup and daily, download in the
-  background through `electron-updater`, and install on exit or on request.
+- **Automatic updates** - packaged builds check GitHub after startup and daily. Signed macOS,
+  Windows, and Linux builds download through `electron-updater` and install on exit or on request.
 - **Automated releases** - conventional commits drive the semantic version bump, changelog,
   release commit, and tag; GitHub Actions then tests, builds, smoke-tests, and publishes all
   supported platform artifacts and updater metadata.
@@ -123,9 +123,8 @@ Confluence-related is written through `vdoc config set`, so CLI and app always a
 
 Grab the artifact for your OS from the latest GitHub release:
 
-- **macOS** - `V-DOC-x.y.z-mac-arm64.dmg` (Apple Silicon). Release builds are unsigned and
-  not notarized. On first launch, macOS may require approval in System Settings under
-  Privacy & Security.
+- **macOS** - `V-DOC-x.y.z-mac-arm64.dmg` (Apple Silicon). Release builds are signed and
+  notarized for Gatekeeper and secure automatic updates.
 - **Windows** - `V-DOC-x.y.z-win-x64.exe` (installer, per-user, no admin needed) or the
   `…-portable-x64.exe`. SmartScreen will warn about an unsigned app - More info → Run anyway.
 - **Linux** - `V-DOC-x.y.z-linux-x64.AppImage` (`chmod +x`, run) or the `.deb`.
@@ -321,18 +320,27 @@ The Windows arch is pinned to x64 in `package.json` (`build.win.target`): withou
 electron-builder defaults to the build host's arch, and an arm64 installer built on Apple
 Silicon silently installs an app that can't run on a normal x64 Windows machine. Windows and
 local development artifacts are unsigned. Version comes from `package.json` and stamps the bundle,
-the artifacts' names, and the status bar. The app icon lives in `build/icon.png` (1024×1024 -
-electron-builder converts it per platform).
+the artifacts' names, and the status bar. `build/icon.svg` is the explicit package icon for every
+platform; `build/icon.png` is also bundled for the running window and dock.
 
-All release artifacts are unsigned. The macOS build explicitly skips certificate lookup,
-hardened runtime, and notarization, so internal releases do not require Apple signing
-credentials. macOS Gatekeeper and Windows SmartScreen may require manual approval when the app
-is installed.
+macOS releases use hardened runtime, Developer ID signing, and notarization. The release repository
+must define `MAC_CSC_LINK`, `MAC_CSC_KEY_PASSWORD`, `APPLE_ID`,
+`APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID` as GitHub Actions secrets. The workflow fails
+before packaging if any credential is missing, then verifies the bundle signature and icon before
+publishing it. Windows and local development artifacts remain unsigned, so Windows SmartScreen may
+require manual approval.
 
 Packaged builds use `electron-updater`. They check GitHub after startup and daily, download an
 available update in the background, verify its release metadata, and install it on exit or when
 the status bar's restart action is selected. The release workflow uploads the generated
-`latest*.yml` and blockmap files with every installer.
+`latest*.yml` and blockmap files with every installer. An unsigned macOS build cannot apply a secure
+automatic update; it shows a manual download action instead. Users of 1.16.0 need one final manual
+replacement with the first signed release, after which automatic updates can work normally.
+
+When diagnostics are enabled and the app is restarted, Sentry receives a scrubbed
+`app.lifecycle.started` log, updater lifecycle logs, `app.update.check` traces, and `app.action.*`
+traces. Updater exceptions are captured without their message, local paths, request data, or
+breadcrumbs.
 
 Vite bundles the renderer and application code into `out/`. Main-process runtime dependencies,
 including Sentry and the updater, are packaged from `node_modules`. See [CLAUDE.md](./CLAUDE.md)

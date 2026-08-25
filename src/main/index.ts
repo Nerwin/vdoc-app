@@ -42,6 +42,12 @@ let mainWindow: BrowserWindow | null = null
 const closeGuard = new CloseGuardState()
 let closeResponseTimer: NodeJS.Timeout | undefined
 
+function applicationIconPath(): string {
+  return app.isPackaged
+    ? join(process.resourcesPath, 'icon.png')
+    : join(__dirname, '../../build/icon.png')
+}
+
 async function finishClose(saved: boolean): Promise<void> {
   const completion = closeGuard.completeSave(saved)
   if (completion === 'ignore') return
@@ -81,7 +87,7 @@ function guardWindowClose(window: BrowserWindow): void {
 
 function createWindow(theme: Settings['theme']): BrowserWindow {
   const dark = theme === 'system' ? nativeTheme.shouldUseDarkColors : theme === 'dark'
-  const icon = join(__dirname, '../../build/icon.png')
+  const icon = applicationIconPath()
   const window = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -153,8 +159,7 @@ if (!app.requestSingleInstanceLock()) {
     const settings = loadSettings()
     setVdocBin(settings.vdocBin)
 
-    // Dev only - the packaged bundle carries its own icon from build/icon.png.
-    const icon = join(__dirname, '../../build/icon.png')
+    const icon = applicationIconPath()
     if (app.dock && existsSync(icon)) app.dock.setIcon(icon)
 
     // macOS: only OS roles - the default View menu would swallow ⌘R / ⌘⇧R / ⌥⌘I before

@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { hidesVdocOutput, redactVdocArgs, scrubSentryEvent, scrubSentryTransaction, sentryActionName, vdocCommandId } from '../privacy.ts'
+import { hidesVdocOutput, redactVdocArgs, scrubSentryEvent, scrubSentryLog, scrubSentryTransaction, sentryActionName, vdocCommandId } from '../privacy.ts'
 
 test('redactVdocArgs hides credentials and comment bodies', () => {
   assert.deepEqual(
@@ -74,4 +74,26 @@ test('scrubSentryTransaction removes action span metadata', () => {
   assert.match(serialized, /app\.action\.push-commit/)
   assert.match(serialized, /span-id/)
   assert.doesNotMatch(serialized, /secret|private|person|123456/)
+})
+
+test('scrubSentryLog allows only stable app events and safe attributes', () => {
+  const scrubbed = scrubSentryLog({
+    level: 'info',
+    message: 'app.update.downloaded',
+    attributes: {
+      'app.version': '1.16.0',
+      'update.latest': '1.17.0',
+      'file.path': '/Users/person/docs/private.md',
+    },
+  })
+
+  assert.deepEqual(scrubbed, {
+    level: 'info',
+    message: 'app.update.downloaded',
+    attributes: {
+      'app.version': '1.16.0',
+      'update.latest': '1.17.0',
+    },
+  })
+  assert.equal(scrubSentryLog({ level: 'info', message: 'private document', attributes: {} }), null)
 })

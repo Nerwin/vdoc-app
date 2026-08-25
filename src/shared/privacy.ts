@@ -1,5 +1,14 @@
 const HIDDEN = '•••'
 export const SENTRY_ACTION_PREFIX = 'app.action.'
+export const SENTRY_UPDATE_PREFIX = 'app.update.'
+
+const SAFE_LOG_ATTRIBUTE_KEYS = new Set([
+  'app.version',
+  'os.name',
+  'update.current',
+  'update.latest',
+  'update.phase',
+])
 
 export function redactVdocArgs(args: string[]): string[] {
   const commentBody = args[0] === 'cf' && args[1] === 'comment' ? 3 : -1
@@ -53,6 +62,12 @@ interface SentrySpanLike {
 interface SentryTransactionLike extends SentryEventLike {
   transaction?: unknown
   spans?: SentrySpanLike[]
+}
+
+interface SentryLogLike {
+  message?: unknown
+  attributes?: Record<string, unknown>
+  [key: string]: unknown
 }
 
 function safeErrorType(type: unknown): string {
@@ -118,4 +133,20 @@ export function scrubSentryTransaction<Event>(event: Event): Event {
       tags: undefined,
     })),
   } as Event
+}
+
+export function scrubSentryLog<Log>(log: Log): Log | null {
+  const source = log as SentryLogLike
+  if (typeof source.message !== 'string' || !/^app\.(?:lifecycle|update)\.[a-z][a-z0-9-]{0,63}$/.test(source.message)) {
+    return null
+  }
+
+  const attributes = Object.fromEntries(
+    Object.entries(source.attributes ?? {})
+      .filter(([key, value]) => SAFE_LOG_ATTRIBUTE_KEYS.has(key)
+        && (typeof value === 'number' || typeof value === 'boolean'
+          || (typeof value === 'string' && /^[A-Za-z0-9._-]{1,64}$/.test(value)))),
+  )
+
+  return { ...source, attributes } as Log
 }

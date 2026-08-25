@@ -79,6 +79,12 @@
       "output": "release",
       "buildResources": "build"
     },
+    "extraResources": [
+      {
+        "from": "build/icon.png",
+        "to": "icon.png"
+      }
+    ],
     "files": [
       "out/**"
     ],
@@ -93,7 +99,7 @@
       }
     ],
     "mac": {
-      "identity": null,
+      "icon": "build/icon.svg",
       "target": [
         {
           "target": "dmg",
@@ -116,6 +122,7 @@
       "title": "${productName} ${version}"
     },
     "win": {
+      "icon": "build/icon.svg",
       "target": [
         {
           "target": "nsis",
@@ -132,6 +139,7 @@
       ]
     },
     "linux": {
+      "icon": "build/icon.svg",
       "target": [
         "AppImage",
         "deb"

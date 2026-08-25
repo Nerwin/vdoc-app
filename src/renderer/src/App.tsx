@@ -321,6 +321,7 @@ export function App() {
         onCancelCheck={app.cancelCheck}
         onCheckUpdate={app.checkUpdateNow}
         onInstallUpdate={() => void app.installUpdate()}
+        onDownloadUpdate={app.downloadUpdate}
       />
 
       {app.message && <Toast message={app.message} onDismiss={app.dismissMessage} />}
