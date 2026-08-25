@@ -5,9 +5,12 @@ import { createRoot } from 'react-dom/client'
 import './styles.css'
 import './highlight.css'
 import { App } from './App.tsx'
+import { scrubSentryEvent } from '../../shared/privacy.ts'
 
 // Main owns the DSN and the settings toggle; the renderer only mirrors its state.
-void window.vdoc?.sentryActive().then(active => active && sentryInit()).catch(() => undefined)
+void window.vdoc?.sentryActive()
+  .then(active => active && sentryInit({ beforeSend: event => scrubSentryEvent(event) }))
+  .catch(() => undefined)
 
 /** Last-resort net: a render crash shows the error instead of unmounting to a black window. */
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {

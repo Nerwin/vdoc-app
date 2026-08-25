@@ -18,7 +18,7 @@ const DEFAULTS: Settings = {
   docsRoot: null,
   contentDirs: [],
   pinnedDirs: [],
-  crashReports: true,
+  crashReports: false,
 }
 
 const settingsFile = (): string => join(app.getPath('userData'), 'settings.json')

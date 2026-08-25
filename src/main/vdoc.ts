@@ -8,6 +8,7 @@ import { LOG_MAX, type VdocLogEntry } from '../shared/types.ts'
 import { mdLinkTargets, resolveRelative } from '../shared/links.ts'
 import { parseFrontmatter } from '../shared/frontmatter.ts'
 import { firstMatch, type SearchHit } from '../shared/search.ts'
+import { hidesVdocOutput, redactVdocArgs, vdocCommandId } from '../shared/privacy.ts'
 import { DEFAULT_DOCS_ROOT, EXCLUDED_DIRS, loadSettings } from './settings.ts'
 
 /** The docs repository root: Settings → $VDOC_APP_ROOT → home directory. */
@@ -76,16 +77,17 @@ export function vdocLogs(): VdocLogEntry[] {
   return logEntries
 }
 
-/** Credential values never reach the renderer: token args and decrypted config output are hidden. */
+/** Sensitive values never reach the renderer's command log. */
 function recordRun(args: string[], run: VdocRun, startedAt: number): void {
+  const hideOutput = hidesVdocOutput(args)
   const entry: VdocLogEntry = {
     id: ++logId,
     at: startedAt,
-    args: args.map((arg, index) => (args[index - 1] === '--encrypt' ? '•••' : arg)),
+    args: redactVdocArgs(args),
     exitCode: run.exitCode,
     durationMs: Date.now() - startedAt,
-    stdout: args.includes('--decrypt') ? '(hidden - output contains credentials)' : run.stdout.slice(0, OUTPUT_CLIP),
-    stderr: run.stderr.slice(-OUTPUT_CLIP),
+    stdout: hideOutput ? '(hidden - output may contain sensitive data)' : run.stdout.slice(0, OUTPUT_CLIP),
+    stderr: hideOutput ? '(hidden - output may contain sensitive data)' : run.stderr.slice(-OUTPUT_CLIP),
   }
   logEntries.push(entry)
   if (logEntries.length > LOG_MAX) logEntries.shift()
@@ -147,20 +149,22 @@ export async function runVdocJson<T>(args: string[]): Promise<T> {
   // oclif --json failures print {"error": {"name", "message", "code"}} with a non-zero exit.
   if (exitCode !== 0 && parsed && typeof parsed === 'object' && 'error' in parsed) {
     const { message } = (parsed as { error: { message?: unknown } }).error ?? {}
-    throw new Error(typeof message === 'string' ? message : vdocFailureMessage(args, stderr, stdout))
+    throw new Error(!hidesVdocOutput(args) && typeof message === 'string' ? message : vdocFailureMessage(args, stderr, stdout))
   }
 
   // oclif error JSON always carries a stack; data payloads never do.
   if (parsed && typeof parsed === 'object' && 'stack' in parsed && 'message' in parsed) {
-    throw new Error(String((parsed as { message: unknown }).message))
+    throw new Error(hidesVdocOutput(args) ? vdocFailureMessage(args, stderr, stdout) : String((parsed as { message: unknown }).message))
   }
 
   return parsed as T
 }
 
 function vdocFailureMessage(args: string[], stderr: string, stdout: string): string {
+  const command = vdocCommandId(args)
+  if (hidesVdocOutput(args)) return `vdoc ${command} failed; details hidden`
   const detail = (stderr || stdout).trim().split('\n').slice(-4).join('\n')
-  return `vdoc ${args.join(' ')} failed${detail ? `:\n${detail}` : ''}`
+  return `vdoc ${command} failed${detail ? `:\n${detail}` : ''}`
 }
 
 /** Relative paths of files with uncommitted git changes under the content dirs. */

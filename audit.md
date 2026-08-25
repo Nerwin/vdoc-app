@@ -129,7 +129,7 @@ Recommendation:
 
 References: [Electron security checklist](https://www.electronjs.org/docs/latest/tutorial/security#checklist-security-recommendations), [context isolation](https://www.electronjs.org/docs/latest/tutorial/context-isolation), [Chromium sandbox](https://www.electronjs.org/docs/latest/tutorial/sandbox).
 
-### A-04: Errors can send credentials and private documentation metadata to Sentry
+### A-04: Errors can send credentials and private documentation metadata to Sentry [Fixed]
 
 Severity: High
 

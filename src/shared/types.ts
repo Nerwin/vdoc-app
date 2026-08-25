@@ -223,7 +223,7 @@ export interface Settings {
   contentDirs: string[]
   /** Folder paths pinned to the top of their parent's listing. */
   pinnedDirs: string[]
-  /** Send anonymous error/crash reports to Sentry. Change takes effect on restart. */
+  /** Send privacy-filtered error/crash reports to Sentry. Change takes effect on restart. */
   crashReports: boolean
 }
 

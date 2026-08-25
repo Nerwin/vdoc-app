@@ -1,6 +1,7 @@
 import { init } from '@sentry/electron/main'
 import { app } from 'electron'
 
+import { scrubSentryEvent } from '../shared/privacy.ts'
 import { loadSettings } from './settings.ts'
 
 /**  Empty = crash reporting disabled. */
@@ -12,5 +13,5 @@ export let sentryActive = false
 /** Call after app.setName - loadSettings caches the userData path on first call. */
 export function initSentry(): void {
   sentryActive = Boolean(SENTRY_DSN) && app.isPackaged && loadSettings().crashReports
-  if (sentryActive) init({ dsn: SENTRY_DSN })
+  if (sentryActive) init({ dsn: SENTRY_DSN, beforeSend: event => scrubSentryEvent(event) })
 }
