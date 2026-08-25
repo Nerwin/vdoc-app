@@ -2,6 +2,16 @@ node_modules/
 out/
 dist/
 *.log
+.env
+.env.*
+!.env.example
+*.secrets.env
+*.pem
+*.p12
+*.pfx
+id_rsa
+id_rsa.*
+credentials.json
 .DS_Store
 release/
 tsconfig.node.tsbuildinfo

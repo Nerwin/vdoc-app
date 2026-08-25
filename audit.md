@@ -410,7 +410,7 @@ Resolution:
 - Windows commands use PowerShell single-quote escaping.
 - Copied and displayed commands share the same tested formatter after argument redaction.
 
-### A-14: Secret-like files are not covered by `.gitignore`
+### A-14: Secret-like files are not covered by `.gitignore` [Fixed]
 
 Severity: Low
 
@@ -426,6 +426,11 @@ A local credential file can be staged accidentally because the repository has no
 Recommendation:
 
 Add the repository's agreed secret patterns to `.gitignore` and optionally add a secret scanner to CI. Do not treat the Sentry DSN as a private credential; it is a client-side project identifier, but event payloads still require A-04's privacy controls.
+
+Resolution:
+
+- Environment files, secret environment variants, private keys, signing certificates, and common credentials files are ignored.
+- `.env.example` remains available for a non-secret configuration template.
 
 ## Validation performed
 
