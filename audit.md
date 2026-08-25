@@ -243,7 +243,7 @@ Resolution:
 - Existing regression tests cover preview escaping, path containment, guarded writes, redaction, and destructive-operation tickets.
 - Every native release runner launches its unpacked application and verifies preload plus trusted IPC before publishing.
 
-### A-08: Bundled DOMPurify has known security advisories
+### A-08: Bundled DOMPurify has known security advisories [Fixed]
 
 Severity: Medium
 
@@ -261,6 +261,11 @@ Recommendation:
 - Do not apply npm's suggested forced downgrade to Monaco 0.53.0 without compatibility and security review.
 
 Advisories: [GHSA-55q2-fjhq-7xh7](https://github.com/advisories/GHSA-55q2-fjhq-7xh7), [GHSA-cmwh-pvxp-8882](https://github.com/advisories/GHSA-cmwh-pvxp-8882), [GHSA-c2j3-45gr-mqc4](https://github.com/advisories/GHSA-c2j3-45gr-mqc4), [GHSA-vxr8-fq34-vvx9](https://github.com/advisories/GHSA-vxr8-fq34-vvx9).
+
+Resolution:
+
+- npm overrides the transitive DOMPurify copy to 3.4.13, above every affected range reported by the audit.
+- The full dependency audit runs clean after lockfile regeneration.
 
 ### A-09: Intel macOS artifacts are documented but not built
 

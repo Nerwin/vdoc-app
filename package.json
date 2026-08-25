@@ -19,6 +19,9 @@
     "updateCommand": "bun install -g @vosker/vdoc@latest",
     "downloadUrl": "https://bitbucket.org/spypoint/vdoc/downloads/"
   },
+  "overrides": {
+    "dompurify": "3.4.13"
+  },
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
