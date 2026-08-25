@@ -57,7 +57,7 @@ Recommendation:
 
 References: [Electron autoUpdater](https://www.electronjs.org/docs/latest/api/auto-updater), [Electron code signing](https://www.electronjs.org/docs/latest/tutorial/code-signing), [electron-builder auto update](https://www.electron.build/docs/features/auto-update/).
 
-### A-02: Frontmatter status values can inject executable HTML into the preview
+### A-02: Frontmatter status values can inject executable HTML into the preview [Fixed]
 
 Severity: High
 

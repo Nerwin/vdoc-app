@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Marked } from 'marked'
 
-import { parseFrontmatter } from '../../../shared/frontmatter.ts'
+import { escapeHtml, previewMetaLine } from '../../../shared/preview-html.ts'
 
 /** Fence language → Monaco language id, for the common shorthands. */
 const LANG_ALIASES: Record<string, string> = {
@@ -33,29 +33,7 @@ const marked = new Marked({
   },
 })
 
-function escapeHtml(text: string): string {
-  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-}
-
 const stripFrontmatter = (content: string): string => content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '')
-
-const formatDate = (iso: string): string => {
-  const date = new Date(iso)
-  return Number.isNaN(date.getTime())
-    ? iso
-    : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-/** The frontmatter rendered as a quiet meta line, injected right under the doc's H1. */
-function metaLine(content: string): string {
-  const fm = parseFrontmatter(content)
-  const parts: string[] = []
-  if (fm.status) parts.push(`<span class="doc-meta-status" data-status="${escapeHtml(fm.status)}">${escapeHtml(fm.status)}</span>`)
-  if (fm.updated) parts.push(`<span>updated ${escapeHtml(formatDate(fm.updated))}</span>`)
-  if (fm.tags?.length) parts.push(`<span>${fm.tags.map(escapeHtml).join(' · ')}</span>`)
-  if (parts.length === 0) return ''
-  return `<div class="doc-meta">${parts.join('<span class="doc-meta-sep">·</span>')}</div>`
-}
 
 interface TocItem {
   id: string
@@ -97,7 +75,7 @@ export function PreviewView({ content, theme, findSeq, onOpenLink }: Props) {
     onOpenLink?.(href)
   }, [onOpenLink])
 
-  const meta = useMemo(() => metaLine(content), [content])
+  const meta = useMemo(() => previewMetaLine(content), [content])
 
   // React 19 re-applies dangerouslySetInnerHTML whenever this element re-renders,
   // rebuilding every node under it - which wipes the heading ids and collapses the
