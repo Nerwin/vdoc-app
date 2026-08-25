@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 
-import type { AuthStatus, CheckFile, CommentEntry, CreateResult, CredentialKey, DiffResult, GetPageResult, LintFile, PullFile, PushFile, Settings, SettingsInfo, SyncFile, VersionEntry } from '../shared/types.ts'
+import type { AuthStatus, CheckFile, CommentEntry, CreateResult, CredentialKey, DiffResult, GetPageResult, InitResult, LintFile, PullFile, PushFile, Settings, SettingsInfo, SyncFile, VersionEntry } from '../shared/types.ts'
 import { maskSecret } from '../shared/secret.ts'
 import { backlinksTo, docsRoot, fileForPageId, gitDirtyFiles, resolvedVdocBin, runVdoc, runVdocJson, scanMarkdownFiles, searchContent, setVdocBin, vdocLogs } from './vdoc.ts'
 import { loadSettings, saveSettings } from './settings.ts'
@@ -113,6 +113,9 @@ export function registerIpc(): void {
     if (parent) args.push('--parent', parent)
     return runVdocJson<CreateResult>(args)
   })
+
+  ipcMain.handle('md-init', (_event, path: string) =>
+    runVdocJson<InitResult>(['md', 'init', path]))
 
   ipcMain.handle('get-page', (_event, input: string, dir: string) => {
     if (relative(docsRoot(), join(docsRoot(), dir)).startsWith('..')) throw new Error(`Refusing to write outside the docs root: ${dir}`)

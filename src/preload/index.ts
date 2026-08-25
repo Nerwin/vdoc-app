@@ -28,6 +28,7 @@ const api: VdocApi = {
   pull: (paths, force) => ipcRenderer.invoke('pull', paths, force),
   push: (path, dryRun, force) => ipcRenderer.invoke('push', path, dryRun, force),
   create: (path, space, parent) => ipcRenderer.invoke('create', path, space, parent),
+  initFile: path => ipcRenderer.invoke('md-init', path),
   getPage: (input, dir) => ipcRenderer.invoke('get-page', input, dir),
   fileForPageId: pageId => ipcRenderer.invoke('file-for-page-id', pageId),
   sync: (path, space) => ipcRenderer.invoke('sync', path, space),

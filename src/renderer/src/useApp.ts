@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { AuthStatus, CheckFile, CredentialKey, DiffResult, PushFile, ScanFile, Settings, SettingsInfo, TriageFilter, UpdateInfo, VersionEntry } from '../../shared/types.ts'
 import { setConfluenceIgnore } from '../../shared/frontmatter.ts'
+import { initMessage } from '../../shared/init.ts'
 import { displayState, needsAttention, type FileEntry } from '../../shared/status.ts'
 import { STATE_META } from './state-meta.ts'
 
@@ -422,6 +423,18 @@ export function useApp() {
     })
   }, [api, createForm, recheck, runOp])
 
+  const initializeFile = useCallback((path: string) => runOp('initialize frontmatter', async () => {
+    const result = await api.initFile(path)
+    const initialized = result.files[0]
+    if (!initialized) throw new Error(`vdoc md init returned no result for ${path}`)
+
+    const scan = await api.scan()
+    setRoot(scan.root)
+    mergeScan(scan.files)
+
+    setMessage({ kind: 'info', text: initMessage(path, initialized.added) })
+  }), [api, mergeScan, runOp])
+
   const submitGet = useCallback((input: string, dir: string) => runOp('get', async () => {
     const result = await api.getPage(input.trim(), dir)
     setGetForm(false)
@@ -699,6 +712,7 @@ export function useApp() {
     setCreateForm,
     getForm,
     setGetForm,
+    initializeFile,
     submitGet,
     fileForPageId: (pageId: string) => api.fileForPageId(pageId).catch(error => {
       fail(error)

@@ -280,6 +280,14 @@ export const COMMANDS: Command[] = [
     run: ctx => ctx.openPalette('recent'),
   },
   {
+    id: 'file.init',
+    group: 'File',
+    label: 'Initialize frontmatter',
+    icon: '◆',
+    reason: all(noFile, idle),
+    run: ctx => void ctx.app.initializeFile(ctx.selection!),
+  },
+  {
     id: 'file.editor',
     group: 'File',
     label: 'Open in editor',

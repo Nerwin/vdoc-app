@@ -98,6 +98,18 @@ export interface CreateResult {
   dryRun?: boolean
 }
 
+export interface InitFileResult {
+  file: string
+  /** Frontmatter keys written by `vdoc md init`. */
+  added: string[]
+  /** Candidate keys already present and left unchanged. */
+  skipped: string[]
+}
+
+export interface InitResult {
+  files: InitFileResult[]
+}
+
 export interface GetPageResult {
   pageId: string
   title: string
@@ -245,6 +257,8 @@ export interface VdocApi {
   pull(paths: string[], force?: boolean): Promise<PullFile[]>
   push(path: string, dryRun: boolean, force?: boolean): Promise<PushFile[]>
   create(path: string, space: string, parent?: string): Promise<CreateResult>
+  /** Add missing authoring frontmatter through `vdoc md init`; existing values are preserved. */
+  initFile(path: string): Promise<InitResult>
   /** Download a page (URL or id) into `dir`; the CLI names the file after the page title. */
   getPage(input: string, dir: string): Promise<GetPageResult>
   /** Tracked file whose frontmatter already carries this confluencePageId, or null. */

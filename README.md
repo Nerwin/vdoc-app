@@ -116,6 +116,7 @@ Four verbs, precise meanings (also in-app: ⌘/ opens the same glossary):
 | **Not linked**         | No `confluencePageId` frontmatter             | Find matching page, or Create                      |
 | **Not found**          | The Confluence page is gone or not visible    | Investigate in Confluence                          |
 | **Not checked**        | No check ran yet this session                 | Check (⌘R / ⌘⇧R)                                   |
+| **Ignored**            | `confluenceIgnore: true` is set               | Right-click the file to include it again           |
 
 A dim `±` marker flags files with uncommitted git changes - display-only, independent of the
 Confluence states. Checks re-run automatically on window focus (attention files once a minute
@@ -142,6 +143,9 @@ Everything lives in the command palette (⌘⇧P); the common ones also have but
 - **Diff** - side-by-side against the live page, rendered exactly as pull would write it.
 - **Lint** - offline validation: frontmatter shape, links, image files, constructs Confluence
   would drop.
+- **Initialize frontmatter** - run `vdoc md init` for the selected file, adding only missing
+  `title`, `updated`, and mapped `confluenceSpace` values. Existing values are never changed,
+  and unknown `confluencePageId` or `confluencePageVersion` values are never invented.
 - **Find matching page** - link a Not-linked file to an existing page by exact title match
   (ambiguity is reported, never guessed).
 - **Create** - publish a Not-linked file as a new page under a chosen parent.
@@ -164,7 +168,8 @@ The tab row also shows **backlinks** - every doc whose links resolve to the open
 - **Renew session token** - when session-cookie auth expires.
 - **Welcome tour** - the guided intro from the first launch: a live setup health check, then a
   spotlight walk through the tree, sync verbs, dashboard, editor, and palette. The app stays
-  usable while it runs.
+  usable while it runs. Right-click a file to include or exclude it from Confluence operations,
+  copy its page ID when available, or copy its file path.
 
 With no file selected, the main pane is a **dashboard**: every file needing attention (including
 who last changed pages that moved remotely), bulk Verify, quick actions, recent files, and last
