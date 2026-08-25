@@ -3,7 +3,7 @@
 import type { SearchHit } from './search.ts'
 import type { VdocCliRequirement } from './app-config.ts'
 
-export type SyncState =
+type SyncState =
   | 'in-sync'
   | 'behind'
   | 'ahead'
@@ -79,7 +79,7 @@ export interface PushFile {
   unresolvedLinks?: number
 }
 
-export interface PushPreviewTicket {
+interface PushPreviewTicket {
   token: string
   result: PushFile
 }
@@ -104,7 +104,7 @@ export interface CreateResult {
   dryRun?: boolean
 }
 
-export interface InitFileResult {
+interface InitFileResult {
   file: string
   /** Frontmatter keys written by `vdoc md init`. */
   added: string[]
@@ -127,7 +127,7 @@ export interface GetPageResult {
   localizedLinks?: number
 }
 
-export interface LintIssue {
+interface LintIssue {
   rule: string
   severity: string
   message: string
@@ -182,7 +182,7 @@ export interface ScanFile {
   ignored?: boolean
 }
 
-export interface ScanResult {
+interface ScanResult {
   root: string
   files: ScanFile[]
 }

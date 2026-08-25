@@ -1,6 +1,6 @@
 /** Pure helpers turning a flat list of relative paths into a rendered tree. */
 
-export interface TreeDir {
+interface TreeDir {
   kind: 'dir'
   path: string
   name: string
@@ -8,7 +8,7 @@ export interface TreeDir {
   children: TreeNode[]
 }
 
-export interface TreeLeaf {
+interface TreeLeaf {
   kind: 'file'
   path: string
   name: string

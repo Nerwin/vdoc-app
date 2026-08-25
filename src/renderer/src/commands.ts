@@ -7,7 +7,7 @@ import type { AppStore } from './useApp.ts'
  * their label and keycaps from here, so a binding can never drift between two places.
  */
 
-export type CommandGroup = 'Sync' | 'File' | 'View' | 'App'
+type CommandGroup = 'Sync' | 'File' | 'View' | 'App'
 
 export const IS_MAC = navigator.platform.startsWith('Mac')
 
