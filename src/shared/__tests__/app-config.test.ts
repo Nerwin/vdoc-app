@@ -49,6 +49,13 @@ test('release workflow applies the Linux sandbox exception only to its smoke tes
   assert.match(RELEASE_WORKFLOW, /release\/linux-unpacked\/vdoc-app --no-sandbox --smoke-test/)
 })
 
+test('release workflow signs the macOS build and verifies the signature', () => {
+  const build = PACKAGE_JSON.build as { mac?: { notarize?: boolean } }
+  assert.equal(build.mac?.notarize, false)
+  assert.match(RELEASE_WORKFLOW, /CSC_LINK: \$\{\{ secrets\.MAC_CSC_LINK \}\}/)
+  assert.match(RELEASE_WORKFLOW, /codesign --verify --deep --strict release\/mac-arm64\/V-DOC\.app/)
+})
+
 test('CI workflows use the pinned Bun package manager with frozen installs', () => {
   assert.equal(PACKAGE_JSON.packageManager, 'bun@1.4.0')
   for (const workflow of [CI_WORKFLOW, RELEASE_WORKFLOW]) {

@@ -323,12 +323,16 @@ local development artifacts are unsigned. Version comes from `package.json` and 
 the artifacts' names, and the status bar. `build/icon.png` (1024×1024) is the explicit package icon
 for every platform and is also bundled for the running window and dock.
 
-macOS releases use hardened runtime, Developer ID signing, and notarization. The release repository
-must define `MAC_CSC_LINK`, `MAC_CSC_KEY_PASSWORD`, `APPLE_ID`,
-`APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID` as GitHub Actions secrets. The workflow fails
-before packaging if any credential is missing, then verifies the bundle signature and icon before
-publishing it. Windows and local development artifacts remain unsigned, so Windows SmartScreen may
-require manual approval.
+macOS releases are signed with an internal self-signed certificate (no Apple account) because
+Squirrel.Mac validates the update's code signature before installing it; notarization is
+intentionally skipped. `scripts/setup-mac-signing.sh` generates the certificate once, stores it as
+the `MAC_CSC_LINK` (base64 p12) and `MAC_CSC_KEY_PASSWORD` GitHub Actions secrets, and writes the
+public certificate to `build/mac-signing-cert.cer` (committed): the workflow trusts it on the
+runner, since a self-signed identity is only valid for codesigning on a machine that trusts it.
+The workflow fails before packaging if either secret is missing and verifies the bundle signature
+after building. The certificate must stay the same across releases: replacing it forces every user
+through one manual reinstall. Windows and local development artifacts remain unsigned, so Windows
+SmartScreen may require manual approval.
 
 Packaged builds use `electron-updater`. They check GitHub after startup and daily, download an
 available update in the background, verify its release metadata, and install it on exit or when

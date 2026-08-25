@@ -115,7 +115,7 @@
         }
       ],
       "hardenedRuntime": true,
-      "notarize": true,
+      "notarize": false,
       "category": "public.app-category.developer-tools"
     },
     "dmg": {

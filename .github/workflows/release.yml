@@ -29,14 +29,29 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
       - run: bun ci
       - run: bun run test
+      - name: Require macOS signing secrets
+        if: runner.os == 'macOS'
+        env:
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+        run: |
+          test -n "$CSC_LINK"
+          test -n "$CSC_KEY_PASSWORD"
+      - name: Trust macOS signing certificate
+        if: runner.os == 'macOS'
+        run: sudo security add-trusted-cert -d -r trustRoot -p codeSign build/mac-signing-cert.cer
       - name: Build release artifacts
         run: bun run dist
+        env:
+          CSC_LINK: ${{ runner.os == 'macOS' && secrets.MAC_CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ runner.os == 'macOS' && secrets.MAC_CSC_KEY_PASSWORD || '' }}
       - run: bun run check:bundle
       - name: Verify macOS artifacts
         if: runner.os == 'macOS'
         run: |
           find release -maxdepth 1 -name '*-mac-arm64.dmg' -print -quit | grep -q .
           find release -maxdepth 1 -name '*-mac-arm64.zip' -print -quit | grep -q .
+          codesign --verify --deep --strict release/mac-arm64/V-DOC.app
       - name: Smoke test packaged macOS app
         if: runner.os == 'macOS'
         timeout-minutes: 1
