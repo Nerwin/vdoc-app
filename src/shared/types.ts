@@ -245,6 +245,17 @@ export interface SettingsInfo extends Settings {
   site: string | null
 }
 
+export interface FileWriteRequest {
+  path: string
+  expected: string
+  next: string
+  revision: number
+}
+
+export interface FileWriteResult {
+  revision: number
+}
+
 export interface VdocApi {
   scan(): Promise<ScanResult>
   checkAll(): Promise<CheckFile[]>
@@ -252,8 +263,8 @@ export interface VdocApi {
   checkCancel(): Promise<void>
   checkFiles(paths: string[]): Promise<CheckFile[]>
   readFile(path: string): Promise<string>
-  /** Overwrite a file inside the docs root - the in-app editor's save. */
-  writeFile(path: string, content: string): Promise<void>
+  /** Write only when the file still matches the content previously read. */
+  writeFile(request: FileWriteRequest): Promise<FileWriteResult>
   /** Docs in the tree whose markdown links resolve to this file. */
   backlinks(path: string): Promise<string[]>
   /** Full-text search over the content dirs - first matching line per file. */

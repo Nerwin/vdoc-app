@@ -4,9 +4,10 @@ import { isAbsolute, join, relative } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { app, BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
 
-import type { AuthStatus, CheckFile, CommentEntry, CreateResult, CredentialKey, DiffResult, GetPageResult, InitResult, LintFile, PullFile, PushFile, Settings, SettingsInfo, SyncFile, VersionEntry } from '../shared/types.ts'
+import type { AuthStatus, CheckFile, CommentEntry, CreateResult, CredentialKey, DiffResult, FileWriteRequest, FileWriteResult, GetPageResult, InitResult, LintFile, PullFile, PushFile, Settings, SettingsInfo, SyncFile, VersionEntry } from '../shared/types.ts'
 import { parseVdocCliRequirement, type VdocCliRequirement } from '../shared/app-config.ts'
 import { parseConfluenceSpaces } from '../shared/confluence.ts'
+import { contentForGuardedWrite } from '../shared/file-write.ts'
 import { relativeAppPath, resolveExistingPathInsideRoot } from '../shared/path-policy.ts'
 import { maskSecret } from '../shared/secret.ts'
 import { OperationTickets } from '../shared/operation-tickets.ts'
@@ -26,6 +27,7 @@ interface PendingPush {
 }
 
 const pushTickets = new OperationTickets<PendingPush>(PUSH_PREVIEW_TTL_MS, 20)
+const pendingFileWrites = new Map<string, Promise<void>>()
 
 let checkCancelled = false
 
@@ -77,6 +79,31 @@ function docsPaths(value: unknown, label = 'paths'): string[] {
 function contentHash(path: string): string {
   const content = readFileSync(resolveExistingPathInsideRoot(docsRoot(), path))
   return createHash('sha256').update(content).digest('hex')
+}
+
+function fileWriteRequest(value: unknown): FileWriteRequest {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid file write')
+  const request = value as Record<string, unknown>
+  const allowed = new Set(['path', 'expected', 'next', 'revision'])
+  if (Object.keys(request).some(key => !allowed.has(key))) throw new Error('Invalid file write')
+  const revision = request.revision
+  if (!Number.isSafeInteger(revision) || (revision as number) < 0) throw new Error('Invalid file revision')
+  return {
+    path: docsPath(request.path),
+    expected: stringValue(request.expected, 'expected file content', 32 * 1024 * 1024, true),
+    next: stringValue(request.next, 'file content', 32 * 1024 * 1024, true),
+    revision: revision as number,
+  }
+}
+
+function serializeFileWrite<T>(path: string, write: () => T): Promise<T> {
+  const previous = pendingFileWrites.get(path) ?? Promise.resolve()
+  const current = previous.catch(() => undefined).then(write)
+  const settled = current.then(() => undefined, () => undefined)
+  pendingFileWrites.set(path, settled)
+  return current.finally(() => {
+    if (pendingFileWrites.get(path) === settled) pendingFileWrites.delete(path)
+  })
 }
 
 function settingsPatch(value: unknown): Partial<Settings> {
@@ -187,10 +214,14 @@ export function registerIpc(getMainWindow: () => BrowserWindow | null): void {
     return shell.openExternal(url.href)
   })
 
-  handle('write-file', (_event, pathInput: unknown, contentInput: unknown) => {
-    const path = resolveExistingPathInsideRoot(docsRoot(), pathInput)
-    const content = stringValue(contentInput, 'file content', 32 * 1024 * 1024, true)
-    writeFileSync(path, content, 'utf8')
+  handle('write-file', async (_event, input: unknown): Promise<FileWriteResult> => {
+    const request = fileWriteRequest(input)
+    const path = resolveExistingPathInsideRoot(docsRoot(), request.path)
+    return serializeFileWrite(path, () => {
+      const current = readFileSync(path, 'utf8')
+      writeFileSync(path, contentForGuardedWrite(current, request.expected, request.next), 'utf8')
+      return { revision: request.revision }
+    })
   })
 
   handle('diff', (_event, input: unknown) => runVdocJson<DiffResult>(['cf', 'diff', docsPath(input)]))

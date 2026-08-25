@@ -627,7 +627,12 @@ export function useApp() {
   /** Toggle `confluenceIgnore:` in the file's frontmatter - the watcher rescan updates the tree. */
   const setIgnored = useCallback((path: string, ignored: boolean) => runOp('ignore', async () => {
     const content = await api.readFile(path)
-    await api.writeFile(path, setConfluenceIgnore(content, ignored))
+    await api.writeFile({
+      path,
+      expected: content,
+      next: setConfluenceIgnore(content, ignored),
+      revision: Date.now(),
+    })
     const name = path.split('/').at(-1)
     setMessage({ kind: 'info', text: `${name} ${ignored ? 'excluded from' : 'included in'} Confluence checks` })
   }), [api, runOp])

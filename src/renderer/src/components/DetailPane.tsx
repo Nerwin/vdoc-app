@@ -62,36 +62,53 @@ export function DetailPane(props: Props) {
 
   const path = entry.path
 
-  // In-app editing: `content` is the draft, `diskRef` the disk truth for the file
-  // it names (last read or successful write). A debounced flush writes the draft,
-  // guarded by a re-read so an edit made outside the app is never clobbered.
-  const diskRef = useRef<{ path: string, text: string } | null>(null)
-  const pendingRef = useRef<{ path: string, text: string } | null>(null)
+  const diskRef = useRef(new Map<string, string>())
+  const pendingRef = useRef<{ path: string, text: string, revision: number } | null>(null)
+  const activeSaveRef = useRef<string | null>(null)
+  const activePathRef = useRef(path)
+  const revisionRef = useRef(0)
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  activePathRef.current = path
+
+  const drainSaves = useCallback(async () => {
+    if (activeSaveRef.current) return
+    while (pendingRef.current) {
+      const pending = pendingRef.current
+      pendingRef.current = null
+      const expected = diskRef.current.get(pending.path)
+      if (expected === undefined) {
+        onError(new Error(`Could not save ${pending.path.split('/').at(-1)} because its disk version is unknown.`))
+        continue
+      }
+      if (expected === pending.text) continue
+
+      activeSaveRef.current = pending.path
+      try {
+        const result = await window.vdoc.writeFile({
+          path: pending.path,
+          expected,
+          next: pending.text,
+          revision: pending.revision,
+        })
+        if (result.revision === pending.revision) diskRef.current.set(pending.path, pending.text)
+      } catch (error) {
+        if (activePathRef.current === pending.path && !pendingRef.current) pendingRef.current = pending
+        onError(error)
+        if (!pendingRef.current || pendingRef.current.path === pending.path) return
+      } finally {
+        activeSaveRef.current = null
+      }
+    }
+  }, [onError])
 
   const flush = useCallback(() => {
     clearTimeout(timerRef.current)
-    const pending = pendingRef.current
-    pendingRef.current = null
-    if (!pending) return
-    const disk = diskRef.current
-    const expected = disk?.path === pending.path ? disk.text : null
-    if (expected === pending.text) return
-    void window.vdoc.readFile(pending.path)
-      .then(onDisk => {
-        if (expected === null || onDisk !== expected) {
-          throw new Error(`${pending.path.split('/').at(-1)} changed on disk while editing - draft not saved. Reload from disk (⌘⌥R) and redo the edit.`)
-        }
-        return window.vdoc.writeFile(pending.path, pending.text).then(() => {
-          if (diskRef.current?.path === pending.path) diskRef.current = pending
-        })
-      })
-      .catch(onError)
-  }, [onError])
+    void drainSaves()
+  }, [drainSaves])
 
   const handleEdit = useCallback((text: string) => {
     setContent(text)
-    pendingRef.current = { path, text }
+    pendingRef.current = { path, text, revision: ++revisionRef.current }
     clearTimeout(timerRef.current)
     timerRef.current = setTimeout(flush, 800)
   }, [flush, path])
@@ -110,7 +127,7 @@ export function DetailPane(props: Props) {
     window.vdoc.readFile(path)
       .then(text => {
         if (!live) return
-        diskRef.current = { path, text }
+        diskRef.current.set(path, text)
         setContent(text)
       })
       .catch(() => {
@@ -126,10 +143,10 @@ export function DetailPane(props: Props) {
   // Disk changed under us (external editor, pull, own save echo): refresh the
   // buffer when there is no active draft to protect.
   useEffect(() => window.vdoc.onFilesChanged(changed => {
-    if (!changed.includes(path) || pendingRef.current) return
+    if (!changed.includes(path) || pendingRef.current?.path === path || activeSaveRef.current === path) return
     void window.vdoc.readFile(path).then(text => {
-      if (pendingRef.current || diskRef.current?.path !== path || text === diskRef.current.text) return
-      diskRef.current = { path, text }
+      if (pendingRef.current?.path === path || activeSaveRef.current === path || text === diskRef.current.get(path)) return
+      diskRef.current.set(path, text)
       setContent(text)
     }).catch(() => undefined)
   }), [path])

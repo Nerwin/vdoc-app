@@ -156,7 +156,7 @@ Recommendation:
 - Prefer explicit opt-in for reports that may contain company data, and make the settings description match the actual data policy.
 - Add regression tests for token, comment, path, stdout, stderr, and IPC-wrapped error redaction.
 
-### A-05: The editor's read-before-write guard is racy and saves can complete out of order
+### A-05: The editor's read-before-write guard is racy and saves can complete out of order [Fixed]
 
 Severity: Medium
 
@@ -178,6 +178,13 @@ Recommendation:
 - Queue or coalesce renderer saves and only accept completion for the latest revision.
 - Reuse the same guarded mutation for frontmatter changes.
 - Test external modification between check and write, overlapping manual/debounced saves, file switching, reload, and unmount.
+
+Resolution:
+
+- Main performs the expected-content comparison and write in one path-serialized IPC operation.
+- Renderer saves are coalesced and drained sequentially with revisioned acknowledgements.
+- File-change refreshes wait for active saves, and conflicts retain the current draft until an explicit reload.
+- Frontmatter ignore toggles use the same guarded write operation.
 
 ### A-06: The release workflow gives a mutable third-party action a release write token [Fixed]
 
