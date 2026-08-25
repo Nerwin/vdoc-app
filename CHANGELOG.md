@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.17.0](https://github.com/Nerwin/vdoc-app/compare/v1.16.0...v1.17.0) (2026-08-25)
+
+### Features
+
+* add more trace for sentry and improve update process ([1e9ba96](https://github.com/Nerwin/vdoc-app/commit/1e9ba966d5a9fcbb8a69af09ca59f0289f38f8aa))
 ## [1.16.0](https://github.com/Nerwin/vdoc-app/compare/v1.15.1...v1.16.0) (2026-08-25)
 
 ### Features
