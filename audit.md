@@ -179,7 +179,7 @@ Recommendation:
 - Reuse the same guarded mutation for frontmatter changes.
 - Test external modification between check and write, overlapping manual/debounced saves, file switching, reload, and unmount.
 
-### A-06: The release workflow gives a mutable third-party action a release write token
+### A-06: The release workflow gives a mutable third-party action a release write token [Fixed]
 
 Severity: High
 
@@ -202,6 +202,12 @@ Recommendation:
 - Add dependency review or automated notifications for action SHA updates.
 
 Reference: [GitHub Actions secure use](https://docs.github.com/en/actions/reference/security/secure-use).
+
+Resolution:
+
+- Every action is pinned to a full commit SHA.
+- Platform builds run with read-only repository permissions and upload one-day intermediate artifacts.
+- A separate publishing job receives `contents: write` only after every build and test job succeeds.
 
 ### A-07: Critical Electron boundaries and packaged behavior have no tests
 
