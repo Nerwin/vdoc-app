@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.13.0](https://github.com/Nerwin/vdoc-app/compare/v1.12.1...v1.13.0) (2026-08-25)
+
+### Features
+
+* **init:** add md init command to add missing frontmatter in a file ([3a47492](https://github.com/Nerwin/vdoc-app/commit/3a47492c5cf238b423d22ee01b89b9d80007c5c9))
+* **tree:** add confluenceIgnore to exclude files from sync ([60cfc67](https://github.com/Nerwin/vdoc-app/commit/60cfc673d37c056ea7610c5007fb7f03b27648ae))
 ## [1.12.1](https://github.com/Nerwin/vdoc-app/compare/v1.12.0...v1.12.1) (2026-08-24)
 ## [1.12.0](https://github.com/Nerwin/vdoc-app/compare/v1.11.0...v1.12.0) (2026-08-24)
 
