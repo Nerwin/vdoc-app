@@ -29,7 +29,29 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      - run: npm run dist
+      - name: Require macOS signing credentials
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.MAC_APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.MAC_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.MAC_APPLE_TEAM_ID }}
+        run: |
+          test -n "$CSC_LINK"
+          test -n "$CSC_KEY_PASSWORD"
+          test -n "$APPLE_ID"
+          test -n "$APPLE_APP_SPECIFIC_PASSWORD"
+          test -n "$APPLE_TEAM_ID"
+      - name: Build release artifacts
+        run: npm run dist
+        env:
+          CSC_LINK: ${{ runner.os == 'macOS' && secrets.MAC_CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ runner.os == 'macOS' && secrets.MAC_CSC_KEY_PASSWORD || '' }}
+          APPLE_ID: ${{ runner.os == 'macOS' && secrets.MAC_APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ runner.os == 'macOS' && secrets.MAC_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ runner.os == 'macOS' && secrets.MAC_APPLE_TEAM_ID || '' }}
       - run: npm run check:bundle
       - name: Verify macOS artifacts
         if: runner.os == 'macOS'
@@ -57,6 +79,8 @@ jobs:
             release/*.exe
             release/*.AppImage
             release/*.deb
+            release/latest*.yml
+            release/*.blockmap
           if-no-files-found: error
           retention-days: 1
 
@@ -80,3 +104,5 @@ jobs:
             release-assets/*.exe
             release-assets/*.AppImage
             release-assets/*.deb
+            release-assets/latest*.yml
+            release-assets/*.blockmap

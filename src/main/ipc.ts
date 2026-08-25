@@ -1,13 +1,12 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs'
 import { isAbsolute, join, relative } from 'node:path'
-import { pathToFileURL } from 'node:url'
 import { app, BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
 
 import type { AuthStatus, CheckFile, CommentEntry, CreateResult, CredentialKey, DiffResult, FileWriteRequest, FileWriteResult, GetPageResult, InitResult, LintFile, PullFile, PushFile, Settings, SettingsInfo, SyncFile, VersionEntry } from '../shared/types.ts'
 import { parseVdocCliRequirement, type VdocCliRequirement } from '../shared/app-config.ts'
 import { parseConfluenceSpaces } from '../shared/confluence.ts'
-import { isTrustedRendererLocation } from '../shared/electron-policy.ts'
+import { isTrustedRendererLocation, PACKAGED_RENDERER_URL } from '../shared/electron-policy.ts'
 import { contentForGuardedWrite } from '../shared/file-write.ts'
 import { relativeAppPath, resolveExistingPathInsideRoot } from '../shared/path-policy.ts'
 import { maskSecret } from '../shared/secret.ts'
@@ -15,7 +14,7 @@ import { OperationTickets } from '../shared/operation-tickets.ts'
 import { backlinksTo, docsRoot, fileForPageId, gitDirtyFiles, resolvedVdocBin, runVdoc, runVdocJson, scanMarkdownFiles, searchContent, setVdocBin, vdocLogs } from './vdoc.ts'
 import { loadSettings, saveSettings } from './settings.ts'
 import { sentryActive } from './sentry.ts'
-import { checkUpdate } from './update.ts'
+import { checkForUpdates, getUpdateStatus, restartAndInstallUpdate } from './update.ts'
 import { watchDocs } from './watcher.ts'
 
 const CHECK_BATCH = 24
@@ -36,7 +35,7 @@ type IpcHandler<Args extends unknown[], Result> = (event: IpcMainInvokeEvent, ..
 
 function rendererUrl(): string {
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) return process.env.ELECTRON_RENDERER_URL
-  return pathToFileURL(join(__dirname, '../renderer/index.html')).href
+  return PACKAGED_RENDERER_URL
 }
 
 function assertTrustedSender(event: IpcMainInvokeEvent, window: BrowserWindow | null): void {
@@ -483,7 +482,11 @@ export function registerIpc(getMainWindow: () => BrowserWindow | null): void {
 
   handle('vdoc-version', () => probeVersion())
 
-  handle('check-update', () => checkUpdate())
+  handle('update-status', () => getUpdateStatus())
+
+  handle('check-update', () => checkForUpdates())
+
+  handle('install-update', () => restartAndInstallUpdate())
 
   handle('sentry-active', () => sentryActive)
 

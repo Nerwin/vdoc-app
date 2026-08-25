@@ -1,15 +1,35 @@
 import { existsSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
-import { app, BrowserWindow, Menu, nativeTheme, session } from 'electron'
+import { isAbsolute, join, relative, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { app, BrowserWindow, Menu, nativeTheme, net, protocol, session } from 'electron'
 
-import { isAllowedNavigation, SECURE_WEB_PREFERENCES } from '../shared/electron-policy.ts'
+import { isAllowedNavigation, PACKAGED_RENDERER_URL, SECURE_WEB_PREFERENCES } from '../shared/electron-policy.ts'
 import type { Settings } from '../shared/types.ts'
 import { importLoginShellEnv, setVdocBin } from './vdoc.ts'
 import { loadSettings } from './settings.ts'
 import { registerIpc } from './ipc.ts'
 import { initSentry } from './sentry.ts'
+import { initializeUpdater } from './update.ts'
 import { watchDocs } from './watcher.ts'
+
+protocol.registerSchemesAsPrivileged([{
+  scheme: 'vdoc-app',
+  privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: false },
+}])
+
+function registerRendererProtocol(): void {
+  const root = resolve(__dirname, '../renderer')
+  protocol.handle('vdoc-app', request => {
+    const url = new URL(request.url)
+    if (url.host !== 'renderer') return new Response(null, { status: 404 })
+
+    const path = resolve(root, `.${decodeURIComponent(url.pathname)}`)
+    const fromRoot = relative(root, path)
+    if (fromRoot.startsWith('..') || isAbsolute(fromRoot)) return new Response(null, { status: 404 })
+    return net.fetch(pathToFileURL(path).href)
+  })
+}
 
 // Automation hook: VDOC_DEBUG_PORT=9222 npm run dev exposes CDP for driving the app.
 if (!app.isPackaged && process.env.VDOC_DEBUG_PORT) {
@@ -41,9 +61,23 @@ function createWindow(theme: Settings['theme']): BrowserWindow {
   })
 
   if (process.argv.includes('--smoke-test')) {
+    window.webContents.once('did-fail-load', (_event, code, description, url, isMainFrame) => {
+      if (!isMainFrame) return
+      console.error(`Packaged smoke test failed to load ${url}: ${code} ${description}`)
+      app.exit(1)
+    })
     window.webContents.once('did-finish-load', () => {
       void window.webContents.executeJavaScript(
-        "window.vdoc.sentryActive().then(value => typeof value === 'boolean')",
+        `new Promise(resolve => {
+          const deadline = Date.now() + 5000
+          const probe = () => {
+            const ready = window.location.href === ${JSON.stringify(PACKAGED_RENDERER_URL)} && document.getElementById('root')?.childElementCount && window.vdoc
+            if (ready) void window.vdoc.sentryActive().then(value => resolve(typeof value === 'boolean'), () => resolve(false))
+            else if (Date.now() >= deadline) resolve(false)
+            else setTimeout(probe, 50)
+          }
+          probe()
+        })`,
       ).then(healthy => app.exit(healthy ? 0 : 1), error => {
         console.error('Packaged smoke test failed:', error)
         app.exit(1)
@@ -52,7 +86,7 @@ function createWindow(theme: Settings['theme']): BrowserWindow {
   }
 
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) window.loadURL(process.env.ELECTRON_RENDERER_URL)
-  else window.loadFile(join(__dirname, '../renderer/index.html'))
+  else window.loadURL(PACKAGED_RENDERER_URL)
 
   return window
 }
@@ -72,6 +106,7 @@ if (!app.requestSingleInstanceLock()) {
   })
 
   app.whenReady().then(() => {
+    registerRendererProtocol()
     importLoginShellEnv()
     const settings = loadSettings()
     setVdocBin(settings.vdocBin)
@@ -98,6 +133,7 @@ if (!app.requestSingleInstanceLock()) {
     registerIpc(() => mainWindow)
     mainWindow = createWindow(settings.theme)
     watchDocs(mainWindow)
+    initializeUpdater(() => mainWindow)
 
     // Automation hook: VDOC_SHOT=/path.png captures the window via the compositor
     // (no macOS screen-recording permission needed) and quits. VDOC_SHOT_DELAY_MS tunes the

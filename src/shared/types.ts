@@ -138,12 +138,11 @@ export interface LintFile {
   issues: LintIssue[]
 }
 
-/** A newer app release on GitHub - the auto-update check's positive result. */
-export interface UpdateInfo {
+export interface AppUpdateStatus {
+  phase: 'idle' | 'checking' | 'current' | 'available' | 'downloading' | 'downloaded' | 'error' | 'unsupported'
   current: string
-  latest: string
-  /** Release page to open in the browser - installers are attached there. */
-  url: string
+  latest?: string
+  progress?: number
 }
 
 /** The two secrets stored in the CLI config file. */
@@ -310,8 +309,9 @@ export interface VdocApi {
   /** Set (or clear with null) confluence.site in the CLI config file. */
   setSite(site: string | null): Promise<SettingsInfo>
   vdocVersion(): Promise<string | null>
-  /** Newer GitHub release than the running app, or null (also null when offline/no releases). */
-  checkUpdate(): Promise<UpdateInfo | null>
+  updateStatus(): Promise<AppUpdateStatus>
+  checkUpdate(): Promise<AppUpdateStatus>
+  installUpdate(): Promise<void>
   /** True when the main process initialized Sentry - the renderer inits its side only then. */
   sentryActive(): Promise<boolean>
   /** Native folder picker rooted at the docs repo; returns a relative path or null. */
@@ -331,5 +331,6 @@ export interface VdocApi {
   logs(): Promise<VdocLogEntry[]>
   onFilesChanged(cb: (paths: string[]) => void): () => void
   onCheckProgress(cb: (progress: CheckProgress) => void): () => void
+  onUpdateStatus(cb: (status: AppUpdateStatus) => void): () => void
   onVdocLog(cb: (entry: VdocLogEntry) => void): () => void
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import type { AuthStatus, TriageFilter, UpdateInfo } from '../../../shared/types.ts'
+import type { AppUpdateStatus, AuthStatus, TriageFilter } from '../../../shared/types.ts'
 import { humanTtl, timeAgo } from '../../../shared/time.ts'
 import { StateDot } from './StateDot.tsx'
 
@@ -11,15 +11,14 @@ interface Props {
   lastChecked: Date | null
   busyOp: string | null
   appVersion: string | null
-  /** A newer GitHub release, when the daily (or manual) check found one. */
-  update: UpdateInfo | null
+  update: AppUpdateStatus | null
   stateFilter: TriageFilter
   onFilterState(filter: TriageFilter): void
   onOpenToken(): void
   onOpenLogs(): void
   onCancelCheck(): void
   onCheckUpdate(): void
-  onOpenUpdate(): void
+  onInstallUpdate(): void
 }
 
 export function StatusBar(props: Props) {
@@ -103,25 +102,12 @@ export function StatusBar(props: Props) {
       {props.appVersion && (
         <>
           <div className="h-4 w-px bg-line" />
-          {props.update
-            ? (
-                <button
-                  onClick={props.onOpenUpdate}
-                  title={`V-DOC ${props.update.latest} is available (you have ${props.update.current}) - open the release page`}
-                  className="whitespace-nowrap rounded-[5px] px-2 py-[3px] text-accent hover:bg-hover"
-                >
-                  ↑ v{props.update.latest} available
-                </button>
-              )
-            : (
-                <button
-                  onClick={props.onCheckUpdate}
-                  title="Check for updates"
-                  className="whitespace-nowrap rounded-[5px] px-2 py-[3px] text-ink-ghost hover:bg-hover hover:text-ink"
-                >
-                  v{props.appVersion}
-                </button>
-              )}
+          <UpdateControl
+            version={props.appVersion}
+            status={props.update}
+            onCheck={props.onCheckUpdate}
+            onInstall={props.onInstallUpdate}
+          />
         </>
       )}
     </footer>
@@ -212,11 +198,62 @@ const TASK_LABELS: Record<string, string> = {
   'save API key': 'Saving API key',
   'switch auth': 'Switching auth',
   'check update': 'Checking for updates',
+  'install update': 'Installing update',
 }
 
 function taskLabel(op: string): string {
   if (op.startsWith('verify ')) return `Verifying ${op.slice('verify '.length)}`
   return TASK_LABELS[op] ?? op
+}
+
+function UpdateControl(props: {
+  version: string
+  status: AppUpdateStatus | null
+  onCheck(): void
+  onInstall(): void
+}) {
+  const { status } = props
+
+  if (status?.phase === 'downloaded') {
+    return (
+      <button
+        onClick={props.onInstall}
+        title={`Restart and install V-DOC ${status.latest ?? 'update'}`}
+        className="whitespace-nowrap rounded-[5px] px-2 py-[3px] text-accent hover:bg-hover"
+      >
+        Restart to update to v{status.latest ?? '?'}
+      </button>
+    )
+  }
+
+  if (status?.phase === 'available' || status?.phase === 'downloading') {
+    const progress = status.progress === undefined ? '' : ` ${status.progress}%`
+    return (
+      <span title="The verified update will install when V-DOC exits" className="whitespace-nowrap px-2 py-[3px] text-accent">
+        Downloading v{status.latest ?? '?'}{progress}
+      </span>
+    )
+  }
+
+  if (status?.phase === 'checking') {
+    return <span className="whitespace-nowrap px-2 py-[3px] text-ink-ghost">Checking for updates...</span>
+  }
+
+  const title = status?.phase === 'error'
+    ? 'The last update check failed - try again'
+    : status?.phase === 'unsupported'
+      ? 'Automatic updates are available in packaged builds'
+      : 'Check for updates'
+
+  return (
+    <button
+      onClick={props.onCheck}
+      title={title}
+      className="whitespace-nowrap rounded-[5px] px-2 py-[3px] text-ink-ghost hover:bg-hover hover:text-ink"
+    >
+      v{props.version}
+    </button>
+  )
 }
 
 function AuthChip({ auth, onClick }: { auth: AuthStatus | null, onClick(): void }) {

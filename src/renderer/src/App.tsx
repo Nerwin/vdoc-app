@@ -301,7 +301,7 @@ export function App() {
         onOpenLogs={() => setLogsOpen(open => !open)}
         onCancelCheck={app.cancelCheck}
         onCheckUpdate={app.checkUpdateNow}
-        onOpenUpdate={() => void app.openUpdate()}
+        onInstallUpdate={() => void app.installUpdate()}
       />
 
       {app.message && <Toast message={app.message} onDismiss={app.dismissMessage} />}

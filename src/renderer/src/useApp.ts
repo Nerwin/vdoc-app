@@ -1,10 +1,11 @@
 import { captureException } from '@sentry/electron/renderer'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import type { AuthStatus, CheckFile, CredentialKey, DiffResult, PushFile, ScanFile, Settings, SettingsInfo, TriageFilter, UpdateInfo, VersionEntry } from '../../shared/types.ts'
+import type { AppUpdateStatus, AuthStatus, CheckFile, CredentialKey, DiffResult, PushFile, ScanFile, Settings, SettingsInfo, TriageFilter, VersionEntry } from '../../shared/types.ts'
 import { setConfluenceIgnore } from '../../shared/frontmatter.ts'
 import { initMessage } from '../../shared/init.ts'
 import { displayState, needsAttention, type FileEntry } from '../../shared/status.ts'
+import { updateCheckMessage } from '../../shared/update.ts'
 import { STATE_META } from './state-meta.ts'
 
 export interface Message {
@@ -88,8 +89,7 @@ export function useApp() {
   /** Latest remote version info per file, keyed `path@vN` so a new version refetches. */
   const [authors, setAuthors] = useState<Map<string, VersionEntry | null>>(new Map())
   const [message, setMessage] = useState<Message | null>(null)
-  /** A newer GitHub release than the running app - surfaced in the status bar. */
-  const [update, setUpdate] = useState<UpdateInfo | null>(null)
+  const [update, setUpdate] = useState<AppUpdateStatus | null>(null)
 
   /** Recently opened files, newest first - feeds the dashboard's Continue reading. */
   const [recents, setRecents] = useState<Visit[]>(() => loadJson('recentFiles', []))
@@ -651,28 +651,19 @@ export function useApp() {
       : { kind: 'error', text: status.error ?? 'Token rejected' })
   }), [api, runOp])
 
-  // Update check: non-blocking after startup, then daily. Failures are silent - offline is normal.
   useEffect(() => {
-    const check = (): void => {
-      void api.checkUpdate().then(setUpdate).catch(() => undefined)
-    }
-    const timer = setTimeout(check, 10_000)
-    const interval = setInterval(check, 24 * 60 * 60 * 1000)
-    return () => {
-      clearTimeout(timer)
-      clearInterval(interval)
-    }
+    void api.updateStatus().then(setUpdate).catch(() => undefined)
+    return api.onUpdateStatus(setUpdate)
   }, [api])
 
-  /** Status-bar version click - explicit check with a spoken result. */
   const checkUpdateNow = useCallback(() => runOp('check update', async () => {
-    const info = await api.checkUpdate()
-    setUpdate(info)
-    setMessage(info
-      ? { kind: 'info', text: `V-DOC ${info.latest} is available - you have ${info.current}` }
-      // Covers both "latest release is not newer" and "no release visible"
-      // (a private repo 404s for the app's unauthenticated check).
-      : { kind: 'info', text: 'No newer release found' })
+    const next = await api.checkUpdate()
+    setUpdate(next)
+    setMessage({ kind: next.phase === 'error' ? 'error' : 'info', text: updateCheckMessage(next) })
+  }), [api, runOp])
+
+  const installUpdate = useCallback(() => runOp('install update', async () => {
+    await api.installUpdate()
   }), [api, runOp])
 
   const counts = useMemo(() => {
@@ -758,10 +749,7 @@ export function useApp() {
     }),
     update,
     checkUpdateNow,
-    openUpdate: () => {
-      if (!update) return
-      void api.openExternal(update.url).catch(fail)
-    },
+    installUpdate,
     message,
     dismissMessage: () => setMessage(null),
     notify: (text: string) => setMessage({ kind: 'info', text }),

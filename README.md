@@ -59,9 +59,7 @@ Confluence-related is written through `vdoc config set`, so CLI and app always a
 
 Grab the artifact for your OS from the latest GitHub release:
 
-- **macOS** - `V-DOC-x.y.z-mac-arm64.dmg` (Apple Silicon). The app is
-  unsigned: on first launch right-click → Open, or clear the quarantine flag with
-  `xattr -cr /Applications/V-DOC.app`.
+- **macOS** - `V-DOC-x.y.z-mac-arm64.dmg` (Apple Silicon). Release builds are signed and notarized.
 - **Windows** - `V-DOC-x.y.z-win-x64.exe` (installer, per-user, no admin needed) or the
   `…-portable-x64.exe`. SmartScreen will warn about an unsigned app - More info → Run anyway.
 - **Linux** - `V-DOC-x.y.z-linux-x64.AppImage` (`chmod +x`, run) or the `.deb`.
@@ -233,7 +231,7 @@ the CLI and the app always agree. The **Config file** section shows the resolved
   single-instance lock; quit it first.
 - **Known formatting loss** - blank lines between list items don't survive Confluence's format
   round trip; such a file genuinely differs until force-pulled once.
-- macOS/Windows unsigned-app warnings: see [Install](#3-install-the-app).
+- Windows unsigned-app warnings: see [Install](#3-install-the-app).
 
 ## Development
 
@@ -251,14 +249,24 @@ the rest. To generate a Windows release from the Mac, run `npm run dist:win` - i
 `V-DOC-x.y.z-win-x64.exe` (NSIS installer, per-user) and `…-portable-x64.exe` into `release/`.
 The Windows arch is pinned to x64 in `package.json` (`build.win.target`): without the pin,
 electron-builder defaults to the build host's arch, and an arm64 installer built on Apple
-Silicon silently installs an app that can't run on a normal x64 Windows machine. All artifacts
-are unsigned. Version comes from `package.json` and stamps the bundle,
+Silicon silently installs an app that can't run on a normal x64 Windows machine. Windows and
+local development artifacts are unsigned. Version comes from `package.json` and stamps the bundle,
 the artifacts' names, and the status bar. The app icon lives in `build/icon.png` (1024×1024 -
 electron-builder converts it per platform).
 
-Everything ships bundled by Vite, so all npm packages are devDependencies and the package
-contains `out/` only (33 MB asar) - no `node_modules`. See [CLAUDE.md](./CLAUDE.md) for the
-architecture and contribution guardrails.
+The release workflow requires `MAC_CSC_LINK`, `MAC_CSC_KEY_PASSWORD`, `MAC_APPLE_ID`,
+`MAC_APP_SPECIFIC_PASSWORD`, and `MAC_APPLE_TEAM_ID` repository secrets. They provide the Apple
+Developer ID certificate and notarization credentials to electron-builder. A release fails instead
+of publishing a macOS build that cannot pass the updater's signature validation.
+
+Packaged builds use `electron-updater`. They check GitHub after startup and daily, download an
+available update in the background, verify its release metadata, and install it on exit or when
+the status bar's restart action is selected. The release workflow uploads the generated
+`latest*.yml` and blockmap files with every installer.
+
+Vite bundles the renderer and application code into `out/`. Main-process runtime dependencies,
+including Sentry and the updater, are packaged from `node_modules`. See [CLAUDE.md](./CLAUDE.md)
+for the architecture and contribution guardrails.
 
 The app/CLI compatibility contract is release metadata in `package.json`:
 

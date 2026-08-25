@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { isAllowedNavigation, isTrustedRendererLocation, SECURE_WEB_PREFERENCES } from '../electron-policy.ts'
+import { isAllowedNavigation, isTrustedRendererLocation, PACKAGED_RENDERER_URL, SECURE_WEB_PREFERENCES } from '../electron-policy.ts'
 
 test('renderer web preferences keep Electron isolation enabled', () => {
   assert.deepEqual(SECURE_WEB_PREFERENCES, {
@@ -13,10 +13,10 @@ test('renderer web preferences keep Electron isolation enabled', () => {
 })
 
 test('packaged IPC accepts only the exact application page', () => {
-  const expected = 'file:///Applications/V-DOC.app/Contents/Resources/app.asar/out/renderer/index.html'
+  const expected = PACKAGED_RENDERER_URL
   assert.equal(isTrustedRendererLocation(expected, `${expected}#preview`, true), true)
   assert.equal(isTrustedRendererLocation(expected, `${expected}?redirect=1`, true), false)
-  assert.equal(isTrustedRendererLocation(expected, 'file:///tmp/index.html', true), false)
+  assert.equal(isTrustedRendererLocation(expected, 'vdoc-app://attacker/index.html', true), false)
 })
 
 test('development IPC accepts only the configured renderer origin', () => {

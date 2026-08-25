@@ -55,11 +55,6 @@ export function compareVersions(left: string, right: string): number | null {
   return 0
 }
 
-/** True when `latest` is strictly newer than `current`. */
-export function isNewerVersion(latest: string, current: string): boolean {
-  return compareVersions(latest, current) === 1
-}
-
 /** True only when both values parse and the installed version is below the requirement. */
 export function isVersionBelowMinimum(current: string, minimum: string): boolean {
   return compareVersions(current, minimum) === -1

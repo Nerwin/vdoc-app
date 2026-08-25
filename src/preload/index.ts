@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcRendererEvent } from 'electron'
 
-import type { CheckProgress, VdocApi, VdocLogEntry } from '../shared/types.ts'
+import type { AppUpdateStatus, CheckProgress, VdocApi, VdocLogEntry } from '../shared/types.ts'
 
 const subscribe = <T>(channel: string, cb: (payload: T) => void): (() => void) => {
   const handler = (_event: IpcRendererEvent, payload: T): void => cb(payload)
@@ -49,7 +49,9 @@ const api: VdocApi = {
   setAssetsDir: dir => ipcRenderer.invoke('set-assets-dir', dir),
   setSite: site => ipcRenderer.invoke('set-site', site),
   vdocVersion: () => ipcRenderer.invoke('vdoc-version'),
+  updateStatus: () => ipcRenderer.invoke('update-status'),
   checkUpdate: () => ipcRenderer.invoke('check-update'),
+  installUpdate: () => ipcRenderer.invoke('install-update'),
   sentryActive: () => ipcRenderer.invoke('sentry-active'),
   pickFolder: () => ipcRenderer.invoke('pick-folder'),
   pickDocsRoot: () => ipcRenderer.invoke('pick-docs-root'),
@@ -62,6 +64,7 @@ const api: VdocApi = {
   logs: () => ipcRenderer.invoke('vdoc-logs'),
   onFilesChanged: cb => subscribe<string[]>('files-changed', cb),
   onCheckProgress: cb => subscribe<CheckProgress>('check-progress', cb),
+  onUpdateStatus: cb => subscribe<AppUpdateStatus>('update-status', cb),
   onVdocLog: cb => subscribe<VdocLogEntry>('vdoc-log', cb),
 }
 

@@ -42,6 +42,20 @@ test('macOS release targets are Apple Silicon only', () => {
   }
 })
 
+test('packaged updates use the GitHub feed and allow macOS signing', () => {
+  const build = PACKAGE_JSON.build as {
+    mac?: { identity?: string | null }
+    publish?: Array<Record<string, string>>
+  }
+  const dependencies = PACKAGE_JSON.dependencies as Record<string, string>
+
+  assert.deepEqual(build.publish, [{ provider: 'github', owner: 'Nerwin', repo: 'vdoc-app' }])
+  assert.equal(build.mac?.identity, undefined)
+  assert.equal((build.mac as Record<string, unknown>)?.hardenedRuntime, true)
+  assert.equal((build.mac as Record<string, unknown>)?.notarize, true)
+  assert.match(dependencies['electron-updater'] ?? '', /^\^6\./)
+})
+
 test('packaged Electron disables permissive fuses', () => {
   const build = PACKAGE_JSON.build as { electronFuses?: Record<string, boolean> }
   assert.deepEqual(build.electronFuses, {

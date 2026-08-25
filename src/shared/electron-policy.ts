@@ -1,3 +1,5 @@
+export const PACKAGED_RENDERER_URL = 'vdoc-app://renderer/index.html'
+
 export const SECURE_WEB_PREFERENCES = Object.freeze({
   contextIsolation: true,
   nodeIntegration: false,

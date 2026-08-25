@@ -77,6 +77,13 @@
     "electronLanguages": [
       "en"
     ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Nerwin",
+        "repo": "vdoc-app"
+      }
+    ],
     "mac": {
       "target": [
         {
@@ -92,7 +99,8 @@
           ]
         }
       ],
-      "identity": null,
+      "hardenedRuntime": true,
+      "notarize": true,
       "category": "public.app-category.developer-tools"
     },
     "dmg": {
@@ -127,6 +135,7 @@
     }
   },
   "dependencies": {
-    "@sentry/electron": "^7.17.0"
+    "@sentry/electron": "^7.17.0",
+    "electron-updater": "^6.8.9"
   }
 }

@@ -5,11 +5,9 @@ Scope: the current `vdoc-app` worktree, including Electron main/preload/renderer
 
 ## Executive summary
 
-The codebase is generally readable, strongly typed, and deliberately structured. Raw Markdown HTML is escaped, CLI execution uses `execFile` instead of a shell, the preload exposes named operations instead of raw `ipcRenderer`, Monaco models are disposed, and the CLI log buffer is bounded.
+The initial review found 1 critical, 4 high, 5 medium, and 4 low issues. All 14 findings are now fixed. The codebase remains readable and strongly typed, with hardened Electron boundaries, guarded operations, privacy-safe telemetry, native release smoke tests, and a supported auto-update path.
 
-It is not yet security-clean. The main issue is that the renderer is treated as trusted even though a confirmed frontmatter injection can execute JavaScript inside it. That JavaScript can reach broad IPC operations, including an updater that accepts an arbitrary URL and replaces the running application with an unsigned bundle. This creates a practical local code-execution chain.
-
-Findings: 1 critical, 4 high, 5 medium, and 4 low.
+The evidence in each finding records the pre-remediation state. Each resolution describes the current implementation.
 
 | ID | Severity | Finding |
 | --- | --- | --- |
@@ -56,6 +54,13 @@ Recommendation:
 5. Clean temporary data in `finally`, retaining the previous bundle only for the minimum rollback window.
 
 References: [Electron autoUpdater](https://www.electronjs.org/docs/latest/api/auto-updater), [Electron code signing](https://www.electronjs.org/docs/latest/tutorial/code-signing), [electron-builder auto update](https://www.electron.build/docs/features/auto-update/).
+
+Resolution:
+
+- The custom download, extraction, and application replacement code was deleted.
+- `electron-updater` owns GitHub release discovery, SHA-512 metadata verification, download, and installation in the main process.
+- Renderer IPC can request a check or installation of the already-downloaded update, but cannot supply a feed URL, artifact URL, or file path.
+- Release jobs publish `latest*.yml` and blockmaps, and macOS releases require Developer ID signing and notarization credentials.
 
 ### A-02: Frontmatter status values can inject executable HTML into the preview [Fixed]
 
@@ -199,7 +204,7 @@ Evidence:
 
 Impact:
 
-A compromised or moved action tag can replace release artifacts with attacker-controlled executables. The custom updater currently adds no independent signature or checksum barrier.
+A compromised or moved action tag could replace release artifacts with attacker-controlled executables. At review time, the custom updater added no independent signature or checksum barrier.
 
 Recommendation:
 
@@ -241,7 +246,8 @@ Resolution:
 
 - Renderer origin, navigation, and secure web-preference policies are shared with focused unit tests.
 - Existing regression tests cover preview escaping, path containment, guarded writes, redaction, and destructive-operation tickets.
-- Every native release runner launches its unpacked application and verifies preload plus trusted IPC before publishing.
+- Every native release runner launches its unpacked application and verifies the exact renderer URL, root document, preload, and trusted IPC before publishing.
+- Main-frame load failures now fail the smoke test instead of accepting Electron's error page.
 
 ### A-08: Bundled DOMPurify has known security advisories [Fixed]
 
@@ -383,6 +389,7 @@ Resolution:
 
 - Node mode, Node options, CLI inspection, and extra file-protocol privileges are disabled.
 - Embedded ASAR integrity validation and ASAR-only application loading are enabled.
+- The packaged renderer is served from the privileged `vdoc-app://` scheme instead of `file://`.
 - Package configuration tests prevent these fuse values from silently regressing.
 - The packaged arm64 executable was inspected with `@electron/fuses` and passed the packaged smoke test.
 
@@ -436,28 +443,19 @@ Resolution:
 
 | Check | Result |
 | --- | --- |
-| `npm test` | Passed: both TypeScript configurations and 41 shared tests |
-| `npm run build` | Passed; reported ineffective Monaco code splitting and an 8.7 MB renderer entry chunk |
-| `npm run pack` | Passed after network access was available; produced arm64 macOS app |
-| Packaged executable | Mach-O arm64 only; ad-hoc signature, no Team Identifier, no sealed resources |
-| Electron fuses | Read from packaged app; permissive defaults confirmed |
-| `npm audit --json` | 2 entries: 1 moderate and 1 low, both rooted in bundled DOMPurify |
-| `npm audit --omit=dev --json` | Clean, but does not cover browser code bundled from dev dependencies |
+| `npm test` | Passed: both TypeScript configurations and 66 shared tests |
+| `npm run build` | Passed; renderer entry is 1.07 MB and Monaco remains lazy-loaded |
+| `npm run check:bundle` | Passed under the 1.25 MB renderer entry budget |
+| macOS distribution | Produced Apple Silicon DMG, ZIP, blockmaps, and `latest-mac.yml` with SHA-512 hashes |
+| Packaged smoke test | Passed outside the tool sandbox with the exact `vdoc-app://renderer/index.html` page and preload bridge |
+| Electron fuses | Hardened values are configured and covered by a package regression test |
+| `npm audit` | Clean, including bundled renderer and updater dependencies |
 | TypeScript with `noUnusedLocals` and `noUnusedParameters` | Both node and web configurations passed |
-| Focused preview proof | Confirmed attribute breakout and inline event-handler injection |
+| Focused preview regression | Attribute breakout payload remains escaped and blocked by CSP |
 | Tracked secret-name scan | No tracked `.env`, PEM, private-key, or credentials file found |
 
 The test command emits Node's `MODULE_TYPELESS_PACKAGE_JSON` warning for each TypeScript test file. It is noisy but not a runtime correctness finding, so it is not assigned an audit ID.
 
-A packaged GUI startup smoke test was not performed. Packaging success alone should not be treated as target-runtime proof; A-07 recommends making that check deterministic in CI with telemetry disabled and isolated test data.
+## Remediation status
 
-## Recommended remediation order
-
-1. Remove or secure the in-app installer (A-01).
-2. Fix preview injection and add CSP/navigation controls (A-02, A-03).
-3. Redesign the privileged IPC surface and enforce destructive guardrails in main (A-03).
-4. Stop sensitive error data before telemetry (A-04).
-5. Pin the release supply chain and sign artifacts (A-06).
-6. Make file mutations atomic and serialized (A-05).
-7. Add boundary and packaged-runtime tests, then address dependency and packaging drift (A-07 through A-09).
-8. Apply startup, scan, fuse, clipboard, and repository hygiene improvements (A-10 through A-14).
+All findings are resolved and their regression checks pass. No additional material issue remains open from this audit.

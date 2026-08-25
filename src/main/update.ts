@@ -1,77 +1,109 @@
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
-import { app, net } from 'electron'
+import { app, type BrowserWindow } from 'electron'
+import electronUpdater, { type AppUpdater } from 'electron-updater'
 
-import type { UpdateInfo } from '../shared/types.ts'
-import { isNewerVersion } from '../shared/version.ts'
+import type { AppUpdateStatus } from '../shared/types.ts'
 
-/**
- * Update feed: the latest published release of this app's own repository.
- * The repository comes from package.json `repository.url` (no name lives in
- * code), and the matching forge adapter is picked by the URL's host.
- */
+const STARTUP_DELAY_MS = 10_000
+const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000
 
-interface Release {
-  /** Version without a leading v. */
-  version: string
-  /** Human release page - where the installers are attached. */
-  url: string
+let initialized = false
+let updater: AppUpdater | null = null
+let windowProvider: (() => BrowserWindow | null) | null = null
+let checkPromise: Promise<AppUpdateStatus> | null = null
+let status: AppUpdateStatus = { phase: 'idle', current: app.getVersion() }
+
+function getAutoUpdater(): AppUpdater {
+  const { autoUpdater } = electronUpdater
+  return autoUpdater
 }
 
-/** One hosted forge's release API. Adding GitLab/Bitbucket = one more entry in PROVIDERS. */
-interface ReleaseProvider {
-  /** Hostname this adapter serves, matched against the repository URL. */
-  host: string
-  /** Latest published release visible to an unauthenticated client, or null. */
-  latestRelease(owner: string, repo: string): Promise<Release | null>
+function setStatus(next: AppUpdateStatus): void {
+  status = next
+  const window = windowProvider?.()
+  if (window && !window.isDestroyed()) window.webContents.send('update-status', next)
 }
 
-const github: ReleaseProvider = {
-  host: 'github.com',
-  async latestRelease(owner, repo) {
-    const response = await net.fetch(`https://api.github.com/repos/${owner}/${repo}/releases/latest`, {
-      headers: { Accept: 'application/vnd.github+json' },
-    })
-    // 404 = nothing published (a private repo hides everything); rate limits etc. also mean "nothing to offer".
-    if (!response.ok) return null
-    const release = await response.json() as {
-      tag_name?: string
-      html_url?: string
-    }
-    const version = String(release.tag_name ?? '').replace(/^v/, '')
-    if (!version) return null
-    return {
-      version,
-      url: release.html_url ?? `https://github.com/${owner}/${repo}/releases/latest`,
-    }
-  },
-}
-
-const PROVIDERS: ReleaseProvider[] = [github]
-
-/** package.json `repository` resolved to an adapter + owner/repo, or null when absent/unrecognized. */
-function updateSource(): { provider: ReleaseProvider, owner: string, repo: string } | null {
-  try {
-    const pkg = JSON.parse(readFileSync(join(app.getAppPath(), 'package.json'), 'utf8')) as {
-      repository?: string | { url?: string }
-    }
-    const raw = typeof pkg.repository === 'string' ? pkg.repository : pkg.repository?.url
-    if (!raw) return null
-    const url = new URL(raw.replace(/^git\+/, ''))
-    const [owner, repo] = url.pathname.replace(/^\/|\.git$/g, '').split('/')
-    const provider = PROVIDERS.find(candidate => candidate.host === url.hostname)
-    return provider && owner && repo ? { provider, owner, repo } : null
-  } catch {
-    return null
+function versionStatus(
+  phase: AppUpdateStatus['phase'],
+  latest?: string,
+  progress?: number,
+): AppUpdateStatus {
+  return {
+    phase,
+    current: app.getVersion(),
+    ...(latest ? { latest } : {}),
+    ...(progress === undefined ? {} : { progress }),
   }
 }
 
-/** Newer release than the running app, or null. Throws on network failure (renderer decides silence). */
-export async function checkUpdate(): Promise<UpdateInfo | null> {
-  const source = updateSource()
-  if (!source) return null
-  const release = await source.provider.latestRelease(source.owner, source.repo)
-  const current = app.getVersion()
-  if (!release || !isNewerVersion(release.version, current)) return null
-  return { current, latest: release.version, url: release.url }
+export function initializeUpdater(getMainWindow: () => BrowserWindow | null): void {
+  if (initialized) return
+  initialized = true
+  windowProvider = getMainWindow
+
+  if (!app.isPackaged || process.argv.includes('--smoke-test')) {
+    setStatus(versionStatus('unsupported'))
+    return
+  }
+
+  updater = getAutoUpdater()
+  updater.autoDownload = true
+  updater.autoInstallOnAppQuit = true
+  updater.allowPrerelease = false
+  updater.disableWebInstaller = true
+  updater.logger = null
+
+  updater.on('checking-for-update', () => setStatus(versionStatus('checking')))
+  updater.on('update-not-available', () => setStatus(versionStatus('current')))
+  updater.on('update-available', info => setStatus(versionStatus('available', info.version)))
+  updater.on('download-progress', info => {
+    const progress = Math.max(0, Math.min(100, Math.round(info.percent)))
+    setStatus(versionStatus('downloading', status.latest, progress))
+  })
+  updater.on('update-downloaded', info => setStatus(versionStatus('downloaded', info.version, 100)))
+  updater.on('error', () => setStatus(versionStatus('error', status.latest)))
+
+  const startupTimer = setTimeout(() => void checkForUpdates(true), STARTUP_DELAY_MS)
+  const interval = setInterval(() => void checkForUpdates(true), CHECK_INTERVAL_MS)
+  app.once('before-quit', () => {
+    clearTimeout(startupTimer)
+    clearInterval(interval)
+  })
+}
+
+export function getUpdateStatus(): AppUpdateStatus {
+  return status
+}
+
+export function checkForUpdates(notify = false): Promise<AppUpdateStatus> {
+  const activeUpdater = updater
+  if (!activeUpdater || !activeUpdater.isUpdaterActive()) {
+    setStatus(versionStatus('unsupported'))
+    return Promise.resolve(status)
+  }
+  if (status.phase === 'available' || status.phase === 'downloading' || status.phase === 'downloaded') {
+    return Promise.resolve(status)
+  }
+  if (checkPromise) return checkPromise
+
+  checkPromise = (async () => {
+    try {
+      if (notify) await activeUpdater.checkForUpdatesAndNotify()
+      else await activeUpdater.checkForUpdates()
+      if (status.phase === 'checking') setStatus(versionStatus('current'))
+    } catch {
+      setStatus(versionStatus('error', status.latest))
+    }
+    return status
+  })().finally(() => {
+    checkPromise = null
+  })
+
+  return checkPromise
+}
+
+export function restartAndInstallUpdate(): void {
+  const activeUpdater = updater
+  if (!activeUpdater || status.phase !== 'downloaded') throw new Error('No downloaded update is ready')
+  setImmediate(() => activeUpdater.quitAndInstall(false, true))
 }
