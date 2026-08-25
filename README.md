@@ -10,6 +10,70 @@ keys (`confluencePageId`, `confluenceSpace`, `confluencePageVersion`); the CLI r
 tracking lines and never rewrites your body. The app never talks to Confluence directly - every
 operation spawns `vdoc … --json`, so the CLI and the app can never disagree.
 
+## Features
+
+### Read, edit, and navigate documentation
+
+- **Five focused views** - edit in Monaco, read the rendered preview, work in a live split
+  editor and preview, compare local and Confluence content side by side, or review comments.
+- **Rich Markdown preview** - syntax-highlighted code, Mermaid diagrams, in-document find,
+  local link navigation, and external links opened in the system browser.
+- **Safe editing** - auto-save with an immediate manual save shortcut and a read-before-write
+  guard that refuses to overwrite a file changed by another process.
+- **Fast navigation** - fuzzy file search, full-text repository search, recent files, back and
+  forward history, backlinks, and keyboard shortcuts for every common action.
+- **Live repository tree** - file watching, configurable content roots, pinned folders,
+  sync-state filters, ignored files, and git working-tree markers.
+- **Actionable dashboard** - files needing attention, remote authors, bulk verification,
+  recent files, quick actions, and recent sync activity in one place.
+- **Confluence context** - page labels, footer and inline comments, footer comment posting,
+  page IDs, and direct hand-offs to Confluence, the default editor, or the file's folder.
+
+### Confluence workflows with guardrails
+
+- **Precise sync states** - Check, Pull, Push, and Verify distinguish remote movement, local
+  edits, divergence, missing versions, and unverified content instead of reducing everything
+  to a single synced flag.
+- **Safe publishing** - every push starts with a dry-run preview; force push and force pull
+  require explicit confirmation; conflicts are never auto-resolved.
+- **Retrieve pages automatically** - paste a Confluence URL or page ID, choose a local folder,
+  and V-DOC creates a correctly named Markdown file or opens the file already tracking it.
+- **Link or create pages** - find an existing page by exact title, or create one under a chosen
+  parent with folder-to-space mappings that prefill the Confluence space.
+- **Bulk and folder operations** - check all files, pull all behind files, verify every
+  unverified file, cancel a long check, or limit checks to one folder.
+- **Document maintenance** - initialize missing frontmatter, lint files before publishing,
+  exclude individual files with `confluenceIgnore`, and detect outdated CLI versions.
+
+### Authentication, privacy, and diagnostics
+
+- **Two authentication methods** - choose an Atlassian API token or a Confluence session
+  cookie, switch methods in Settings, and renew expiring session credentials in-app.
+- **Encrypted credentials** - tokens are stored through `vdoc config set --encrypt`; the app
+  redacts credentials, decrypted config output, and comment bodies from its command history.
+- **Opt-in Sentry analytics** - privacy-filtered error and crash reporting is disabled by
+  default and can be enabled in Settings for packaged builds.
+- **Built-in CLI logs** - inspect the last 200 commands and their output, with sensitive values
+  hidden, then copy a safely shell-quoted command for terminal reproduction.
+- **Guarded Electron surface** - context isolation, a narrow typed preload API, sender and path
+  validation, denied browser permissions, a Content Security Policy, and hardened fuses.
+- **Guided onboarding** - the welcome tour validates the CLI, repository, and Confluence
+  connection before walking through the main workflows.
+
+### Desktop experience and delivery
+
+- **Cross-platform** - macOS Apple Silicon, Windows x64 installer and portable builds, and
+  Linux x64 AppImage and Debian packages.
+- **Light, dark, and system themes** - the complete UI and Monaco editor follow the selected
+  appearance, including automatic OS theme changes.
+- **Command palette** - every action is discoverable from one keyboard-first command bar, with
+  platform-correct shortcuts and inline reasons when an action is unavailable.
+- **Automatic updates** - packaged builds check GitHub after startup and daily, download in the
+  background through `electron-updater`, and install on exit or on request.
+- **Automated releases** - conventional commits drive the semantic version bump, changelog,
+  release commit, and tag; GitHub Actions then tests, builds, smoke-tests, and publishes all
+  supported platform artifacts and updater metadata.
+
 ## Getting started
 
 ### 1. Install the vdoc CLI
@@ -205,7 +269,7 @@ method, the **space mapping**, and the **assets folder** (where pulled page imag
 the CLI and the app always agree. The **Config file** section shows the resolved path
 (`vdoc config path`) with buttons to open or edit it directly.
 
-- **Theme** - light or dark (UI and the Monaco editors).
+- **Theme** - system, light, or dark (UI and the Monaco editors).
 - **Docs repository** - the docs repo clone the whole app works in (`VDOC_APP_ROOT` is the fallback).
 - **Folders & spaces** - root folders, folder → space mapping, assets folder.
 - **Confluence authentication** - session token or API key, plus the ID, key, and name of every
@@ -241,7 +305,7 @@ npm run dev            # launch in dev mode
 npm test               # typecheck + unit tests
 npm run build          # production bundle to out/
 npm run pack           # quick unsigned app for this OS into release/
-npm run release        # bump version + changelog + tag, then build this OS's binaries
+npm run release        # bump version + CHANGELOG + release commit + tag; pushing the tag starts CI
 npm run dist           # rebuild binaries without bumping (host OS) - or dist:mac / dist:win / dist:linux
 ```
 
