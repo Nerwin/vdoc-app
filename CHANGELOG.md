@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.17.3](https://github.com/Nerwin/vdoc-app/compare/v1.17.2...v1.17.3) (2026-08-25)
+
+### Bug Fixes
+
+* **release:** sign macOS builds with internal certificate for auto-update ([bc59230](https://github.com/Nerwin/vdoc-app/commit/bc5923054ad694628b3522f86cc8e471360c71e6))
 ## [1.17.2](https://github.com/Nerwin/vdoc-app/compare/v1.17.1...v1.17.2) (2026-08-25)
 
 ### Bug Fixes
