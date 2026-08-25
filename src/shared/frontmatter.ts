@@ -4,6 +4,7 @@ export interface Frontmatter {
   updated?: string
   tags?: string[]
   confluencePageId?: string
+  confluenceSpace?: string
   confluencePageVersion?: number
   /** Only ever true - any other value (or absence) reads as undefined. */
   confluenceIgnore?: boolean
@@ -54,6 +55,7 @@ export function parseFrontmatter(content: string): Frontmatter {
     updated: scalar('updated'),
     tags: inlineList(fields.get('tags')),
     confluencePageId: scalar('confluencePageId'),
+    confluenceSpace: scalar('confluenceSpace'),
     confluencePageVersion: positiveInteger(fields.get('confluencePageVersion')),
     confluenceIgnore: fields.get('confluenceIgnore') === 'true' || undefined,
   }

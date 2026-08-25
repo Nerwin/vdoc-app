@@ -12,6 +12,7 @@ test('parseFrontmatter reads scalars, quoted values, and inline tag lists', () =
     'updated: 2026-01-01',
     'tags: [guidelines, eda, kafka]',
     'confluencePageId: "5697306635"',
+    'confluenceSpace: BACK',
     'confluencePageVersion: 42',
     'confluenceIgnore: true',
     '---',
@@ -25,6 +26,7 @@ test('parseFrontmatter reads scalars, quoted values, and inline tag lists', () =
     updated: '2026-01-01',
     tags: ['guidelines', 'eda', 'kafka'],
     confluencePageId: '5697306635',
+    confluenceSpace: 'BACK',
     confluencePageVersion: 42,
     confluenceIgnore: true,
   })
@@ -38,6 +40,7 @@ test('parseFrontmatter tolerates missing frontmatter and missing keys', () => {
     updated: undefined,
     tags: undefined,
     confluencePageId: undefined,
+    confluenceSpace: undefined,
     confluencePageVersion: undefined,
     confluenceIgnore: undefined,
   })
