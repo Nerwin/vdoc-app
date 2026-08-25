@@ -74,7 +74,7 @@ export interface VdocRunOptions {
   timeoutMs?: number
 }
 
-export type VdocTermination = 'cancelled' | 'timeout'
+type VdocTermination = 'cancelled' | 'timeout'
 
 export class VdocCancelledError extends Error {
   constructor(command: string) {
