@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.18.0](https://github.com/Nerwin/vdoc-app/compare/v1.17.3...v1.18.0) (2026-08-26)
+
+### Features
+
+* **telemetry:** enhance Sentry events and add anonymous install id ([fe7115a](https://github.com/Nerwin/vdoc-app/commit/fe7115a1a0986958986f5ef21b58971e306fc0b6))
 ## [1.17.3](https://github.com/Nerwin/vdoc-app/compare/v1.17.2...v1.17.3) (2026-08-25)
 
 ### Bug Fixes
