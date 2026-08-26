@@ -1,0 +1,3 @@
+[install]
+# 7 days - never resolve a version published more recently (supply chain guard)
+minimumReleaseAge = 604800

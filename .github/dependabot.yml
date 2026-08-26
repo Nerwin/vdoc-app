@@ -1,0 +1,9 @@
+version: 2
+updates:
+  - package-ecosystem: "bun"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    # Never propose a version younger than 7 days - supply chain guard
+    cooldown:
+      default-days: 7
