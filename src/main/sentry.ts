@@ -1,4 +1,4 @@
-import { captureException, init, logger, startSpan } from '@sentry/electron/main'
+import { captureException, init, logger, setUser, startSpan } from '@sentry/electron/main'
 import { app } from 'electron'
 
 import { scrubSentryEvent, scrubSentryLog, scrubSentryTransaction, sentryActionName, SENTRY_ACTION_PREFIX, SENTRY_UPDATE_PREFIX } from '../shared/privacy.ts'
@@ -28,6 +28,7 @@ export function initSentry(): void {
       tracesSampler: context => context.name.startsWith(SENTRY_ACTION_PREFIX)
         || context.name.startsWith(SENTRY_UPDATE_PREFIX) ? 1 : 0,
     })
+    setUser({ id: loadSettings().installId })
     logAppEvent('info', 'app.lifecycle.started', {
       'app.version': app.getVersion(),
       'os.name': process.platform,

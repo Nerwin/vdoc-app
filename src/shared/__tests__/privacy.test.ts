@@ -50,6 +50,14 @@ test('scrubSentryEvent removes user content and file paths', () => {
   assert.match(serialized, /Application error/)
 })
 
+test('scrubSentryEvent keeps only the anonymous user id', () => {
+  const scrubbed = scrubSentryEvent({
+    user: { id: '3f2b6f0a-9c1d-4e8a-b7c2-1a2b3c4d5e6f', email: 'person@example.com', ip_address: '1.2.3.4' },
+  })
+  assert.deepEqual(scrubbed.user, { id: '3f2b6f0a-9c1d-4e8a-b7c2-1a2b3c4d5e6f' })
+  assert.equal(scrubSentryEvent({ user: { id: '/Users/person' } }).user, undefined)
+})
+
 test('Sentry action names accept only stable internal identifiers', () => {
   assert.equal(sentryActionName('push-preview'), 'app.action.push-preview')
   assert.equal(sentryActionName('docs/private.md'), 'app.action.unknown')
@@ -96,4 +104,29 @@ test('scrubSentryLog allows only stable app events and safe attributes', () => {
     },
   })
   assert.equal(scrubSentryLog({ level: 'info', message: 'private document', attributes: {} }), null)
+})
+
+test('scrubSentryLog passes command metrics with safe attribute values', () => {
+  const scrubbed = scrubSentryLog({
+    level: 'info',
+    message: 'app.command.finished',
+    attributes: {
+      'command.name': 'cf-check',
+      'command.duration_ms': 1240,
+      'command.exit_code': 0,
+      'command.success': true,
+      'command.args': 'cf check docs/private.md',
+    },
+  })
+
+  assert.deepEqual(scrubbed, {
+    level: 'info',
+    message: 'app.command.finished',
+    attributes: {
+      'command.name': 'cf-check',
+      'command.duration_ms': 1240,
+      'command.exit_code': 0,
+      'command.success': true,
+    },
+  })
 })

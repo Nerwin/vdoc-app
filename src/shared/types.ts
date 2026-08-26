@@ -222,8 +222,10 @@ export interface Settings {
   contentDirs: string[]
   /** Folder paths pinned to the top of their parent's listing. */
   pinnedDirs: string[]
-  /** Send privacy-filtered error, crash, and action performance reports to Sentry. */
+  /** Send privacy-filtered error, crash, and command/action timing reports to Sentry. */
   crashReports: boolean
+  /** Random id generated on first launch - the only user identifier ever sent to Sentry. */
+  installId: string
 }
 
 export interface SettingsInfo extends Settings {

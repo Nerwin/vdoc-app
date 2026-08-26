@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -19,6 +20,7 @@ const DEFAULTS: Settings = {
   contentDirs: [],
   pinnedDirs: [],
   crashReports: false,
+  installId: '',
 }
 
 const settingsFile = (): string => join(app.getPath('userData'), 'settings.json')
@@ -33,6 +35,10 @@ export function loadSettings(): Settings {
     cache = { ...DEFAULTS, ...JSON.parse(readFileSync(settingsFile(), 'utf8')) as Partial<Settings> }
   } catch {
     cache = { ...DEFAULTS }
+  }
+  if (!cache.installId) {
+    cache.installId = randomUUID()
+    saveSettings(cache)
   }
   return cache
 }

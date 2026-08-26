@@ -5,9 +5,14 @@ export const SENTRY_UPDATE_PREFIX = 'app.update.'
 const SAFE_LOG_ATTRIBUTE_KEYS = new Set([
   'app.version',
   'os.name',
+  'command.name',
+  'command.duration_ms',
+  'command.exit_code',
+  'command.success',
   'update.current',
   'update.latest',
   'update.phase',
+  'user.id',
 ])
 
 export function redactVdocArgs(args: string[]): string[] {
@@ -74,6 +79,12 @@ function safeErrorType(type: unknown): string {
   return typeof type === 'string' && /^[A-Za-z][A-Za-z0-9_.]{0,63}$/.test(type) ? type : 'ApplicationError'
 }
 
+/** Keep only the anonymous install id - never emails, names, or IPs. */
+function anonymousUser(user: unknown): { id: string } | undefined {
+  const id = (user as { id?: unknown } | null | undefined)?.id
+  return typeof id === 'string' && /^[A-Za-z0-9-]{1,64}$/.test(id) ? { id } : undefined
+}
+
 export function sentryActionName(action: unknown): string {
   return typeof action === 'string' && /^[a-z][a-z0-9-]{0,63}$/.test(action)
     ? `${SENTRY_ACTION_PREFIX}${action}`
@@ -111,7 +122,7 @@ export function scrubSentryEvent<Event>(event: Event): Event {
     message: source.message ? 'Application error' : undefined,
     breadcrumbs: [],
     request: undefined,
-    user: undefined,
+    user: anonymousUser(source.user),
     extra: undefined,
     logentry: undefined,
   } as Event
@@ -137,7 +148,7 @@ export function scrubSentryTransaction<Event>(event: Event): Event {
 
 export function scrubSentryLog<Log>(log: Log): Log | null {
   const source = log as SentryLogLike
-  if (typeof source.message !== 'string' || !/^app\.(?:lifecycle|update)\.[a-z][a-z0-9-]{0,63}$/.test(source.message)) {
+  if (typeof source.message !== 'string' || !/^app\.(?:command|lifecycle|update)\.[a-z][a-z0-9-]{0,63}$/.test(source.message)) {
     return null
   }
 

@@ -10,6 +10,7 @@ import { parseFrontmatter } from '../shared/frontmatter.ts'
 import { firstMatch, type SearchHit } from '../shared/search.ts'
 import { hidesVdocOutput, redactVdocArgs, vdocCommandId } from '../shared/privacy.ts'
 import { DEFAULT_DOCS_ROOT, EXCLUDED_DIRS, loadSettings } from './settings.ts'
+import { logAppEvent } from './sentry.ts'
 
 /** The docs repository root: Settings → $VDOC_APP_ROOT → home directory. */
 // env read at call time, not import time - importLoginShellEnv runs after module load.
@@ -108,6 +109,12 @@ function recordRun(args: string[], run: VdocRun, startedAt: number): void {
   }
   logEntries.push(entry)
   if (logEntries.length > LOG_MAX) logEntries.shift()
+  logAppEvent('info', 'app.command.finished', {
+    'command.name': vdocCommandId(args).replace(' ', '-'),
+    'command.duration_ms': entry.durationMs,
+    'command.exit_code': run.exitCode,
+    'command.success': run.exitCode === 0,
+  })
   for (const window of BrowserWindow.getAllWindows()) window.webContents.send('vdoc-log', entry)
 }
 
