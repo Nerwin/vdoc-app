@@ -246,6 +246,8 @@ interface FileMeta {
   title?: string
   pageId?: string
   ignored?: boolean
+  hidden?: boolean
+  pinned?: boolean
 }
 
 /** Relative paths of all Markdown files in the content dirs, tracked = has confluencePageId frontmatter. */
@@ -324,12 +326,14 @@ function fileMeta(absPath: string): FileMeta {
     }
     const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(head)
     if (!frontmatter) return { tracked: false }
-    const { title, confluencePageId, confluenceIgnore } = parseFrontmatter(head)
+    const { title, confluencePageId, confluenceIgnore, vdocHide, vdocPin } = parseFrontmatter(head)
     return {
       tracked: /^confluencePageId\s*:/m.test(frontmatter[1]),
       title,
       pageId: confluencePageId,
       ignored: confluenceIgnore,
+      hidden: vdocHide,
+      pinned: vdocPin,
     }
   } catch {
     return { tracked: false }

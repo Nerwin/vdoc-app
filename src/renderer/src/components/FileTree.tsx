@@ -22,6 +22,7 @@ interface Props {
   onOpenDiff(path: string): void
   onCheckFolder(path: string): void
   onTogglePin(path: string): void
+  onSetPinned(path: string, pinned: boolean): void
   onOpenFolder(path: string): void
   onGetPage(path: string): void
   onRemoveFolder(path: string): void
@@ -64,10 +65,13 @@ export function FileTree(props: Props) {
     return () => window.removeEventListener('keydown', onKey, true)
   }, [menu])
 
-  const { rows, filteredOut } = useMemo(() => {
+  const { rows, filteredOut, pinnedPaths } = useMemo(() => {
     const query = filterText.toLowerCase()
+    const pinnedPaths = new Set(pinnedDirs)
     const paths = [...entries.values()]
       .filter(entry => {
+        if (entry.hidden) return false
+        if (entry.pinned) pinnedPaths.add(entry.path)
         if (query && !entry.path.toLowerCase().includes(query) && !entry.title?.toLowerCase().includes(query)) return false
         return matchesFilter(entry, stateFilter)
       })
@@ -76,8 +80,8 @@ export function FileTree(props: Props) {
     const filteredOut = selection !== null && entries.has(selection) && !paths.includes(selection)
     if (filteredOut) paths.push(selection!)
     // A filter shows every match expanded; the collapse set only applies when browsing.
-    const tree = orderPinnedFirst(buildTree(paths), new Set(pinnedDirs))
-    return { rows: flattenVisible(tree, filtering ? new Set() : collapsed), filteredOut }
+    const tree = orderPinnedFirst(buildTree(paths), pinnedPaths)
+    return { rows: flattenVisible(tree, filtering ? new Set() : collapsed), filteredOut, pinnedPaths }
   }, [entries, filterText, stateFilter, selection, filtering, collapsed, pinnedDirs])
 
   const fileRows = useMemo(() => rows.filter(row => row.kind === 'file'), [rows])
@@ -195,7 +199,7 @@ export function FileTree(props: Props) {
             entries={entries}
             selected={row.path === selection}
             dimmed={row.path === selection && filteredOut}
-            pinned={pinnedDirs.includes(row.path)}
+            pinned={pinnedPaths.has(row.path)}
             collapsed={!filtering && collapsed.has(row.path)}
             onClick={() => (row.kind === 'dir' ? toggleDir(row.path) : props.onSelect(row.path))}
             onContextMenu={event => {
@@ -259,6 +263,10 @@ export function FileTree(props: Props) {
                   const pageId = entry?.check?.pageId ?? entry?.pageId
                   return (
                     <>
+                      <MenuItem
+                        label={entry?.pinned ? 'Unpin' : 'Pin on top'}
+                        onClick={() => { props.onSetPinned(menu.path, !entry?.pinned); setMenu(null) }}
+                      />
                       <MenuItem
                         label={entry?.ignored ? 'Include in Confluence check' : 'Exclude from Confluence check'}
                         onClick={() => { props.onSetIgnore(menu.path, !entry?.ignored); setMenu(null) }}
@@ -394,6 +402,14 @@ function Row({ node, entries, selected, dimmed, pinned, collapsed, onClick, onCo
       <span className={`min-w-0 flex-1 truncate text-[12.5px] ${selected ? 'text-ink font-medium' : entry?.tracked ? 'text-ink-mid' : 'text-ink-label'}`}>
         {entry?.title ?? node.name}
       </span>
+      {pinned && (
+        <span title="Pinned on top" className="shrink-0 text-accent">
+          <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 17v5" />
+            <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1z" />
+          </svg>
+        </span>
+      )}
       {meta.glyph
         ? <span title={glyphHint} className={`shrink-0 text-[11px] ${meta.color}`}>{meta.glyph}</span>
         : entry?.gitDirty && <span title="uncommitted git changes" className="shrink-0 text-[11px] text-warn-text">±</span>}

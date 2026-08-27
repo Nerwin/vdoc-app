@@ -2,7 +2,7 @@ import { captureException } from '@sentry/electron/renderer'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { AppUpdateStatus, AuthStatus, CheckFile, CredentialKey, DiffResult, PushFile, ScanFile, Settings, SettingsInfo, TriageFilter, VersionEntry } from '../../shared/types.ts'
-import { setConfluenceIgnore } from '../../shared/frontmatter.ts'
+import { setFrontmatterFlag } from '../../shared/frontmatter.ts'
 import { initMessage } from '../../shared/init.ts'
 import { isLossyPushError } from '../../shared/lossy-push.ts'
 import { displayState, needsAttention, type FileEntry } from '../../shared/status.ts'
@@ -192,6 +192,8 @@ export function useApp() {
           title: file.title,
           pageId: file.pageId,
           ignored: file.ignored,
+          hidden: file.hidden,
+          pinned: file.pinned,
           check: file.tracked ? previous?.check : undefined,
         })
       }
@@ -666,11 +668,24 @@ export function useApp() {
     await api.writeFile({
       path,
       expected: content,
-      next: setConfluenceIgnore(content, ignored),
+      next: setFrontmatterFlag(content, 'confluenceIgnore', ignored),
       revision: Date.now(),
     })
     const name = path.split('/').at(-1)
     setMessage({ kind: 'info', text: `${name} ${ignored ? 'excluded from' : 'included in'} Confluence checks` })
+  }), [api, runOp])
+
+  /** Toggle `vdocPin:` in the file's frontmatter - the watcher rescan updates the tree. */
+  const setPinned = useCallback((path: string, pinned: boolean) => runOp('pin', async () => {
+    const content = await api.readFile(path)
+    await api.writeFile({
+      path,
+      expected: content,
+      next: setFrontmatterFlag(content, 'vdocPin', pinned),
+      revision: Date.now(),
+    })
+    const name = path.split('/').at(-1)
+    setMessage({ kind: 'info', text: `${name} ${pinned ? 'pinned on top' : 'unpinned'}` })
   }), [api, runOp])
 
   const reloadVersion = useCallback(() => {
@@ -766,6 +781,7 @@ export function useApp() {
     pickDocsRoot,
     removeFolder,
     togglePin,
+    setPinned,
     checkFolder,
     setIgnored,
     openFolder: (path: string) => api.openFolder(path).catch(fail),

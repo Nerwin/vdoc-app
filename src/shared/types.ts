@@ -180,6 +180,10 @@ export interface ScanFile {
   pageId?: string
   /** Frontmatter `confluenceIgnore: true` - the file is skipped by every Confluence operation. */
   ignored?: boolean
+  /** Frontmatter `vdocHide: true` - the file never shows in the tree view. */
+  hidden?: boolean
+  /** Frontmatter `vdocPin: true` - the file is pinned on top of its siblings, after folders. */
+  pinned?: boolean
 }
 
 interface ScanResult {

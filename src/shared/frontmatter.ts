@@ -8,7 +8,14 @@ export interface Frontmatter {
   confluencePageVersion?: number
   /** Only ever true - any other value (or absence) reads as undefined. */
   confluenceIgnore?: boolean
+  /** Only ever true - hides the file from the tree view. */
+  vdocHide?: boolean
+  /** Only ever true - pins the file on top of its siblings, after folders. */
+  vdocPin?: boolean
 }
+
+/** Frontmatter booleans the app can toggle in place. */
+export type FrontmatterFlag = 'confluenceIgnore' | 'vdocHide' | 'vdocPin'
 
 const unquote = (value: string): string => value.replace(/^(["'])(.*)\1$/, '$2')
 
@@ -49,6 +56,7 @@ export function parseFrontmatter(content: string): Frontmatter {
     if (!value) return undefined
     return unquote(value) || undefined
   }
+  const flag = (key: FrontmatterFlag): true | undefined => fields.get(key) === 'true' || undefined
   return {
     title: scalar('title'),
     status: scalar('status'),
@@ -57,15 +65,18 @@ export function parseFrontmatter(content: string): Frontmatter {
     confluencePageId: scalar('confluencePageId'),
     confluenceSpace: scalar('confluenceSpace'),
     confluencePageVersion: positiveInteger(fields.get('confluencePageVersion')),
-    confluenceIgnore: fields.get('confluenceIgnore') === 'true' || undefined,
+    confluenceIgnore: flag('confluenceIgnore'),
+    vdocHide: flag('vdocHide'),
+    vdocPin: flag('vdocPin'),
   }
 }
 
-function upsertIgnore(body: string, line: string, eol: string): string {
+function upsertFlag(body: string, key: FrontmatterFlag, line: string, eol: string): string {
+  const keyPattern = new RegExp(`^${key}\\s*:`)
   const lines = body ? body.split(/\r?\n/) : []
   let replaced = false
   const next = lines.flatMap(existing => {
-    if (!/^confluenceIgnore\s*:/.test(existing)) return [existing]
+    if (!keyPattern.test(existing)) return [existing]
     if (replaced) return []
     replaced = true
     return [line]
@@ -74,9 +85,9 @@ function upsertIgnore(body: string, line: string, eol: string): string {
   return next.join(eol)
 }
 
-/** Set (or insert) `confluenceIgnore:` in the frontmatter, creating the block if absent. */
-export function setConfluenceIgnore(content: string, ignored: boolean): string {
-  const line = `confluenceIgnore: ${ignored}`
+/** Set (or insert) a boolean `key:` in the frontmatter, creating the block if absent. */
+export function setFrontmatterFlag(content: string, key: FrontmatterFlag, value: boolean): string {
+  const line = `${key}: ${value}`
   const match = BLOCK.exec(content)
   if (!match) {
     const eol = content.match(/\r\n|\n/)?.[0] ?? '\n'
@@ -84,6 +95,6 @@ export function setConfluenceIgnore(content: string, ignored: boolean): string {
   }
 
   const eol = match[1]
-  const body = upsertIgnore(blockBody(match), line, eol)
+  const body = upsertFlag(blockBody(match), key, line, eol)
   return `---${eol}${body}${eol}---${match[3]}${content.slice(match[0].length)}`
 }

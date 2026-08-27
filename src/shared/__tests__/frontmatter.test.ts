@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { parseFrontmatter, setConfluenceIgnore } from '../frontmatter.ts'
+import { parseFrontmatter, setFrontmatterFlag } from '../frontmatter.ts'
 
 test('parseFrontmatter reads scalars, quoted values, and inline tag lists', () => {
   const md = [
@@ -29,6 +29,8 @@ test('parseFrontmatter reads scalars, quoted values, and inline tag lists', () =
     confluenceSpace: 'BACK',
     confluencePageVersion: 42,
     confluenceIgnore: true,
+    vdocHide: undefined,
+    vdocPin: undefined,
   })
 })
 
@@ -43,12 +45,22 @@ test('parseFrontmatter tolerates missing frontmatter and missing keys', () => {
     confluenceSpace: undefined,
     confluencePageVersion: undefined,
     confluenceIgnore: undefined,
+    vdocHide: undefined,
+    vdocPin: undefined,
   })
 })
 
 test('parseFrontmatter only reads confluenceIgnore: true as ignored', () => {
   assert.equal(parseFrontmatter('---\nconfluenceIgnore: false\n---\n').confluenceIgnore, undefined)
   assert.equal(parseFrontmatter('---\nconfluenceIgnore: yes\n---\n').confluenceIgnore, undefined)
+})
+
+test('parseFrontmatter reads vdocHide and vdocPin only as true', () => {
+  const result = parseFrontmatter('---\nvdocHide: true\nvdocPin: true\n---\n')
+  assert.equal(result.vdocHide, true)
+  assert.equal(result.vdocPin, true)
+  assert.equal(parseFrontmatter('---\nvdocHide: false\nvdocPin: yes\n---\n').vdocHide, undefined)
+  assert.equal(parseFrontmatter('---\nvdocHide: false\nvdocPin: yes\n---\n').vdocPin, undefined)
 })
 
 test('parseFrontmatter rejects malformed versions, lists, and closing delimiters', () => {
@@ -64,34 +76,41 @@ test('parseFrontmatter only reads the leading block and ignores nested yaml', ()
   assert.equal(result.title, 'First')
 })
 
-test('setConfluenceIgnore inserts into an existing block without touching other keys', () => {
+test('setFrontmatterFlag inserts into an existing block without touching other keys', () => {
   const md = '---\ntitle: Doc\nconfluencePageId: "123"\n---\n\n# Doc\n'
   assert.equal(
-    setConfluenceIgnore(md, true),
+    setFrontmatterFlag(md, 'confluenceIgnore', true),
     '---\ntitle: Doc\nconfluencePageId: "123"\nconfluenceIgnore: true\n---\n\n# Doc\n',
   )
 })
 
-test('setConfluenceIgnore replaces an existing value', () => {
+test('setFrontmatterFlag replaces an existing value', () => {
   const md = '---\nconfluenceIgnore: true\ntitle: Doc\n---\nBody\n'
-  assert.equal(setConfluenceIgnore(md, false), '---\nconfluenceIgnore: false\ntitle: Doc\n---\nBody\n')
+  assert.equal(setFrontmatterFlag(md, 'confluenceIgnore', false), '---\nconfluenceIgnore: false\ntitle: Doc\n---\nBody\n')
 })
 
-test('setConfluenceIgnore removes duplicate values', () => {
+test('setFrontmatterFlag removes duplicate values', () => {
   const md = '---\nconfluenceIgnore: false\ntitle: Doc\nconfluenceIgnore: true\n---\nBody\n'
-  assert.equal(setConfluenceIgnore(md, false), '---\nconfluenceIgnore: false\ntitle: Doc\n---\nBody\n')
-  assert.equal(parseFrontmatter(setConfluenceIgnore(md, false)).confluenceIgnore, undefined)
+  assert.equal(setFrontmatterFlag(md, 'confluenceIgnore', false), '---\nconfluenceIgnore: false\ntitle: Doc\n---\nBody\n')
+  assert.equal(parseFrontmatter(setFrontmatterFlag(md, 'confluenceIgnore', false)).confluenceIgnore, undefined)
 })
 
-test('setConfluenceIgnore handles an empty frontmatter block', () => {
-  assert.equal(setConfluenceIgnore('---\n---\nBody\n', true), '---\nconfluenceIgnore: true\n---\nBody\n')
+test('setFrontmatterFlag handles an empty frontmatter block', () => {
+  assert.equal(setFrontmatterFlag('---\n---\nBody\n', 'confluenceIgnore', true), '---\nconfluenceIgnore: true\n---\nBody\n')
 })
 
-test('setConfluenceIgnore creates the block when the file has none', () => {
-  assert.equal(setConfluenceIgnore('# Doc\n', true), '---\nconfluenceIgnore: true\n---\n\n# Doc\n')
+test('setFrontmatterFlag creates the block when the file has none', () => {
+  assert.equal(setFrontmatterFlag('# Doc\n', 'confluenceIgnore', true), '---\nconfluenceIgnore: true\n---\n\n# Doc\n')
 })
 
-test('setConfluenceIgnore keeps CRLF line endings', () => {
+test('setFrontmatterFlag keeps CRLF line endings', () => {
   const md = '---\r\ntitle: Doc\r\n---\r\nBody\r\n'
-  assert.equal(setConfluenceIgnore(md, true), '---\r\ntitle: Doc\r\nconfluenceIgnore: true\r\n---\r\nBody\r\n')
+  assert.equal(setFrontmatterFlag(md, 'confluenceIgnore', true), '---\r\ntitle: Doc\r\nconfluenceIgnore: true\r\n---\r\nBody\r\n')
+})
+
+test('setFrontmatterFlag toggles vdocPin independently of other flags', () => {
+  const md = '---\ntitle: Doc\nconfluenceIgnore: true\n---\nBody\n'
+  const pinned = setFrontmatterFlag(md, 'vdocPin', true)
+  assert.equal(pinned, '---\ntitle: Doc\nconfluenceIgnore: true\nvdocPin: true\n---\nBody\n')
+  assert.equal(setFrontmatterFlag(pinned, 'vdocPin', false), '---\ntitle: Doc\nconfluenceIgnore: true\nvdocPin: false\n---\nBody\n')
 })

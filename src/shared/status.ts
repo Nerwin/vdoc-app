@@ -11,6 +11,10 @@ export interface FileEntry {
   pageId?: string
   /** Frontmatter `confluenceIgnore: true` - excluded from every Confluence operation. */
   ignored?: boolean
+  /** Frontmatter `vdocHide: true` - never shown in the tree view. */
+  hidden?: boolean
+  /** Frontmatter `vdocPin: true` - pinned on top of its siblings, after folders. */
+  pinned?: boolean
   check?: CheckFile
 }
 

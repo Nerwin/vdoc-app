@@ -235,6 +235,7 @@ export function App() {
               onOpenDiff={path => void app.loadDiff(path, true)}
               onCheckFolder={app.checkFolder}
               onTogglePin={app.togglePin}
+              onSetPinned={(path, pinned) => void app.setPinned(path, pinned)}
               onOpenFolder={path => void app.openFolder(path)}
               onGetPage={path => app.setGetForm({ dir: path })}
               onRemoveFolder={app.removeFolder}

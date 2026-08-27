@@ -70,10 +70,11 @@ export function filesUnder(node: TreeNode): string[] {
   return node.children.flatMap(filesUnder)
 }
 
-/** Stable re-order putting pinned paths first among their siblings, at every depth. */
+/** Stable re-order putting pinned paths first within their kind (dirs stay before files), at every depth. */
 export function orderPinnedFirst(nodes: TreeNode[], pinned: ReadonlySet<string>): TreeNode[] {
   if (pinned.size === 0) return nodes
+  const rank = (node: TreeNode): number => (node.kind === 'dir' ? 0 : 2) + (pinned.has(node.path) ? 0 : 1)
   return [...nodes]
-    .sort((a, b) => Number(pinned.has(b.path)) - Number(pinned.has(a.path)))
+    .sort((a, b) => rank(a) - rank(b))
     .map(node => (node.kind === 'dir' ? { ...node, children: orderPinnedFirst(node.children, pinned) } : node))
 }

@@ -51,6 +51,13 @@ test('orderPinnedFirst hoists pinned dirs at every depth, stable otherwise', () 
   assert.deepEqual(orderPinnedFirst(tree, new Set()).map(node => node.path), ['a', 'b', 'c'])
 })
 
+test('orderPinnedFirst keeps pinned files below dirs, above their file siblings', () => {
+  const tree = buildTree(['a/x.md', 'first.md', 'second.md', 'third.md'])
+
+  const ordered = orderPinnedFirst(tree, new Set(['third.md']))
+  assert.deepEqual(ordered.map(node => node.path), ['a', 'third.md', 'first.md', 'second.md'])
+})
+
 test('displayState refuses to show green without a local-edit baseline', () => {
   const base = { path: 'x.md', tracked: true }
   assert.equal(displayState({ path: 'x.md', tracked: false }), 'untracked')
