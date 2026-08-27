@@ -17,7 +17,7 @@ interface TreeLeaf {
 
 export type TreeNode = TreeDir | TreeLeaf
 
-/** Build a nested tree from sorted relative paths ('dir/sub/foo.md'). */
+/** Build a nested tree from sorted relative paths ('dir/sub/foo.md'). Dirs sort before files at every depth. */
 export function buildTree(paths: string[]): TreeNode[] {
   const roots: TreeNode[] = []
   const dirs = new Map<string, TreeDir>()
@@ -41,6 +41,12 @@ export function buildTree(paths: string[]): TreeNode[] {
     if (segments.length === 1) roots.push(leaf)
     else dirFor(segments.slice(0, -1).join('/'), depth - 1).children.push(leaf)
   }
+
+  const dirsFirst = (list: TreeNode[]): void => {
+    list.sort((a, b) => Number(b.kind === 'dir') - Number(a.kind === 'dir'))
+    for (const node of list) if (node.kind === 'dir') dirsFirst(node.children)
+  }
+  dirsFirst(roots)
 
   return roots
 }

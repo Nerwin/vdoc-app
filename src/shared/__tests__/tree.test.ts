@@ -21,6 +21,14 @@ test('buildTree nests files under their directories', () => {
   assert.deepEqual(filesUnder(backend).sort(), ['1-Backend/components/api.md', '1-Backend/intro.md'])
 })
 
+test('buildTree puts dirs before files at every depth', () => {
+  const tree = buildTree(['a.md', 'b/nested.md', 'b/z/deep.md', 'c.md'])
+  assert.deepEqual(tree.map(node => [node.kind, node.name]), [['dir', 'b'], ['file', 'a.md'], ['file', 'c.md']])
+  const b = tree[0]
+  assert.ok(b.kind === 'dir')
+  assert.deepEqual(b.children.map(node => [node.kind, node.name]), [['dir', 'z'], ['file', 'nested.md']])
+})
+
 test('flattenVisible hides children of collapsed dirs', () => {
   const tree = buildTree(['a/b/one.md', 'a/two.md', 'c/three.md'])
 

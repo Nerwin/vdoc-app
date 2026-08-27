@@ -353,6 +353,9 @@ function Row({ node, entries, selected, dimmed, pinned, collapsed, onClick, onCo
         className="flex w-full shrink-0 items-center gap-[7px] rounded-[5px] py-[5px] pr-2 text-left hover:bg-row-hover"
       >
         <span className="text-[8px] text-ink-faint">{collapsed ? '▸' : '▾'}</span>
+        <svg viewBox="0 0 16 16" aria-hidden="true" className="h-3 w-3 shrink-0 fill-current text-ink-faint">
+          <path d="M1.5 3c0-.83.67-1.5 1.5-1.5h3.2c.4 0 .78.16 1.06.44L8.4 3h4.6c.83 0 1.5.67 1.5 1.5v7c0 .83-.67 1.5-1.5 1.5H3c-.83 0-1.5-.67-1.5-1.5V3Z" />
+        </svg>
         <span className="truncate text-[12.5px] font-medium text-ink">{node.name}</span>
         {pinned && <span className="text-[9px] text-accent" title="Pinned on top">✦</span>}
         <span className="text-[10.5px] text-ink-ghost">{filesUnder(node).length}</span>
