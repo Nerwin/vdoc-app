@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.19.0](https://github.com/Nerwin/vdoc-app/compare/v1.18.0...v1.19.0) (2026-08-27)
+
+### Features
+
+* **get-form:** add 'Get page from Confluence' to folder context menu ([9bfa49e](https://github.com/Nerwin/vdoc-app/commit/9bfa49e3be0f0d497ef4e01ddea19594e55a4354))
+* **get-form:** fetch all nested pages with cf get --recursive ([6af1035](https://github.com/Nerwin/vdoc-app/commit/6af10357d3cf618da24dbc5cc52606ce93705142))
+* **tree:** show folders on top with a folder icon ([9ffc3ef](https://github.com/Nerwin/vdoc-app/commit/9ffc3ef856290119b5ea0c556d9aa8562c13f731))
+* **tree:** vdocHide and vdocPin frontmatter flags with pin/unpin context action ([0109465](https://github.com/Nerwin/vdoc-app/commit/0109465263e0082f7b8f93595c9be1e4bfa182bf))
 ## [1.18.0](https://github.com/Nerwin/vdoc-app/compare/v1.17.3...v1.18.0) (2026-08-26)
 
 ### Features
