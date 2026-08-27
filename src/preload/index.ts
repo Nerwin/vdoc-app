@@ -32,6 +32,7 @@ const api: VdocApi = {
   create: (path, space, parent) => ipcRenderer.invoke('create', path, space, parent),
   initFile: path => ipcRenderer.invoke('md-init', path),
   getPage: (input, dir) => ipcRenderer.invoke('get-page', input, dir),
+  getPageRecursive: (input, dir) => ipcRenderer.invoke('get-page', input, dir, true),
   fileForPageId: pageId => ipcRenderer.invoke('file-for-page-id', pageId),
   sync: (path, space) => ipcRenderer.invoke('sync', path, space),
   lint: path => ipcRenderer.invoke('lint', path),

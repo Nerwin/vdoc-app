@@ -127,6 +127,13 @@ export interface GetPageResult {
   localizedLinks?: number
 }
 
+/** `cf get --recursive` result - the page plus every nested descendant, written flat into the target dir. */
+export interface GetPageRecursiveResult {
+  root: string
+  pages: Array<{ pageId: string, title: string, file: string, version: number }>
+  skipped: Array<{ pageId: string, title: string, reason: string }>
+}
+
 interface LintIssue {
   rule: string
   severity: string
@@ -292,6 +299,8 @@ export interface VdocApi {
   initFile(path: string): Promise<InitResult>
   /** Download a page (URL or id) into `dir`; the CLI names the file after the page title. */
   getPage(input: string, dir: string): Promise<GetPageResult>
+  /** Download a page and every nested descendant flat into `dir`. */
+  getPageRecursive(input: string, dir: string): Promise<GetPageRecursiveResult>
   /** Tracked file whose frontmatter already carries this confluencePageId, or null. */
   fileForPageId(pageId: string): Promise<string | null>
   sync(path: string, space?: string): Promise<SyncFile[]>

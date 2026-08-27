@@ -12,13 +12,14 @@ interface Props {
   /** Tracked file already carrying this page id, or null. */
   findExisting(pageId: string): Promise<string | null>
   onOpenExisting(path: string): void
-  onSubmit(input: string, dir: string): void
+  onSubmit(input: string, dir: string, recursive: boolean): void
   onClose(): void
 }
 
 export function GetForm({ folders, presetDir, busy, findExisting, onOpenExisting, onSubmit, onClose }: Props) {
   const [dir, setDir] = useState(presetDir ?? folders[0] ?? '')
   const [input, setInput] = useState('')
+  const [recursive, setRecursive] = useState(false)
   const [existing, setExisting] = useState<string | null>(null)
   const [checking, setChecking] = useState(false)
 
@@ -26,11 +27,16 @@ export function GetForm({ folders, presetDir, busy, findExisting, onOpenExisting
 
   const submit = (): void => {
     if (!pageId || busy || checking) return
+    // Recursive skips the duplicate gate: the CLI skips tracked pages but still fetches their children.
+    if (recursive) {
+      onSubmit(input, dir, true)
+      return
+    }
     setChecking(true)
     void findExisting(pageId).then(found => {
       setChecking(false)
       if (found) setExisting(found)
-      else onSubmit(input, dir)
+      else onSubmit(input, dir, false)
     })
   }
 
@@ -48,7 +54,7 @@ export function GetForm({ folders, presetDir, busy, findExisting, onOpenExisting
         : (
             <>
               <ModalButton label="Cancel" onClick={onClose} />
-              <ModalButton label="Get page" primary disabled={pageId === null || busy || checking} onClick={submit} />
+              <ModalButton label={recursive ? 'Get pages' : 'Get page'} primary disabled={pageId === null || busy || checking} onClick={submit} />
             </>
           )}
     >
@@ -88,6 +94,15 @@ export function GetForm({ folders, presetDir, busy, findExisting, onOpenExisting
         </label>
         {input.trim() !== '' && pageId === null && (
           <p className="text-[11px] text-warn">Enter a numeric page ID or a Confluence page URL.</p>
+        )}
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={recursive} onChange={event => setRecursive(event.target.checked)} />
+          <span className="text-[12px] text-ink-body">Include all nested pages</span>
+        </label>
+        {recursive && (
+          <p className="text-[11px] text-ink-faint">
+            Every sub-page is written into the folder as its own file; already-tracked pages are skipped.
+          </p>
         )}
         {existing && (
           <p className="text-[11px] text-warn">

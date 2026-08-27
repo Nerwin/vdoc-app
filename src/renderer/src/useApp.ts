@@ -467,7 +467,23 @@ export function useApp() {
     setMessage({ kind: 'info', text: initMessage(path, initialized.added) })
   }), [api, mergeScan, runOp])
 
-  const submitGet = useCallback((input: string, dir: string) => runOp('get', async () => {
+  const submitGet = useCallback((input: string, dir: string, recursive: boolean) => runOp('get', async () => {
+    if (recursive) {
+      const result = await api.getPageRecursive(input.trim(), dir)
+      setGetForm(null)
+      const scan = await api.scan()
+      setRoot(scan.root)
+      mergeScan(scan.files)
+      const fetched = result.pages.map(page => normalize(page.file)).filter(path => scan.files.some(file => file.path === path))
+      const skipped = result.skipped.length > 0 ? `, ${result.skipped.length} skipped` : ''
+      setMessage({ kind: 'info', text: `Fetched ${result.pages.length} page(s) into ${dir}${skipped}` })
+      if (fetched.length > 0) {
+        recordActivity('fetched', fetched)
+        select(fetched[0])
+        await recheck(fetched)
+      }
+      return
+    }
     const result = await api.getPage(input.trim(), dir)
     setGetForm(null)
     // The watcher also fires, but rescan now so the new file can be selected immediately.

@@ -3,7 +3,7 @@ import { readFileSync, realpathSync, statSync } from 'node:fs'
 import { isAbsolute, join, relative } from 'node:path'
 import { app, BrowserWindow, clipboard, dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
 
-import type { AuthStatus, CheckFile, CommentEntry, CreateResult, CredentialKey, DiffResult, FileWriteRequest, FileWriteResult, GetPageResult, InitResult, LintFile, PullFile, PushFile, Settings, SettingsInfo, SyncFile, VersionEntry } from '../shared/types.ts'
+import type { AuthStatus, CheckFile, CommentEntry, CreateResult, CredentialKey, DiffResult, FileWriteRequest, FileWriteResult, GetPageRecursiveResult, GetPageResult, InitResult, LintFile, PullFile, PushFile, Settings, SettingsInfo, SyncFile, VersionEntry } from '../shared/types.ts'
 import { parseVdocCliRequirement, type VdocCliRequirement } from '../shared/app-config.ts'
 import { clipboardText } from '../shared/clipboard.ts'
 import { parseConfluenceSpaces } from '../shared/confluence.ts'
@@ -348,11 +348,13 @@ export function registerIpc(
   handle('md-init', (_event, input: unknown) =>
     runVdocJson<InitResult>(['md', 'init', docsPath(input)]))
 
-  handle('get-page', (_event, pageInput: unknown, dirInput: unknown) => {
+  handle('get-page', (_event, pageInput: unknown, dirInput: unknown, recursiveInput?: unknown) => {
     const input = stringValue(pageInput, 'page URL or id', 2048)
     const dir = docsPath(dirInput, 'output directory')
     if (!statSync(resolveExistingPathInsideRoot(docsRoot(), dir)).isDirectory()) throw new Error('Invalid output directory')
-    return runVdocJson<GetPageResult>(['cf', 'get', input, '--out', dir])
+    const args = ['cf', 'get', input, '--out', dir]
+    if (recursiveInput === true) args.push('--recursive')
+    return runVdocJson<GetPageResult | GetPageRecursiveResult>(args)
   })
 
   handle('file-for-page-id', (_event, input: unknown) => fileForPageId(stringValue(input, 'page id', 32)))
