@@ -137,7 +137,7 @@ export function App() {
 
   // Global shortcuts stand down while any dialog is open - each dialog owns its keys.
   const dialogOpen = palette !== null || tokenOpen || settingsOpen || helpOpen
-    || app.pushPreview !== null || app.pullConfirm !== null || app.createForm !== null || app.getForm
+    || app.pushPreview !== null || app.pullConfirm !== null || app.createForm !== null || app.getForm !== null
 
   useEffect(() => {
     if (dialogOpen) return
@@ -236,6 +236,7 @@ export function App() {
               onCheckFolder={app.checkFolder}
               onTogglePin={app.togglePin}
               onOpenFolder={path => void app.openFolder(path)}
+              onGetPage={path => app.setGetForm({ dir: path })}
               onRemoveFolder={app.removeFolder}
               onSetIgnore={(path, ignored) => void app.setIgnored(path, ignored)}
               onCopyPageId={pageId => copy(ctx, pageId, 'Page ID')}
@@ -299,7 +300,7 @@ export function App() {
                   onCheckAll={() => void app.checkAll()}
                   onOpenFilePalette={() => setPalette('file')}
                   onOpenCommandPalette={() => setPalette('command')}
-                  onOpenGetForm={() => app.setGetForm(true)}
+                  onOpenGetForm={() => app.setGetForm({})}
                   onFilterFolder={dir => app.setFilterText(`${dir}/`)}
                 />
               )}
@@ -441,14 +442,15 @@ export function App() {
       {app.getForm && (
         <GetForm
           folders={app.settings?.contentDirs ?? []}
+          presetDir={app.getForm.dir}
           busy={app.busyOp !== null}
           findExisting={app.fileForPageId}
           onOpenExisting={path => {
-            app.setGetForm(false)
+            app.setGetForm(null)
             app.setSelection(path)
           }}
           onSubmit={app.submitGet}
-          onClose={() => app.setGetForm(false)}
+          onClose={() => app.setGetForm(null)}
         />
       )}
 

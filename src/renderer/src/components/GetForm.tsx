@@ -4,8 +4,10 @@ import { confluencePageId } from '../../../shared/links.ts'
 import { Modal, ModalButton } from './Modal.tsx'
 
 interface Props {
-  /** Root folders the tree shows - the only allowed destinations. */
+  /** Root folders the tree shows - the destinations offered by the select. */
   folders: string[]
+  /** Destination fixed by the tree's folder context menu - hides the select, allows nested folders. */
+  presetDir?: string
   busy: boolean
   /** Tracked file already carrying this page id, or null. */
   findExisting(pageId: string): Promise<string | null>
@@ -14,8 +16,8 @@ interface Props {
   onClose(): void
 }
 
-export function GetForm({ folders, busy, findExisting, onOpenExisting, onSubmit, onClose }: Props) {
-  const [dir, setDir] = useState(folders[0] ?? '')
+export function GetForm({ folders, presetDir, busy, findExisting, onOpenExisting, onSubmit, onClose }: Props) {
+  const [dir, setDir] = useState(presetDir ?? folders[0] ?? '')
   const [input, setInput] = useState('')
   const [existing, setExisting] = useState<string | null>(null)
   const [checking, setChecking] = useState(false)
@@ -57,13 +59,17 @@ export function GetForm({ folders, busy, findExisting, onOpenExisting, onSubmit,
         </p>
         <label className="block">
           <span className="mb-1 block text-[11px] text-ink-faint">Create in folder</span>
-          <select
-            value={dir}
-            onChange={event => setDir(event.target.value)}
-            className="w-56 rounded-md border border-control bg-raised px-2 py-1.5 font-mono text-[12px] text-ink outline-none"
-          >
-            {folders.map(folder => <option key={folder} value={folder}>{folder}</option>)}
-          </select>
+          {presetDir
+            ? <span className="block font-mono text-[12px] text-ink">{presetDir}</span>
+            : (
+                <select
+                  value={dir}
+                  onChange={event => setDir(event.target.value)}
+                  className="w-56 rounded-md border border-control bg-raised px-2 py-1.5 font-mono text-[12px] text-ink outline-none"
+                >
+                  {folders.map(folder => <option key={folder} value={folder}>{folder}</option>)}
+                </select>
+              )}
         </label>
         <label className="block">
           <span className="mb-1 block text-[11px] text-ink-faint">Page URL or ID</span>

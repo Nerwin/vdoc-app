@@ -113,7 +113,8 @@ function recordRun(args: string[], run: VdocRun, startedAt: number): void {
     'command.name': vdocCommandId(args).replace(' ', '-'),
     'command.duration_ms': entry.durationMs,
     'command.exit_code': run.exitCode,
-    'command.success': run.exitCode === 0,
+    // exit 3 = drift/findings, a normal result - not a failure
+    'command.success': run.exitCode === 0 || run.exitCode === 3,
   })
   for (const window of BrowserWindow.getAllWindows()) window.webContents.send('vdoc-log', entry)
 }

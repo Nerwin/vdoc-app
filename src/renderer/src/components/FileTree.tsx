@@ -23,6 +23,7 @@ interface Props {
   onCheckFolder(path: string): void
   onTogglePin(path: string): void
   onOpenFolder(path: string): void
+  onGetPage(path: string): void
   onRemoveFolder(path: string): void
   onSetIgnore(path: string, ignored: boolean): void
   onCopyPageId(pageId: string): void
@@ -219,7 +220,7 @@ export function FileTree(props: Props) {
         <div className="fixed inset-0 z-40" onClick={() => setMenu(null)} onContextMenu={event => { event.preventDefault(); setMenu(null) }}>
           <div
             className="absolute w-52 overflow-hidden rounded-lg border border-line-menu bg-overlay py-1 shadow-menu"
-            style={{ left: Math.min(menu.x, window.innerWidth - 220), top: Math.min(menu.y, window.innerHeight - 160) }}
+            style={{ left: Math.min(menu.x, window.innerWidth - 220), top: Math.min(menu.y, window.innerHeight - 190) }}
             onClick={event => event.stopPropagation()}
           >
             {menu.kind === 'dir'
@@ -232,6 +233,10 @@ export function FileTree(props: Props) {
                     <MenuItem
                       label="Check this folder"
                       onClick={() => { props.onCheckFolder(menu.path); setMenu(null) }}
+                    />
+                    <MenuItem
+                      label="Get page from Confluence…"
+                      onClick={() => { props.onGetPage(menu.path); setMenu(null) }}
                     />
                     <MenuItem
                       label="Open folder"

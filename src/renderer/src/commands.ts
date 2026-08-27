@@ -217,7 +217,7 @@ export const COMMANDS: Command[] = [
       idle,
       online,
     ),
-    run: ctx => ctx.app.setGetForm(true),
+    run: ctx => ctx.app.setGetForm({}),
   },
   {
     id: 'sync.link',

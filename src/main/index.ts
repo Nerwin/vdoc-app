@@ -159,8 +159,9 @@ if (!app.requestSingleInstanceLock()) {
     const settings = loadSettings()
     setVdocBin(settings.vdocBin)
 
+    // Dev only - packaged macOS uses the bundle .icns; the raw png has no rounded mask.
     const icon = applicationIconPath()
-    if (app.dock && existsSync(icon)) app.dock.setIcon(icon)
+    if (!app.isPackaged && app.dock && existsSync(icon)) app.dock.setIcon(icon)
 
     // macOS: only OS roles - the default View menu would swallow ⌘R / ⌘⇧R / ⌥⌘I before
     // the window sees them. Windows/Linux: no menu bar; every action lives in the palette.

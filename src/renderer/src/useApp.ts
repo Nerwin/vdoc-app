@@ -92,7 +92,7 @@ export function useApp() {
   const [lossyPushPaths, setLossyPushPaths] = useState<Set<string>>(() => new Set())
   const [pullConfirm, setPullConfirm] = useState<PullConfirm | null>(null)
   const [createForm, setCreateForm] = useState<{ path: string } | null>(null)
-  const [getForm, setGetForm] = useState(false)
+  const [getForm, setGetForm] = useState<{ dir?: string } | null>(null)
   const [settings, setSettings] = useState<SettingsInfo | null>(null)
   const [spaceMapping, setSpaceMapping] = useState<Record<string, string>>({})
   /** Latest remote version info per file, keyed `path@vN` so a new version refetches. */
@@ -467,7 +467,7 @@ export function useApp() {
 
   const submitGet = useCallback((input: string, dir: string) => runOp('get', async () => {
     const result = await api.getPage(input.trim(), dir)
-    setGetForm(false)
+    setGetForm(null)
     // The watcher also fires, but rescan now so the new file can be selected immediately.
     const scan = await api.scan()
     setRoot(scan.root)
