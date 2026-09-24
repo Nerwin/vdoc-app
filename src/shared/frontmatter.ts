@@ -71,6 +71,30 @@ export function parseFrontmatter(content: string): Frontmatter {
   }
 }
 
+export interface FrontmatterEntry {
+  key: string
+  value: string | string[]
+}
+
+/** Every top-level key in order, for display: scalars unquoted, inline and block lists as arrays. */
+export function frontmatterEntries(content: string): FrontmatterEntry[] {
+  const match = BLOCK.exec(content)
+  if (!match) return []
+  const entries: FrontmatterEntry[] = []
+  for (const line of blockBody(match).split(/\r?\n/)) {
+    const kv = /^([A-Za-z][\w-]*):\s*(.*)$/.exec(line)
+    if (kv) {
+      const raw = kv[2].trim()
+      entries.push({ key: kv[1], value: inlineList(raw) ?? (raw === '' ? [] : unquote(raw)) })
+      continue
+    }
+    const item = /^\s+-\s+(.*)$/.exec(line)
+    const last = entries.at(-1)
+    if (item && Array.isArray(last?.value)) last.value.push(unquote(item[1].trim()))
+  }
+  return entries
+}
+
 function upsertFlag(body: string, key: FrontmatterFlag, line: string, eol: string): string {
   const keyPattern = new RegExp(`^${key}\\s*:`)
   const lines = body ? body.split(/\r?\n/) : []

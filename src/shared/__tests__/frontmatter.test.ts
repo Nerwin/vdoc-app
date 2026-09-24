@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { parseFrontmatter, setFrontmatterFlag } from '../frontmatter.ts'
+import { frontmatterEntries, parseFrontmatter, setFrontmatterFlag } from '../frontmatter.ts'
 
 test('parseFrontmatter reads scalars, quoted values, and inline tag lists', () => {
   const md = [
@@ -113,4 +113,29 @@ test('setFrontmatterFlag toggles vdocPin independently of other flags', () => {
   const pinned = setFrontmatterFlag(md, 'vdocPin', true)
   assert.equal(pinned, '---\ntitle: Doc\nconfluenceIgnore: true\nvdocPin: true\n---\nBody\n')
   assert.equal(setFrontmatterFlag(pinned, 'vdocPin', false), '---\ntitle: Doc\nconfluenceIgnore: true\nvdocPin: false\n---\nBody\n')
+})
+
+test('frontmatterEntries lists every key with scalars, inline and block lists', () => {
+  const content = [
+    '---',
+    'title: "CE: 1. Celigo"',
+    'status: DONE',
+    'tags: [ipaas, "integration"]',
+    'owners:',
+    '  - alice',
+    "  - 'bob'",
+    'confluenceIgnore: true',
+    'empty:',
+    '---',
+    '# Body',
+  ].join('\n')
+  assert.deepEqual(frontmatterEntries(content), [
+    { key: 'title', value: 'CE: 1. Celigo' },
+    { key: 'status', value: 'DONE' },
+    { key: 'tags', value: ['ipaas', 'integration'] },
+    { key: 'owners', value: ['alice', 'bob'] },
+    { key: 'confluenceIgnore', value: 'true' },
+    { key: 'empty', value: [] },
+  ])
+  assert.deepEqual(frontmatterEntries('# No frontmatter'), [])
 })

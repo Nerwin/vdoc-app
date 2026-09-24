@@ -42,10 +42,10 @@ const marked = new Marked({
 
 const INFO_SVG = '<svg class="callout-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>'
 
-interface TocItem {
+/** One H2 of the rendered preview - the inspector's Outline lists them. */
+export interface OutlineItem {
   id: string
   text: string
-  sub: boolean
 }
 
 interface Props {
@@ -55,17 +55,20 @@ interface Props {
   findSeq: number
   /** Intercepted `<a>` clicks - receives the href as written in the markdown. */
   onOpenLink?(href: string): void
+  onOutline(items: OutlineItem[]): void
+  /** The section in view (scroll-spy), for the Outline's selected row. */
+  onActiveSection(id: string | null): void
+  /** Receives the scroll-to-section function, for Outline clicks. */
+  jumpRef: React.RefObject<((id: string) => void) | null>
 }
 
 /** Unique mermaid render ids - an id colliding with an svg already in the DOM breaks the render. */
 let mermaidSeq = 0
 
-export function PreviewView({ content, theme, findSeq, onOpenLink }: Props) {
+export function PreviewView({ content, theme, findSeq, onOpenLink, onOutline, onActiveSection, jumpRef }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [html, setHtml] = useState('')
-  const [toc, setToc] = useState<TocItem[]>([])
-  const [activeId, setActiveId] = useState<string | null>(null)
   const [findOpen, setFindOpen] = useState(false)
 
   useEffect(() => {
@@ -141,36 +144,37 @@ export function PreviewView({ content, theme, findSeq, onOpenLink }: Props) {
     }
   }, [content, theme])
 
-  // The "On this page" rail: ids are assigned to the rendered h2/h3 nodes.
+  // Outline: ids are assigned to the rendered h2 nodes.
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
-    const headings = [...container.querySelectorAll<HTMLHeadingElement>('h2, h3')]
+    const headings = [...container.querySelectorAll<HTMLHeadingElement>('h2')]
     headings.forEach((el, index) => {
       el.id = `sec-${index}`
     })
-    setToc(headings.map((el, index) => ({ id: `sec-${index}`, text: el.textContent ?? '', sub: el.tagName === 'H3' })))
-    setActiveId(current => (current && headings.some(el => el.id === current) ? current : headings[0]?.id ?? null))
-  }, [html])
+    onOutline(headings.map((el, index) => ({ id: `sec-${index}`, text: el.textContent ?? '' })))
+  }, [html, onOutline])
 
   /** Scroll-spy: the active section is the last heading above the reading line. */
   const onScroll = (): void => {
     const scroller = scrollRef.current
     const container = containerRef.current
-    if (!scroller || !container || toc.length < 2) return
+    if (!scroller || !container) return
     const top = scroller.getBoundingClientRect().top
     let current: string | null = null
-    for (const el of container.querySelectorAll('h2, h3')) {
+    for (const el of container.querySelectorAll('h2')) {
       if (el.getBoundingClientRect().top - top <= 96) current = el.id
       else break
     }
-    setActiveId(current ?? toc[0]?.id ?? null)
+    onActiveSection(current ?? container.querySelector('h2')?.id ?? null)
   }
 
-  const jumpTo = (id: string): void => {
-    containerRef.current?.querySelector(`#${CSS.escape(id)}`)?.scrollIntoView()
-    setActiveId(id)
-  }
+  useEffect(() => {
+    jumpRef.current = id => containerRef.current?.querySelector(`#${CSS.escape(id)}`)?.scrollIntoView()
+    return () => {
+      jumpRef.current = null
+    }
+  }, [jumpRef])
 
   return (
     <div className="relative h-full">
@@ -184,24 +188,8 @@ export function PreviewView({ content, theme, findSeq, onOpenLink }: Props) {
         />
       )}
       <div ref={scrollRef} onScroll={onScroll} className="h-full overflow-y-auto scroll-smooth motion-reduce:scroll-auto">
-        <div className="flex gap-14 px-10 py-[34px]">
+        <div className="flex px-10 py-[34px]">
           {contentEl}
-          {toc.length >= 2 && (
-            <nav aria-label="On this page" className="sticky top-6 hidden max-h-[75vh] w-[200px] shrink-0 self-start overflow-y-auto @min-[960px]:block">
-              <p className="mb-3 font-mono text-[10.5px] uppercase tracking-[0.12em] text-ink-label">On this page</p>
-              {toc.map(item => (
-                <button
-                  key={item.id}
-                  onClick={() => jumpTo(item.id)}
-                  className={`block w-full border-l-2 py-[5px] pr-2 text-left font-sans text-[12.5px] leading-[1.4] ${
-                    item.id === activeId ? 'border-select-edge text-ink' : 'border-line-subtle text-ink-dim hover:text-ink'
-                  } ${item.sub ? 'pl-6' : 'pl-3'}`}
-                >
-                  {item.text}
-                </button>
-              ))}
-            </nav>
-          )}
         </div>
       </div>
     </div>
