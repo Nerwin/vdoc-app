@@ -70,11 +70,25 @@ export function filesUnder(node: TreeNode): string[] {
   return node.children.flatMap(filesUnder)
 }
 
-/** Stable re-order putting pinned paths first within their kind (dirs stay before files), at every depth. */
-export function orderPinnedFirst(nodes: TreeNode[], pinned: ReadonlySet<string>): TreeNode[] {
-  if (pinned.size === 0) return nodes
-  const rank = (node: TreeNode): number => (node.kind === 'dir' ? 0 : 2) + (pinned.has(node.path) ? 0 : 1)
+/** Re-order putting pinned paths first within their kind (dirs stay before files), in pin order, at every depth. */
+export function orderPinnedFirst(nodes: TreeNode[], pinned: readonly string[]): TreeNode[] {
+  if (pinned.length === 0) return nodes
+  const order = new Map(pinned.map((path, index) => [path, index]))
+  const rank = (node: TreeNode): number => (node.kind === 'dir' ? 0 : 2) + (order.has(node.path) ? 0 : 1)
   return [...nodes]
-    .sort((a, b) => rank(a) - rank(b))
+    .sort((a, b) => rank(a) - rank(b) || (order.get(a.path) ?? 0) - (order.get(b.path) ?? 0))
     .map(node => (node.kind === 'dir' ? { ...node, children: orderPinnedFirst(node.children, pinned) } : node))
+}
+
+/** Pinned file rows directly followed by an unpinned file of the same folder - the rule goes after these. */
+export function pinnedGroupEnds(rows: TreeNode[], pinned: ReadonlySet<string>): Set<string> {
+  const parent = (path: string): string => path.slice(0, path.lastIndexOf('/') + 1)
+  const ends = new Set<string>()
+  rows.forEach((row, index) => {
+    const next = rows[index + 1]
+    if (row.kind === 'file' && pinned.has(row.path) && next?.kind === 'file' && !pinned.has(next.path) && parent(next.path) === parent(row.path)) {
+      ends.add(row.path)
+    }
+  })
+  return ends
 }

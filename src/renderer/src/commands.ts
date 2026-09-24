@@ -161,12 +161,14 @@ function visiblePrimary(ctx: CommandContext): PrimaryAction | null {
   return remote > 0 ? { label: `Pull ${remote} remote update${remote === 1 ? '' : 's'}`, commandId: 'sync.pullAll', tone: 'primary' } : null
 }
 
+export const isPinned = (ctx: CommandContext): boolean => ctx.selection !== null && ctx.app.pinnedFiles.includes(ctx.selection)
+
 /** A menu row: a registry id, optionally relabelled for the surface it sits in. */
 export type MenuItem = string | { id: string, label: string }
 
 /** What `⋯` offers per state (R5 §5) - everything that is not the primary. */
 export function secondaryActions(ctx: CommandContext): MenuItem[] {
-  const pin = { id: 'file.pin', label: ctx.entry?.pinned ? 'Unpin from top' : 'Pin on top' }
+  const pin = { id: 'file.pin', label: isPinned(ctx) ? 'Unpin from top' : 'Pin on top' }
   const ignore = { id: 'file.ignore', label: ctx.entry?.ignored ? 'Include in Confluence' : 'Ignore in Confluence' }
   const common: MenuItem[] = ['file.editor', 'file.finder', 'file.copyUrl', 'file.copyPath', pin, ignore]
   if (!ctx.state) return common
@@ -473,8 +475,8 @@ export const COMMANDS: Command[] = [
     icon: Pin,
     keys: { key: 'p', meta: true },
     reason: all(noFile, idle),
-    suffix: ctx => (ctx.entry?.pinned ? 'currently pinned - unpin it' : undefined),
-    run: ctx => void ctx.app.setPinned(ctx.selection!, !ctx.entry?.pinned),
+    suffix: ctx => (isPinned(ctx) ? 'currently pinned - unpin it' : undefined),
+    run: ctx => ctx.app.setPinned(ctx.selection!, !isPinned(ctx)),
   },
   {
     id: 'file.reload',

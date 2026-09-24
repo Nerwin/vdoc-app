@@ -19,6 +19,7 @@ const DEFAULTS: Settings = {
   docsRoot: null,
   contentDirs: [],
   pinnedDirs: [],
+  pinnedFiles: {},
   crashReports: false,
   installId: '',
 }

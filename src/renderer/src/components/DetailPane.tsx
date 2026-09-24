@@ -7,7 +7,7 @@ import { resolveRelative } from '../../../shared/links.ts'
 import { GuardedSaveQueue } from '../../../shared/save-queue.ts'
 import { displayState, displayTitle, syncGroup, type FileEntry } from '../../../shared/status.ts'
 import { timeAgo } from '../../../shared/time.ts'
-import { command, primaryAction, secondaryActions, shortcutLabel, type CommandContext, type ViewMode } from '../commands.ts'
+import { command, isPinned, primaryAction, secondaryActions, shortcutLabel, type CommandContext, type ViewMode } from '../commands.ts'
 import { AlertIcon, BanIcon, ChevronDownIcon, ExternalIcon, MoreIcon, PinIcon } from '../icons.tsx'
 import { STATE_META } from '../state-meta.ts'
 import type { SyncEvent } from '../useApp.ts'
@@ -277,7 +277,7 @@ export function DetailPane(props: Props) {
                   ? (
                       <>
                         <span className="inline-flex items-center gap-[7px] text-ink-dim"><BanIcon size={12} className="shrink-0 text-ink-mute" />Not synced with Confluence</span>
-                        {entry.pinned && <><Sep /><span className="inline-flex items-center gap-[7px] text-ink-dim"><PinIcon size={11} className="shrink-0 text-brand" />Pinned</span></>}
+                        {isPinned(ctx) && <><Sep /><span className="inline-flex items-center gap-[7px] text-ink-dim"><PinIcon size={11} className="shrink-0 text-brand" />Pinned</span></>}
                         {entry.mtimeMs !== undefined && <><Sep /><span className="text-ink-mute">edited {timeAgo(entry.mtimeMs)}</span></>}
                       </>
                     )

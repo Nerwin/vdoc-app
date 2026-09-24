@@ -110,7 +110,7 @@ function serializeFileWrite<T>(path: string, write: () => T): Promise<T> {
 function settingsPatch(value: unknown): Partial<Settings> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid settings patch')
   const patch = value as Record<string, unknown>
-  const allowed = new Set(['theme', 'vdocBin', 'contentDirs', 'pinnedDirs', 'crashReports'])
+  const allowed = new Set(['theme', 'vdocBin', 'contentDirs', 'pinnedDirs', 'pinnedFiles', 'crashReports'])
   if (Object.keys(patch).some(key => !allowed.has(key))) throw new Error('Invalid settings patch')
 
   const result: Partial<Settings> = {}
@@ -126,8 +126,20 @@ function settingsPatch(value: unknown): Partial<Settings> {
   }
   if ('contentDirs' in patch) result.contentDirs = settingPaths(patch.contentDirs, 'content directories')
   if ('pinnedDirs' in patch) result.pinnedDirs = settingPaths(patch.pinnedDirs, 'pinned directories')
+  if ('pinnedFiles' in patch) result.pinnedFiles = pinnedFilesPatch(patch.pinnedFiles)
   if ('crashReports' in patch) result.crashReports = booleanValue(patch.crashReports, 'diagnostics setting')
   return result
+}
+
+/** Only the current workspace's list can change; other roots are carried over untouched. */
+function pinnedFilesPatch(value: unknown): Record<string, string[]> {
+  const root = docsRoot()
+  const lists = value && typeof value === 'object' && !Array.isArray(value) ? Object.entries(value) : []
+  if (lists.length !== 1 || lists[0][0] !== root || !Array.isArray(lists[0][1]) || lists[0][1].length > 5000) {
+    throw new Error('Invalid pinned files')
+  }
+  const paths = (lists[0][1] as unknown[]).map((path, index) => relativeAppPath(path, `pinned files[${index}]`))
+  return { ...loadSettings().pinnedFiles, [root]: [...new Set(paths)] }
 }
 
 function settingPaths(value: unknown, label: string): string[] {
@@ -168,8 +180,16 @@ export function registerIpc(
 
   handle('scan', () => {
     const dirty = gitDirtyFiles()
-    const files = scanMarkdownFiles().map(file => ({ ...file, gitDirty: dirty.has(file.path) }))
-    return { root: docsRoot(), files }
+    const scanned = scanMarkdownFiles()
+    const root = docsRoot()
+    const settings = loadSettings()
+    // First scan of a workspace seeds its pins from legacy `vdocPin: true`; after that the flag is inert.
+    if (!settings.pinnedFiles[root]) {
+      const seed = scanned.filter(file => file.legacyPin).map(file => file.path).sort()
+      saveSettings({ ...settings, pinnedFiles: { ...settings.pinnedFiles, [root]: seed } })
+    }
+    const files = scanned.map(({ legacyPin: _, ...file }) => ({ ...file, gitDirty: dirty.has(file.path) }))
+    return { root, files, pinnedFiles: loadSettings().pinnedFiles[root] }
   })
 
   handle('check-all', async event => {

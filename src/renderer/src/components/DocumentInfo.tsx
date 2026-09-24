@@ -5,7 +5,7 @@ import { frontmatterEntries, type FrontmatterEntry } from '../../../shared/front
 import type { FileEntry } from '../../../shared/status.ts'
 import type { VdocLogEntry } from '../../../shared/types.ts'
 import { shellCommand } from '../../../shared/shell-command.ts'
-import { command, shortcutLabel, type CommandContext } from '../commands.ts'
+import { command, isPinned, shortcutLabel, type CommandContext } from '../commands.ts'
 import { ArrowRightIcon, ExternalIcon, PinIcon } from '../icons.tsx'
 import type { SyncEvent } from '../useApp.ts'
 import type { OutlineItem } from './PreviewView.tsx'
@@ -34,6 +34,15 @@ interface Props {
   activeSection: string | null
   onJump(id: string): void
   onOpenLogs(): void
+}
+
+const parentOf = (path: string): string => path.slice(0, path.lastIndexOf('/') + 1)
+
+/** `top of ADR` for the first pin in its folder, `#2 in ADR` after that. */
+function pinPosition(path: string, pinned: string[]): string {
+  const rank = pinned.filter(entry => parentOf(entry) === parentOf(path)).indexOf(path) + 1
+  const folder = path.split('/').at(-2) ?? 'the tree'
+  return rank <= 1 ? `top of ${folder}` : `#${rank} in ${folder}`
 }
 
 const stamp = (at: number): string => new Date(at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -148,7 +157,7 @@ export function DocumentInfo(props: Props) {
                     </Section>
                   </>
                 )}
-                {entry.pinned && (
+                {isPinned(ctx) && (
                   <>
                     <Rule />
                     <Section label="App">
@@ -156,7 +165,7 @@ export function DocumentInfo(props: Props) {
                         <span className="w-[88px] shrink-0 text-[11.5px] text-ink-mute">Pinned</span>
                         <span className="flex min-w-0 items-center gap-1.5 text-[11.5px] text-ink-body">
                           <PinIcon size={11} className="shrink-0 text-brand" />
-                          <span className="truncate">top of {entry.path.split('/').at(-2) ?? 'the tree'}</span>
+                          <span className="truncate">{pinPosition(entry.path, ctx.app.pinnedFiles)}</span>
                         </span>
                         <div className="flex-1" />
                         <button onClick={() => command('file.pin').run(ctx)} className="shrink-0 text-[11px] text-link hover:text-link-hover">Unpin</button>

@@ -270,12 +270,13 @@ export function App() {
               selection={app.selection}
               rootDirs={app.settings?.contentDirs ?? []}
               pinnedDirs={app.settings?.pinnedDirs ?? []}
+              pinnedFiles={app.pinnedFiles}
               onSetMode={ctx.setSidebarMode}
               onSelect={app.setSelection}
               onOpenDiff={openDiff}
               onCheckFolder={app.checkFolder}
               onTogglePin={app.togglePin}
-              onSetPinned={(path, pinned) => void app.setPinned(path, pinned)}
+              onSetPinned={app.setPinned}
               onOpenFolder={path => void app.openFolder(path)}
               onGetPage={path => app.setGetForm({ dir: path })}
               onRemoveFolder={app.removeFolder}

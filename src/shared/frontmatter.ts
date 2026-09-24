@@ -10,7 +10,7 @@ export interface Frontmatter {
   confluenceIgnore?: boolean
   /** Only ever true - hides the file from the tree view. */
   vdocHide?: boolean
-  /** Only ever true - pins the file on top of its siblings, after folders. */
+  /** Legacy pin flag - only seeds a workspace's first pinned-files list. */
   vdocPin?: boolean
 }
 

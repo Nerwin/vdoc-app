@@ -248,7 +248,8 @@ interface FileMeta {
   pageId?: string
   ignored?: boolean
   hidden?: boolean
-  pinned?: boolean
+  /** Legacy `vdocPin: true` - only seeds a workspace's first pinnedFiles entry. */
+  legacyPin?: boolean
   mtimeMs?: number
 }
 
@@ -338,7 +339,7 @@ function fileMeta(absPath: string): FileMeta {
       pageId: confluencePageId,
       ignored: confluenceIgnore,
       hidden: vdocHide,
-      pinned: vdocPin,
+      legacyPin: vdocPin,
     }
   } catch {
     return { tracked: false }

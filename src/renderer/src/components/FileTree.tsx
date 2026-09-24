@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { SyncGroup } from '../../../shared/types.ts'
 import { displayState, needsAttention, syncGroup, type FileEntry } from '../../../shared/status.ts'
-import { buildTree, filesUnder, flattenVisible, orderPinnedFirst, type TreeNode } from '../../../shared/tree.ts'
+import { buildTree, filesUnder, flattenVisible, orderPinnedFirst, pinnedGroupEnds, type TreeNode } from '../../../shared/tree.ts'
 import { shortcutLabel, type SidebarMode } from '../commands.ts'
 import { ChevronDownIcon, ChevronRightIcon, FolderIcon, PinIcon } from '../icons.tsx'
 import { GROUP_META, STATE_META } from '../state-meta.ts'
@@ -16,6 +16,7 @@ interface Props {
   /** Configured root folders - the only ones removable from the tree. */
   rootDirs: string[]
   pinnedDirs: string[]
+  pinnedFiles: string[]
   onSetMode(mode: SidebarMode): void
   onSelect(path: string): void
   onOpenDiff(path: string): void
@@ -40,7 +41,7 @@ interface ContextMenu {
 const LEGEND: SyncGroup[] = ['synced', 'local', 'remote', 'conflict', 'unchecked']
 
 export function FileTree(props: Props) {
-  const { entries, selection, pinnedDirs, mode } = props
+  const { entries, selection, pinnedDirs, pinnedFiles, mode } = props
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [menu, setMenu] = useState<ContextMenu | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -59,18 +60,15 @@ export function FileTree(props: Props) {
   }, [menu])
 
   // Changes mode narrows the same tree to the documents needing attention.
-  const { rows, pinnedPaths } = useMemo(() => {
-    const pinnedPaths = new Set(pinnedDirs)
+  const { rows, pinnedPaths, groupEnds } = useMemo(() => {
+    const pins = [...pinnedDirs, ...pinnedFiles]
+    const pinnedPaths = new Set(pins)
     const paths = [...entries.values()]
-      .filter(entry => {
-        if (entry.hidden) return false
-        if (entry.pinned) pinnedPaths.add(entry.path)
-        return mode === 'all' || needsAttention(displayState(entry))
-      })
+      .filter(entry => !entry.hidden && (mode === 'all' || needsAttention(displayState(entry))))
       .map(entry => entry.path)
-    const tree = orderPinnedFirst(buildTree(paths), pinnedPaths)
-    return { rows: flattenVisible(tree, collapsed), pinnedPaths }
-  }, [entries, collapsed, pinnedDirs, mode])
+    const rows = flattenVisible(orderPinnedFirst(buildTree(paths), pins), collapsed)
+    return { rows, pinnedPaths, groupEnds: pinnedGroupEnds(rows, pinnedPaths) }
+  }, [entries, collapsed, pinnedDirs, pinnedFiles, mode])
 
   const fileRows = useMemo(() => rows.filter(row => row.kind === 'file'), [rows])
 
@@ -145,8 +143,8 @@ export function FileTree(props: Props) {
           </p>
         )}
         {rows.map(row => (
+          <Fragment key={row.path}>
           <Row
-            key={row.path}
             node={row}
             entries={entries}
             selected={row.path === selection}
@@ -159,6 +157,8 @@ export function FileTree(props: Props) {
               setMenu({ x: event.clientX, y: event.clientY, path: row.path, kind: row.kind })
             }}
           />
+          {groupEnds.has(row.path) && <div className="my-1 h-px shrink-0 bg-line-subtle" style={{ marginLeft: `${10 + row.depth * 17}px` }} />}
+          </Fragment>
         ))}
       </div>
 
@@ -203,7 +203,7 @@ export function FileTree(props: Props) {
                   const pageId = entry?.check?.pageId ?? entry?.pageId
                   return (
                     <>
-                      <MenuItem label={entry?.pinned ? 'Unpin' : 'Pin on top'} onClick={() => { props.onSetPinned(menu.path, !entry?.pinned); setMenu(null) }} />
+                      <MenuItem label={pinnedFiles.includes(menu.path) ? 'Unpin from top' : 'Pin on top'} onClick={() => { props.onSetPinned(menu.path, !pinnedFiles.includes(menu.path)); setMenu(null) }} />
                       <MenuItem
                         label={entry?.ignored ? 'Include this document' : 'Ignore this document'}
                         onClick={() => { props.onSetIgnore(menu.path, !entry?.ignored); setMenu(null) }}

@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { buildTree, flattenVisible, filesUnder, orderPinnedFirst } from '../tree.ts'
+import { buildTree, flattenVisible, filesUnder, orderPinnedFirst, pinnedGroupEnds } from '../tree.ts'
 import { displayState } from '../status.ts'
 
 test('buildTree nests files under their directories', () => {
@@ -42,20 +42,31 @@ test('flattenVisible hides children of collapsed dirs', () => {
 test('orderPinnedFirst hoists pinned dirs at every depth, stable otherwise', () => {
   const tree = buildTree(['a/x.md', 'b/deep/y.md', 'b/first.md', 'c/z.md'])
 
-  const ordered = orderPinnedFirst(tree, new Set(['c', 'b/deep']))
+  const ordered = orderPinnedFirst(tree, ['c', 'b/deep'])
   assert.deepEqual(ordered.map(node => node.path), ['c', 'a', 'b'])
   const b = ordered[2]
   assert.ok(b.kind === 'dir')
   assert.deepEqual(b.children.map(node => node.path), ['b/deep', 'b/first.md'])
 
-  assert.deepEqual(orderPinnedFirst(tree, new Set()).map(node => node.path), ['a', 'b', 'c'])
+  assert.deepEqual(orderPinnedFirst(tree, []).map(node => node.path), ['a', 'b', 'c'])
 })
 
 test('orderPinnedFirst keeps pinned files below dirs, above their file siblings', () => {
   const tree = buildTree(['a/x.md', 'first.md', 'second.md', 'third.md'])
 
-  const ordered = orderPinnedFirst(tree, new Set(['third.md']))
+  const ordered = orderPinnedFirst(tree, ['third.md'])
   assert.deepEqual(ordered.map(node => node.path), ['a', 'third.md', 'first.md', 'second.md'])
+})
+
+test('orderPinnedFirst keeps pinned files in pin order, not name order', () => {
+  const tree = buildTree(['a.md', 'b.md', 'c.md', 'd.md'])
+  assert.deepEqual(orderPinnedFirst(tree, ['c.md', 'a.md']).map(node => node.path), ['c.md', 'a.md', 'b.md', 'd.md'])
+})
+
+test('pinnedGroupEnds marks the last pinned file before the rest of its folder', () => {
+  const pins = ['x/b.md', 'x/a.md', 'y/only.md']
+  const rows = flattenVisible(orderPinnedFirst(buildTree(['x/a.md', 'x/b.md', 'x/c.md', 'y/only.md', 'z.md']), pins), new Set())
+  assert.deepEqual([...pinnedGroupEnds(rows, new Set(pins))], ['x/a.md'])
 })
 
 test('displayState refuses to show green without a local-edit baseline', () => {

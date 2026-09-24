@@ -1,7 +1,7 @@
 import { captureException } from '@sentry/electron/renderer'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { LOG_MAX, type AppUpdateStatus, type AuthStatus, type ChangesScope, type CheckFile, type CredentialKey, type DiffResult, type PushFile, type ScanFile, type Settings, type SettingsInfo, type VdocLogEntry, type VersionEntry } from '../../shared/types.ts'
+import { LOG_MAX, type AppUpdateStatus, type AuthStatus, type ChangesScope, type CheckFile, type CredentialKey, type DiffResult, type PushFile, type ScanResult, type Settings, type SettingsInfo, type VdocLogEntry, type VersionEntry } from '../../shared/types.ts'
 import { setFrontmatterFlag } from '../../shared/frontmatter.ts'
 import { initMessage } from '../../shared/init.ts'
 import { isLossyPushError } from '../../shared/lossy-push.ts'
@@ -75,6 +75,8 @@ export function useApp() {
 
   const [root, setRoot] = useState('')
   const [entries, setEntries] = useState<Map<string, FileEntry>>(new Map())
+  /** This workspace's pinned files, in pin order (settings.json, never the file). */
+  const [pinnedFiles, setPinnedFiles] = useState<string[]>([])
   const [selection, setSelection] = useState<string | null>(null)
   /** Files navigated away from, oldest first - Back pops from the end. */
   const [history, setHistory] = useState<string[]>([])
@@ -186,7 +188,8 @@ export function useApp() {
     })
   }, [])
 
-  const mergeScan = useCallback((files: ScanFile[]) => {
+  const mergeScan = useCallback(({ files, pinnedFiles }: ScanResult) => {
+    setPinnedFiles(pinnedFiles)
     setEntries(prev => {
       const next = new Map<string, FileEntry>()
       for (const file of files) {
@@ -199,7 +202,6 @@ export function useApp() {
           pageId: file.pageId,
           ignored: file.ignored,
           hidden: file.hidden,
-          pinned: file.pinned,
           mtimeMs: file.mtimeMs,
           check: file.tracked ? previous?.check : undefined,
         })
@@ -243,7 +245,7 @@ export function useApp() {
       try {
         const scan = await api.scan()
         setRoot(scan.root)
-        mergeScan(scan.files)
+        mergeScan(scan)
         // Restore the last session's check results (age shown as "last checked …";
         // the focus refresh re-checks when they are over an hour old).
         const saved = loadJson<SavedChecks | null>(CHECKS_KEY, null)
@@ -288,7 +290,7 @@ export function useApp() {
       try {
         const scan = await api.scan()
         setRoot(scan.root)
-        mergeScan(scan.files)
+        mergeScan(scan)
         setDiff(current => (current && changed.includes(current.path) ? null : current))
         const tracked = new Set(scan.files.filter(file => file.tracked && !file.ignored).map(file => file.path))
         const present = changed.filter(path => tracked.has(path))
@@ -518,7 +520,7 @@ export function useApp() {
 
     const scan = await api.scan()
     setRoot(scan.root)
-    mergeScan(scan.files)
+    mergeScan(scan)
 
     setMessage({ kind: 'info', text: initMessage(path, initialized.added) })
   }), [api, mergeScan, runOp])
@@ -529,7 +531,7 @@ export function useApp() {
       setGetForm(null)
       const scan = await api.scan()
       setRoot(scan.root)
-      mergeScan(scan.files)
+      mergeScan(scan)
       const fetched = result.pages.map(page => normalize(page.file)).filter(path => scan.files.some(file => file.path === path))
       const skipped = result.skipped.length > 0 ? `, ${result.skipped.length} skipped` : ''
       setMessage({ kind: 'info', text: `Fetched ${result.pages.length} page(s) into ${dir}${skipped}` })
@@ -545,7 +547,7 @@ export function useApp() {
     // The watcher also fires, but rescan now so the new file can be selected immediately.
     const scan = await api.scan()
     setRoot(scan.root)
-    mergeScan(scan.files)
+    mergeScan(scan)
     const path = normalize(result.file ?? '')
     setMessage({ kind: 'info', text: `Fetched "${result.title}" (v${result.version}) → ${path}` })
     if (scan.files.some(file => file.path === path)) {
@@ -668,7 +670,7 @@ export function useApp() {
       setSettings(await api.settingsSet(patch))
       const scan = await api.scan()
       setRoot(scan.root)
-      mergeScan(scan.files)
+      mergeScan(scan)
     } catch (error) {
       fail(error)
     }
@@ -682,7 +684,7 @@ export function useApp() {
       setSettings(nextSettings)
       const scan = await api.scan()
       setRoot(scan.root)
-      mergeScan(scan.files)
+      mergeScan(scan)
       setMessage({ kind: 'info', text: `Docs repository is now ${nextSettings.resolvedRoot}` })
     } catch (error) {
       fail(error)
@@ -754,18 +756,12 @@ export function useApp() {
     setMessage({ kind: 'info', text: `${name} ${ignored ? 'excluded from' : 'included in'} Confluence checks` })
   }), [api, runOp])
 
-  /** Toggle `vdocPin:` in the file's frontmatter - the watcher rescan updates the tree. */
-  const setPinned = useCallback((path: string, pinned: boolean) => runOp('pin', async () => {
-    const content = await api.readFile(path)
-    await api.writeFile({
-      path,
-      expected: content,
-      next: setFrontmatterFlag(content, 'vdocPin', pinned),
-      revision: Date.now(),
-    })
-    const name = path.split('/').at(-1)
-    setMessage({ kind: 'info', text: `${name} ${pinned ? 'pinned on top' : 'unpinned'}` })
-  }), [api, runOp])
+  const setPinned = useCallback((path: string, pinned: boolean) => {
+    const next = pinned ? [...pinnedFiles.filter(entry => entry !== path), path] : pinnedFiles.filter(entry => entry !== path)
+    setPinnedFiles(next)
+    updateSettings({ pinnedFiles: { [root]: next } })
+    setMessage({ kind: 'info', text: `${path.split('/').at(-1)} ${pinned ? 'pinned on top' : 'unpinned'}` })
+  }, [pinnedFiles, root, updateSettings])
 
   const reloadVersion = useCallback(() => {
     void api.vdocVersion()
@@ -855,6 +851,7 @@ export function useApp() {
     pickDocsRoot,
     removeFolder,
     togglePin,
+    pinnedFiles,
     setPinned,
     checkFolder,
     setIgnored,

@@ -108,11 +108,11 @@ test('setFrontmatterFlag keeps CRLF line endings', () => {
   assert.equal(setFrontmatterFlag(md, 'confluenceIgnore', true), '---\r\ntitle: Doc\r\nconfluenceIgnore: true\r\n---\r\nBody\r\n')
 })
 
-test('setFrontmatterFlag toggles vdocPin independently of other flags', () => {
+test('setFrontmatterFlag toggles vdocHide independently of other flags', () => {
   const md = '---\ntitle: Doc\nconfluenceIgnore: true\n---\nBody\n'
-  const pinned = setFrontmatterFlag(md, 'vdocPin', true)
-  assert.equal(pinned, '---\ntitle: Doc\nconfluenceIgnore: true\nvdocPin: true\n---\nBody\n')
-  assert.equal(setFrontmatterFlag(pinned, 'vdocPin', false), '---\ntitle: Doc\nconfluenceIgnore: true\nvdocPin: false\n---\nBody\n')
+  const hidden = setFrontmatterFlag(md, 'vdocHide', true)
+  assert.equal(hidden, '---\ntitle: Doc\nconfluenceIgnore: true\nvdocHide: true\n---\nBody\n')
+  assert.equal(setFrontmatterFlag(hidden, 'vdocHide', false), '---\ntitle: Doc\nconfluenceIgnore: true\nvdocHide: false\n---\nBody\n')
 })
 
 test('frontmatterEntries lists every key with scalars, inline and block lists', () => {

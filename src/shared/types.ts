@@ -182,7 +182,7 @@ export interface AuthStatus {
   error?: string
 }
 
-export interface ScanFile {
+interface ScanFile {
   path: string
   tracked: boolean
   /** Has uncommitted git changes (purely informational - no sync logic depends on it). */
@@ -195,15 +195,15 @@ export interface ScanFile {
   ignored?: boolean
   /** Frontmatter `vdocHide: true` - the file never shows in the tree view. */
   hidden?: boolean
-  /** Frontmatter `vdocPin: true` - the file is pinned on top of its siblings, after folders. */
-  pinned?: boolean
   /** Last modification time on disk - local data, feeds "edited 3d ago". */
   mtimeMs?: number
 }
 
-interface ScanResult {
+export interface ScanResult {
   root: string
   files: ScanFile[]
+  /** This workspace's pinned files, in pin order. */
+  pinnedFiles: string[]
 }
 
 export interface CheckProgress {
@@ -243,6 +243,8 @@ export interface Settings {
   contentDirs: string[]
   /** Folder paths pinned to the top of their parent's listing. */
   pinnedDirs: string[]
+  /** Pinned files per docs root, in pin order - app data, never written to the file. */
+  pinnedFiles: Record<string, string[]>
   /** Send privacy-filtered error, crash, and command/action timing reports to Sentry. */
   crashReports: boolean
   /** Random id generated on first launch - the only user identifier ever sent to Sentry. */
