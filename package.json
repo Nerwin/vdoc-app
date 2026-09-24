@@ -16,7 +16,7 @@
     "url": "https://github.com/Nerwin/vdoc-app.git"
   },
   "vdocCli": {
-    "minimumVersion": "2.0.0",
+    "minimumVersion": "2.5.0",
     "updateCommand": "bun install -g @vosker/vdoc@latest",
     "downloadUrl": "https://bitbucket.org/spypoint/vdoc/downloads/"
   },

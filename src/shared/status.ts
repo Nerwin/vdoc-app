@@ -1,4 +1,4 @@
-import type { CheckFile, DisplayState } from './types.ts'
+import type { CheckFile, DisplayState, SyncGroup } from './types.ts'
 
 export interface FileEntry {
   path: string
@@ -31,9 +31,30 @@ export function displayState(entry: FileEntry): DisplayState {
   return entry.check.state
 }
 
+/** The R4 group a CLI state renders as - state derives from the CLI, never from the UI comparing strings. */
+export function syncGroup(state: DisplayState): SyncGroup {
+  switch (state) {
+    case 'in-sync': return 'synced'
+    case 'ahead':
+    case 'local-edits':
+    case 'no-version': return 'local'
+    case 'behind': return 'remote'
+    case 'conflict':
+    case 'not-found': return 'conflict'
+    case 'unverified':
+    case 'unchecked': return 'unchecked'
+    case 'untracked': return 'unlinked'
+    case 'ignored': return 'ignored'
+  }
+}
+
+/** Groups on the Changes screen, in the fixed order cheap work first, conflicts last. */
+const CHANGE_GROUPS: SyncGroup[] = ['remote', 'local', 'conflict']
+
 /** States that need the user's attention, in severity order. */
 export const ATTENTION_STATES: DisplayState[] = ['conflict', 'not-found', 'local-edits', 'ahead', 'behind']
 
+/** "Needs attention" is the sum of the actionable groups - a counter, never a state. */
 export function needsAttention(state: DisplayState): boolean {
-  return ATTENTION_STATES.includes(state)
+  return CHANGE_GROUPS.includes(syncGroup(state))
 }
