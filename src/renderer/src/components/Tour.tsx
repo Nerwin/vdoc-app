@@ -178,7 +178,7 @@ const STEPS: Step[] = [
           Preview, Source (an editor that auto-saves as you type, alone or beside the preview),
           Diff against the live page (<Keys id="view.diff" />) and Comments. The header carries
           one primary action for the document's state - <Keys id="doc.primary" /> runs it - and
-          <Keys id="view.info" /> toggles the info panel with versions, page id and the last CLI result.
+          <Keys id="view.info" /> toggles the inspector with versions, page id and the last CLI result.
         </p>
         <p>
           Links to other local docs navigate in-app (<Keys id="file.back" /> goes back), and the

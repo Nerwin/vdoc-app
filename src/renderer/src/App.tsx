@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type SetStateAction } from 'react'
 
 import { FileTree } from './components/FileTree.tsx'
 import { DetailPane, type SourceLayout } from './components/DetailPane.tsx'
@@ -38,6 +38,19 @@ function useResolvedTheme(preference: 'dark' | 'light' | 'system'): 'dark' | 'li
   return preference === 'system' ? (systemDark ? 'dark' : 'light') : preference
 }
 
+/** A panel's open state, persisted per docs root. Panels start open. */
+function useWorkspaceFlag(name: string, root: string): [boolean, (next: SetStateAction<boolean>) => void] {
+  const key = `${name}:${root}`
+  const [open, setOpen] = useState(true)
+  useEffect(() => setOpen(localStorage.getItem(key) !== '0'), [key])
+  const update = useCallback((next: SetStateAction<boolean>) => setOpen(current => {
+    const value = typeof next === 'function' ? next(current) : next
+    localStorage.setItem(key, value ? '1' : '0')
+    return value
+  }), [key])
+  return [open, update]
+}
+
 export function App() {
   const app = useApp()
   const [tokenOpen, setTokenOpen] = useState(false)
@@ -48,13 +61,11 @@ export function App() {
   const [tourOpen, setTourOpen] = useState(() => localStorage.getItem('tourSeen') === null)
   const [view, setView] = useState<ViewMode>('preview')
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>('all')
-  const [infoOpen, setInfoOpen] = useState(() => localStorage.getItem('infoPanel') !== '0')
   /** The document under per-hunk conflict review, when any. */
   const [resolving, setResolving] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
   /** Bumped by ⌘F - opens (or refocuses) the preview's find bar. */
   const [findSeq, setFindSeq] = useState(0)
-  const [sidebarOpen, setSidebarOpen] = useState(true)
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = Number(localStorage.getItem('sidebarWidth'))
     return saved >= SIDEBAR_MIN && saved <= SIDEBAR_MAX ? saved : 258
@@ -94,13 +105,11 @@ export function App() {
     setSourceLayoutState(layout)
   }
 
-  const toggleInfo = (): void => setInfoOpen(open => {
-    localStorage.setItem('infoPanel', open ? '0' : '1')
-    return !open
-  })
+  const [sidebarOpen, setSidebarOpen] = useWorkspaceFlag('sidebarOpen', app.root)
+  const [infoOpen, setInfoOpen] = useWorkspaceFlag('inspectorOpen', app.root)
 
   const selected = app.selection ? app.entries.get(app.selection) ?? null : null
-  const taskRunning = app.checking !== null || app.busyOp !== null
+  const inspectorAvailable = selected !== null && resolving !== selected.path && !logsOpen
   const connected = app.auth?.ok === true
   const cliOutdated = Boolean(
     app.settings?.version
@@ -145,6 +154,7 @@ export function App() {
     checking: app.checking !== null,
     busy: app.busyOp !== null,
     connected,
+    inspectorAvailable,
     openPalette: mode => setPalette(mode),
     openSettings: () => setSettingsOpen(true),
     openToken: () => setTokenOpen(true),
@@ -164,7 +174,12 @@ export function App() {
     openResolve,
     openFind: () => setFindSeq(seq => seq + 1),
     toggleSidebar: () => setSidebarOpen(open => !open),
-    toggleInfo,
+    toggleInfo: () => setInfoOpen(open => !open),
+    toggleFocus: () => {
+      const show = !sidebarOpen && !infoOpen
+      setSidebarOpen(show)
+      setInfoOpen(show)
+    },
     toggleTheme: () => app.updateSettings({ theme: theme === 'dark' ? 'light' : 'dark' }),
     reloadFile: () => setReloadKey(key => key + 1),
   }
@@ -215,23 +230,18 @@ export function App() {
     window.addEventListener('mouseup', onUp)
   }
 
-  const remotePaths = (): string[] => [...app.entries.values()]
-    .filter(entry => entry.tracked && !entry.ignored && entry.check?.state === 'behind')
-    .map(entry => entry.path)
-
   return (
     <div className="flex h-screen flex-col bg-pane font-sans text-[12.5px] text-ink-body">
       <TopBar
-        theme={theme}
-        remoteCount={app.counts.remote}
-        busy={taskRunning}
-        connected={connected}
+        sidebarOpen={sidebarOpen}
+        inspectorOpen={infoOpen}
+        inspectorAvailable={inspectorAvailable}
         canGoBack={app.canGoBack}
         canGoForward={app.canGoForward}
         onBack={app.goBack}
         onForward={app.goForward}
-        onPullAll={() => app.pullAll(remotePaths())}
-        onOpenSettings={() => setSettingsOpen(true)}
+        onToggleSidebar={ctx.toggleSidebar}
+        onToggleInspector={ctx.toggleInfo}
         onOpenSearch={() => setPalette('file')}
         onOpenChanges={() => ctx.openChanges()}
       />
@@ -308,7 +318,6 @@ export function App() {
                     findSeq={findSeq}
                     onView={setView}
                     onSourceLayout={setSourceLayout}
-                    onToggleInfo={toggleInfo}
                     onOpenLogs={() => setLogsOpen(true)}
                     onError={app.reportError}
                     onRegisterFlush={registerEditorFlush}
@@ -362,6 +371,7 @@ export function App() {
         onCancelCheck={app.cancelCheck}
         onCheckUpdate={app.checkUpdateNow}
         onInstallUpdate={() => void app.installUpdate()}
+        onOpenSettings={() => setSettingsOpen(true)}
       />
 
       {app.message && <Toast message={app.message} onDismiss={app.dismissMessage} />}

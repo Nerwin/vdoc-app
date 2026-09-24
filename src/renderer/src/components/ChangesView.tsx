@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangesScope, DisplayState, SyncGroup, VersionEntry } from '../../../shared/types.ts'
 import { CHANGE_GROUPS, displayState, displayTitle, syncGroup, type FileEntry } from '../../../shared/status.ts'
 import { timeAgo } from '../../../shared/time.ts'
-import { forPath, shortcutLabel, type CommandContext } from '../commands.ts'
+import { command, forPath, shortcutLabel, type CommandContext } from '../commands.ts'
 import { ArrowRightIcon, CheckIcon, CloseIcon, MoreIcon } from '../icons.tsx'
 import { GROUP_META, STATE_META } from '../state-meta.ts'
 import { ActionMenu } from './ActionMenu.tsx'
@@ -12,7 +12,7 @@ import { StateGlyph } from './StateGlyph.tsx'
 interface Props {
   ctx: CommandContext
   entries: Map<string, FileEntry>
-  counts: { files: number, tracked: number, attention: number, unchecked: number }
+  counts: { files: number, tracked: number, attention: number, remote: number, unchecked: number }
   authors: Map<string, VersionEntry | null>
   checking: { done: number, total: number } | null
   lastChecked: Date | null
@@ -56,6 +56,8 @@ const GROUP_TITLE: Record<SyncGroup, string> = {
 }
 
 const plural = (count: number, noun: string): string => `${count} ${noun}${count === 1 ? '' : 's'}`
+
+const pullAll = command('sync.pullAll')
 
 /** The home screen: what needs attention, grouped by state, cheap work first. */
 export function ChangesView(props: Props) {
@@ -109,8 +111,8 @@ export function ChangesView(props: Props) {
 
   return (
     <div className="flex h-full flex-col overflow-y-auto">
-      <header className="flex items-end gap-4 px-[30px] pb-[18px] pt-[26px]">
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+      <header className="flex items-end gap-2 px-[30px] pb-[18px] pt-[26px]">
+        <div className="mr-2 flex min-w-0 flex-1 flex-col gap-1.5">
           <h1 className="text-[21px] font-semibold tracking-[-0.2px] text-ink">{empty ? 'Everything is in sync' : title}</h1>
           {props.checking
             ? (
@@ -145,6 +147,16 @@ export function ChangesView(props: Props) {
         >
           {props.checking ? 'Cancel' : 'Recheck workspace'}
         </button>
+        {props.counts.remote > 0 && (
+          <button
+            onClick={() => pullAll.run(props.ctx)}
+            disabled={pullAll.reason?.(props.ctx) !== undefined}
+            title={pullAll.reason?.(props.ctx) ?? `${pullAll.label} - ${shortcutLabel('doc.primary')}`}
+            className="flex items-center gap-2 whitespace-nowrap rounded-md border border-primary-edge bg-primary px-[13px] py-[7px] text-[12px] font-medium text-primary-ink hover:bg-primary-hover disabled:opacity-40"
+          >
+            <span className="text-[11px]">↓</span>Pull {plural(props.counts.remote, 'remote update')}
+          </button>
+        )}
       </header>
 
       {props.counts.unchecked > 0 && !scanning && (

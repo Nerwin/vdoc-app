@@ -56,4 +56,30 @@ export function needsAttention(state: DisplayState): boolean {
   return CHANGE_GROUPS.includes(syncGroup(state))
 }
 
+export interface StateCounts {
+  files: number
+  tracked: number
+  attention: number
+  synced: number
+  local: number
+  remote: number
+  conflict: number
+  unchecked: number
+}
+
+/** Workspace counters - unlinked and Confluence-ignored documents never count toward a state. */
+export function countStates(entries: Iterable<FileEntry>): StateCounts {
+  const counts: StateCounts = { files: 0, tracked: 0, attention: 0, synced: 0, local: 0, remote: 0, conflict: 0, unchecked: 0 }
+  for (const entry of entries) {
+    counts.files += 1
+    if (entry.tracked) counts.tracked += 1
+    const state = displayState(entry)
+    const group = syncGroup(state)
+    if (group === 'unlinked' || group === 'ignored') continue
+    counts[group] += 1
+    if (needsAttention(state)) counts.attention += 1
+  }
+  return counts
+}
+
 export const displayTitle = (entry: FileEntry): string => entry.title ?? entry.path.split('/').at(-1) ?? entry.path

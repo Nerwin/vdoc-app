@@ -3,7 +3,7 @@ import type { FileEntry } from '../../../shared/status.ts'
 import type { VdocLogEntry } from '../../../shared/types.ts'
 import { shellCommand } from '../../../shared/shell-command.ts'
 import { command, shortcutLabel, type CommandContext } from '../commands.ts'
-import { CloseIcon, ExternalIcon } from '../icons.tsx'
+import { ExternalIcon } from '../icons.tsx'
 import { OutcomeIcon } from './StateGlyph.tsx'
 import type { SyncEvent } from '../useApp.ts'
 
@@ -15,7 +15,6 @@ interface Props {
   /** Most recent CLI command that named this document. */
   lastCli: VdocLogEntry | undefined
   onOpenLogs(): void
-  onClose(): void
 }
 
 const ACTIONS = ['file.editor', 'file.finder', 'file.copyUrl', 'file.copyPath']
@@ -23,17 +22,13 @@ const ACTIONS = ['file.editor', 'file.finder', 'file.copyUrl', 'file.copyPath']
 const stamp = (at: number): string => new Date(at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 
 /** Where the header's tertiary technical data went - toggled with ⌘I. */
-export function DocumentInfo({ ctx, entry, labels, lastSync, lastCli, onOpenLogs, onClose }: Props) {
+export function DocumentInfo({ ctx, entry, labels, lastSync, lastCli, onOpenLogs }: Props) {
   const check = entry.check
   const pageId = check?.pageId ?? entry.pageId
   const status = lastCli ? cliStatus(lastCli) : null
   return (
     <aside className="flex w-[286px] shrink-0 flex-col gap-[18px] overflow-y-auto border-l border-line-subtle bg-sidebar px-[18px] py-[18px]">
-      <div className="flex items-center gap-2">
-        <span className="text-[11px] uppercase tracking-[0.09em] text-ink-label">Document info</span>
-        <span className="flex-1" />
-        <button onClick={onClose} title={`Hide panel - ${shortcutLabel('view.info')}`} className="text-ink-label hover:text-ink-body"><CloseIcon size={12} /></button>
-      </div>
+      <span className="text-[11px] uppercase tracking-[0.09em] text-ink-label">Document info</span>
 
       <dl className="flex flex-col gap-[11px] text-[11.5px]">
         <Row label="Confluence">

@@ -26,3 +26,13 @@ export {
 export const FolderIcon = (props: LucideProps) => <Folder fill="currentColor" stroke="none" {...props} />
 
 export const DotIcon = (props: LucideProps) => <Circle fill="currentColor" stroke="none" {...props} />
+
+/** Panel toggle (board 6b): a filled segment when the panel is open, outline only when closed. */
+export function PanelToggleIcon({ side, open }: { side: 'left' | 'right', open: boolean }) {
+  const tone = open ? 'border-link' : 'border-ink-dim'
+  return (
+    <span className={`flex h-[12px] w-[15px] overflow-hidden rounded-[3px] border-[1.5px] ${tone} ${side === 'right' ? 'justify-end' : ''}`}>
+      <span className={`h-full w-[5px] ${open ? 'bg-link' : `${tone} ${side === 'left' ? 'border-r-[1.5px]' : 'border-l-[1.5px]'}`}`} />
+    </span>
+  )
+}

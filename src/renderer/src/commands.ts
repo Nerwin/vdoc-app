@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowDownToLine, ArrowUp, ArrowUpToLine, Ban, Check, ChevronLeft, ChevronRight, CircleArrowUp, CircleHelp, Clock, Command as CommandKey, Copy, CornerDownLeft, Download, ExternalLink, FilePlus, FileText, FolderOpen, House, KeyRound, Link, ListTree, PanelLeft, PanelRight, Plus, Power, RefreshCw, RotateCw, Search, Settings, Sparkles, SquarePen, SunMoon, Terminal, TriangleAlert, X, type LucideIcon } from 'lucide-react'
+import { ArrowDown, ArrowDownToLine, ArrowUp, ArrowUpToLine, Ban, Check, ChevronLeft, ChevronRight, CircleArrowUp, CircleHelp, Columns3, Clock, Command as CommandKey, Copy, CornerDownLeft, Download, ExternalLink, FilePlus, FileText, FolderOpen, House, KeyRound, Link, ListTree, PanelLeft, PanelRight, Pin, Plus, Power, RefreshCw, RotateCw, Search, Settings, Sparkles, SquarePen, SunMoon, Terminal, TriangleAlert, X, type LucideIcon } from 'lucide-react'
 import type { ChangesScope, DisplayState } from '../../shared/types.ts'
 import { displayState, syncGroup, type FileEntry } from '../../shared/status.ts'
 import type { AppStore } from './useApp.ts'
@@ -40,6 +40,8 @@ export interface CommandContext {
   checking: boolean
   busy: boolean
   connected: boolean
+  /** The current view has an inspector (document view) - ⌘I stands down elsewhere. */
+  inspectorAvailable: boolean
   openPalette(mode: 'file' | 'command' | 'recent' | 'search'): void
   openSettings(): void
   openToken(): void
@@ -57,6 +59,8 @@ export interface CommandContext {
   openFind(): void
   toggleSidebar(): void
   toggleInfo(): void
+  /** Focus mode: hides both panels, or shows both again. */
+  toggleFocus(): void
   toggleTheme(): void
   reloadFile(): void
 }
@@ -150,6 +154,13 @@ export function primaryAction(state: DisplayState | null): PrimaryAction | null 
   }
 }
 
+/** What ⌘⏎ runs: the document's primary, or on Changes the bulk pull when anything is remote. */
+function visiblePrimary(ctx: CommandContext): PrimaryAction | null {
+  if (ctx.selection) return primaryAction(ctx.state)
+  const remote = ctx.app.counts.remote
+  return remote > 0 ? { label: `Pull ${remote} remote update${remote === 1 ? '' : 's'}`, commandId: 'sync.pullAll', tone: 'primary' } : null
+}
+
 /** What `⋯` offers per state - everything that is not the primary. */
 export function secondaryActions(state: DisplayState | null): string[] {
   const common = ['file.editor', 'file.finder', 'file.copyUrl', 'file.browser', 'file.copyPath', 'file.ignore']
@@ -185,12 +196,12 @@ export const COMMANDS: Command[] = [
     icon: CornerDownLeft,
     keys: { key: 'Enter', meta: true },
     reason: ctx => {
-      const primary = primaryAction(ctx.state)
+      const primary = visiblePrimary(ctx)
       return primary ? command(primary.commandId).reason?.(ctx) : 'no primary action here'
     },
-    suffix: ctx => primaryAction(ctx.state)?.label,
+    suffix: ctx => visiblePrimary(ctx)?.label,
     run: ctx => {
-      const primary = primaryAction(ctx.state)
+      const primary = visiblePrimary(ctx)
       if (primary) command(primary.commandId).run(ctx)
     },
   },
@@ -363,7 +374,7 @@ export const COMMANDS: Command[] = [
     group: 'File',
     label: 'Search documents…',
     icon: Search,
-    keys: { key: 'p', meta: true },
+    keys: { key: 'k', meta: true },
     run: ctx => ctx.openPalette('file'),
   },
   {
@@ -451,6 +462,16 @@ export const COMMANDS: Command[] = [
     run: ctx => void ctx.app.setIgnored(ctx.selection!, !ctx.entry?.ignored),
   },
   {
+    id: 'file.pin',
+    group: 'File',
+    label: 'Pin / unpin on top',
+    icon: Pin,
+    keys: { key: 'p', meta: true },
+    reason: all(noFile, idle),
+    suffix: ctx => (ctx.entry?.pinned ? 'currently pinned - unpin it' : undefined),
+    run: ctx => void ctx.app.setPinned(ctx.selection!, !ctx.entry?.pinned),
+  },
+  {
     id: 'file.reload',
     group: 'File',
     label: 'Reload from disk',
@@ -487,9 +508,10 @@ export const COMMANDS: Command[] = [
   {
     id: 'view.info',
     group: 'View',
-    label: 'Toggle document info panel',
+    label: 'Toggle inspector',
     icon: PanelRight,
     keys: { key: 'i', meta: true },
+    reason: ctx => (ctx.inspectorAvailable ? undefined : 'no inspector in this view'),
     run: ctx => ctx.toggleInfo(),
   },
   {
@@ -499,6 +521,14 @@ export const COMMANDS: Command[] = [
     icon: PanelLeft,
     keys: { key: 'b', meta: true },
     run: ctx => ctx.toggleSidebar(),
+  },
+  {
+    id: 'view.focus',
+    group: 'View',
+    label: 'Toggle both panels (focus mode)',
+    icon: Columns3,
+    keys: { key: '.', meta: true, shift: true },
+    run: ctx => ctx.toggleFocus(),
   },
   {
     id: 'view.find',
@@ -635,10 +665,21 @@ export function fullLabel(cmd: Command): string {
   return `${cmd.group}: ${cmd.label}`
 }
 
+const PUNCTUATION_CODES: Record<string, string> = { '.': 'Period', ',': 'Comma', '[': 'BracketLeft', ']': 'BracketRight', '/': 'Slash' }
+
+/** Physical key of a binding - ⌥ rewrites `event.key` on macOS (∂), ⇧ rewrites punctuation (>). */
+function codeOf(key: string): string | undefined {
+  if (/^[a-z]$/i.test(key)) return `Key${key.toUpperCase()}`
+  if (/^\d$/.test(key)) return `Digit${key}`
+  return PUNCTUATION_CODES[key]
+}
+
 function matches(keys: KeyBinding, event: KeyboardEvent): boolean {
   // `meta` means the platform's primary modifier; the other one must stay unpressed.
   const otherMod = IS_MAC ? event.ctrlKey : event.metaKey
-  return event.key.toLowerCase() === keys.key.toLowerCase()
+  // Physical fallback only where a modifier rewrites the character, so AZERTY letters still match by key.
+  const rewritten = Boolean(keys.alt) || (Boolean(keys.shift) && !/^[a-z]$/i.test(keys.key))
+  return (event.key.toLowerCase() === keys.key.toLowerCase() || (rewritten && event.code === codeOf(keys.key)))
     && isMod(event) === Boolean(keys.meta)
     && event.shiftKey === Boolean(keys.shift)
     && event.altKey === Boolean(keys.alt)

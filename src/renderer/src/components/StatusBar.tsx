@@ -4,7 +4,7 @@ import type { CliOutcome } from '../../../shared/cli-status.ts'
 import type { AppUpdateStatus, AuthStatus, ChangesScope } from '../../../shared/types.ts'
 import { humanTtl } from '../../../shared/time.ts'
 import { shortcutLabel } from '../commands.ts'
-import { CloseIcon } from '../icons.tsx'
+import { CloseIcon, SettingsIcon } from '../icons.tsx'
 import { OutcomeIcon, StateGlyph } from './StateGlyph.tsx'
 
 interface Props {
@@ -23,13 +23,14 @@ interface Props {
   onCancelCheck(): void
   onCheckUpdate(): void
   onInstallUpdate(): void
+  onOpenSettings(): void
 }
 
 export function StatusBar(props: Props) {
   useMinuteTick() // re-render each minute so the token countdown stays fresh
 
   return (
-    <footer data-tour="statusbar" className="flex h-[30px] shrink-0 items-center gap-2 border-t border-line bg-chrome px-[14px] text-[11.5px]">
+    <footer data-tour="statusbar" className="flex h-[30px] shrink-0 items-center gap-1 border-t border-line bg-chrome px-[14px] text-[11.5px]">
       <ConnectionButton auth={props.auth} site={props.site} onRefresh={props.onOpenToken} />
 
       {props.checking
@@ -79,6 +80,14 @@ export function StatusBar(props: Props) {
       </BarButton>
 
       {props.appVersion && <UpdateControl version={props.appVersion} status={props.update} onCheck={props.onCheckUpdate} onInstall={props.onInstallUpdate} />}
+
+      <button
+        onClick={props.onOpenSettings}
+        title={`Settings - ${shortcutLabel('app.settings')}`}
+        className="flex h-[27px] w-[27px] shrink-0 items-center justify-center rounded-md text-ink-dim hover:bg-hover hover:text-ink"
+      >
+        <SettingsIcon size={15} />
+      </button>
     </footer>
   )
 }
@@ -156,7 +165,7 @@ function UpdateControl(props: { version: string, status: AppUpdateStatus | null,
         : 'Check for updates'
 
   return (
-    <button onClick={props.onCheck} title={title} className="flex items-center gap-1.5 whitespace-nowrap rounded px-[7px] py-[3px] font-mono text-[11px] text-ink-label hover:bg-hover hover:text-ink-body">
+    <button onClick={props.onCheck} title={title} className="flex items-center gap-1.5 whitespace-nowrap rounded px-[7px] py-[3px] font-mono text-[11px] text-ink-mute hover:bg-hover hover:text-ink-body">
       v{props.version}
       {status?.phase === 'checking' && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />}
     </button>
@@ -190,13 +199,13 @@ function ConnectionButton({ auth, site, onRefresh }: { auth: AuthStatus | null, 
   const expiryMs = auth?.tokenExp ? auth.tokenExp * 1000 - Date.now() : null
   const expired = expiryMs !== null && expiryMs <= 0
   const expiringSoon = expiryMs !== null && !expired && expiryMs < 24 * 3600 * 1000
+  // Remaining time follows the name for session tokens only - an API key shows nothing after it.
+  const ttl = auth?.method === 'session-token' && expiryMs !== null && !expired ? expiryMs : null
   const label = !auth
     ? { glyph: '○', text: 'Connecting…', tone: 'text-ink-label' }
     : !auth.ok || expired
       ? { glyph: <CloseIcon size={11} />, text: 'Not connected', tone: 'text-conflict' }
-      : expiringSoon
-        ? { glyph: '⚠', text: `Token expires in ${humanTtl(expiryMs!)}`, tone: 'text-warn' }
-        : { glyph: '●', text: 'Confluence connected', tone: 'text-sync' }
+      : { glyph: '●', text: auth.displayName ?? 'Confluence connected', tone: 'text-sync' }
 
   return (
     <div ref={wrapperRef} className="relative">
@@ -206,6 +215,12 @@ function ConnectionButton({ auth, site, onRefresh }: { auth: AuthStatus | null, 
         className={`flex items-center gap-[7px] whitespace-nowrap rounded px-[7px] py-[3px] hover:bg-hover ${label.tone === 'text-sync' ? 'text-ink-body' : label.tone}`}
       >
         <span className={`flex ${label.tone}`}>{label.glyph}</span>{label.text}
+        {label.tone === 'text-sync' && ttl !== null && (
+          <>
+            <span className="text-ink-label">·</span>
+            <span className={ttl < 2 * 3600 * 1000 ? 'text-warn' : 'text-ink-dim'}>{humanTtl(ttl)} left</span>
+          </>
+        )}
       </button>
       {open && auth && (
         <div className="absolute bottom-full left-0 z-30 mb-1.5 w-[280px] rounded-lg border border-line-menu bg-overlay p-3 shadow-menu">

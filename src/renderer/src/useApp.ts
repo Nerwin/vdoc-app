@@ -5,7 +5,7 @@ import { LOG_MAX, type AppUpdateStatus, type AuthStatus, type ChangesScope, type
 import { setFrontmatterFlag } from '../../shared/frontmatter.ts'
 import { initMessage } from '../../shared/init.ts'
 import { isLossyPushError } from '../../shared/lossy-push.ts'
-import { displayState, needsAttention, syncGroup, type FileEntry } from '../../shared/status.ts'
+import { countStates, displayState, needsAttention, type FileEntry } from '../../shared/status.ts'
 import { updateCheckMessage } from '../../shared/update.ts'
 import { verifyBatch } from '../../shared/verification.ts'
 import { STATE_META } from './state-meta.ts'
@@ -795,18 +795,7 @@ export function useApp() {
     await api.installUpdate()
   }), [api, runOp])
 
-  const counts = useMemo(() => {
-    const result = { files: 0, tracked: 0, attention: 0, synced: 0, local: 0, remote: 0, conflict: 0, unchecked: 0 }
-    for (const entry of entries.values()) {
-      result.files += 1
-      if (entry.tracked) result.tracked += 1
-      const group = syncGroup(displayState(entry))
-      if (group === 'unlinked' || group === 'ignored') continue
-      result[group] += 1
-      if (needsAttention(displayState(entry))) result.attention += 1
-    }
-    return result
-  }, [entries])
+  const counts = useMemo(() => countStates(entries.values()), [entries])
 
   /** Home screen: no document selected, optionally narrowed to one group. */
   const openChanges = useCallback((scope: ChangesScope = null) => {

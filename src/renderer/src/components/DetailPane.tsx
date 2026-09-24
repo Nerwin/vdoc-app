@@ -42,7 +42,6 @@ interface Props {
   findSeq: number
   onView(view: ViewMode): void
   onSourceLayout(layout: SourceLayout): void
-  onToggleInfo(): void
   onOpenLogs(): void
   onError(error: unknown): void
   onRegisterFlush(flush: (() => Promise<boolean>) | null): void
@@ -417,7 +416,6 @@ export function DetailPane(props: Props) {
             lastSync={props.lastSync}
             lastCli={props.lastCli}
             onOpenLogs={props.onOpenLogs}
-            onClose={props.onToggleInfo}
           />
         )}
       </div>
