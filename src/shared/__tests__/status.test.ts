@@ -28,6 +28,7 @@ describe('sync state model', () => {
       { path: 'd.md', tracked: true },
       { path: 'e.md', tracked: false },
       { path: 'f.md', tracked: true, ignored: true, check: check('behind') },
+      { path: 'g.md', tracked: false, hidden: true },
     ])
     assert.deepEqual(counts, { files: 6, tracked: 5, attention: 2, synced: 1, local: 0, remote: 1, conflict: 1, unchecked: 1 })
   })

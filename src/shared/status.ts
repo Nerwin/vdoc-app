@@ -66,11 +66,11 @@ export interface StateCounts {
   unchecked: number
 }
 
-/** Workspace counters - unlinked and Confluence-ignored documents never count toward a state. */
+/** Workspace counters - unlinked and Confluence-ignored documents never count toward a state; `files` is what the tree lists (no vdocHide). */
 export function countStates(entries: Iterable<FileEntry>): StateCounts {
   const counts: StateCounts = { files: 0, tracked: 0, attention: 0, synced: 0, local: 0, remote: 0, conflict: 0, unchecked: 0 }
   for (const entry of entries) {
-    counts.files += 1
+    if (!entry.hidden) counts.files += 1
     if (entry.tracked) counts.tracked += 1
     const state = displayState(entry)
     const group = syncGroup(state)

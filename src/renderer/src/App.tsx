@@ -111,6 +111,7 @@ export function App() {
 
   const [sidebarOpen, setSidebarOpen] = useWorkspaceFlag('sidebarOpen', app.root)
   const [infoOpen, setInfoOpen] = useWorkspaceFlag('inspectorOpen', app.root)
+  const [legendOpen, setLegendOpen] = useWorkspaceFlag('legendOpen', app.root)
 
   const selected = app.selection ? app.entries.get(app.selection) ?? null : null
   const inspectorAvailable = selected !== null && resolving !== selected.path && !logsOpen
@@ -271,6 +272,8 @@ export function App() {
               rootDirs={app.settings?.contentDirs ?? []}
               pinnedDirs={app.settings?.pinnedDirs ?? []}
               pinnedFiles={app.pinnedFiles}
+              legendOpen={legendOpen}
+              onToggleLegend={() => setLegendOpen(open => !open)}
               onSetMode={ctx.setSidebarMode}
               onSelect={app.setSelection}
               onOpenDiff={openDiff}
@@ -281,6 +284,8 @@ export function App() {
               onGetPage={path => app.setGetForm({ dir: path })}
               onRemoveFolder={app.removeFolder}
               onSetIgnore={(path, ignored) => void app.setIgnored(path, ignored)}
+              onOpenEditor={path => void app.openEditor(path)}
+              onReveal={path => void app.revealFinder(path)}
               onCopyPageId={pageId => copy(ctx, pageId, 'Page ID')}
               onCopyPath={path => copy(ctx, absolutePath(app.root, path), 'Document path')}
             />

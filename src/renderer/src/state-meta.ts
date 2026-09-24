@@ -18,9 +18,9 @@ export const GROUP_META: Record<SyncGroup, GroupMeta> = {
   local: { glyph: '↑', label: 'Local changes', color: 'text-behind' },
   remote: { glyph: '↓', label: 'Remote changes', color: 'text-behind' },
   conflict: { glyph: '⚠', label: 'Conflict', color: 'text-conflict' },
-  unchecked: { glyph: '○', label: 'Not checked', color: 'text-ink-label' },
-  unlinked: { glyph: '○', label: 'No page linked', color: 'text-ink-label' },
-  ignored: { glyph: '○', label: 'Ignored', color: 'text-ink-label' },
+  unchecked: { glyph: '○', label: 'Not checked', color: 'text-ink-mute' },
+  unlinked: { glyph: '○', label: 'No page linked', color: 'text-ink-mute' },
+  ignored: { glyph: '○', label: 'Ignored', color: 'text-ink-mute' },
 }
 
 interface StateMeta {

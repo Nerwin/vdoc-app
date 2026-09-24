@@ -9,6 +9,7 @@ export {
   ChevronLeft as BackIcon,
   ChevronRight as ForwardIcon,
   ChevronRight as ChevronRightIcon,
+  ChevronUp as ChevronUpIcon,
   Ellipsis as MoreIcon,
   ExternalLink as ExternalIcon,
   House as HomeIcon,
