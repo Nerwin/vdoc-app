@@ -231,6 +231,11 @@ body {
   overflow: hidden;
 }
 
+/* Lucide icons: the R5 stroke grammar (stroke 1.8, round caps). */
+svg.lucide {
+  stroke-width: 1.8;
+}
+
 /* Machine output the user may copy: real text, never a drag target. */
 .selectable {
   user-select: text;

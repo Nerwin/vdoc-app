@@ -1,5 +1,6 @@
 import type { VdocCliRequirement } from '../../../shared/app-config.ts'
 import { extractVersion } from '../../../shared/version.ts'
+import { AlertIcon } from '../icons.tsx'
 
 interface Props {
   currentVersion: string
@@ -26,7 +27,7 @@ export function CliVersionWarning(props: Props) {
       role="alert"
       className="flex shrink-0 items-center gap-3 border-b border-banner-edge bg-banner-bg px-3.5 py-2 text-[11.5px] text-banner-ink"
     >
-      <span className="shrink-0 text-[13px] text-banner-glyph">⚠</span>
+      <AlertIcon size={14} className="shrink-0 text-banner-glyph" />
       <p className="min-w-0 flex-1 leading-[1.45]">
         vdoc CLI <strong>v{current}</strong> is below the required <strong>v{props.requirement.minimumVersion}</strong>.
         {' '}The app remains usable, but actions may fail or behave incorrectly. Update to the latest CLI version.

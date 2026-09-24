@@ -4,6 +4,7 @@ import type { ChangesScope, DisplayState, SyncGroup, VersionEntry } from '../../
 import { CHANGE_GROUPS, displayState, displayTitle, syncGroup, type FileEntry } from '../../../shared/status.ts'
 import { timeAgo } from '../../../shared/time.ts'
 import { forPath, shortcutLabel, type CommandContext } from '../commands.ts'
+import { ArrowRightIcon, CheckIcon, CloseIcon, MoreIcon } from '../icons.tsx'
 import { GROUP_META, STATE_META } from '../state-meta.ts'
 import { ActionMenu } from './ActionMenu.tsx'
 import { StateGlyph } from './StateGlyph.tsx'
@@ -121,7 +122,7 @@ export function ChangesView(props: Props) {
                       style={{ width: props.checking.total ? `${(props.checking.done / props.checking.total) * 100}%` : '0%' }}
                     />
                   </div>
-                  <button onClick={props.onCancelCheck} title="Cancel" className="rounded px-1 text-[10px] text-ink-label hover:bg-hover hover:text-ink">✕</button>
+                  <button onClick={props.onCancelCheck} title="Cancel" className="flex items-center rounded p-[3px] text-ink-label hover:bg-hover hover:text-ink"><CloseIcon size={11} /></button>
                 </div>
               )
             : (
@@ -164,7 +165,7 @@ export function ChangesView(props: Props) {
 
       {showBulk && props.bulkResult && (
         <div className="mx-[30px] mb-5 flex items-center gap-3 rounded-[7px] border border-ok-edge bg-ok-bg px-[14px] py-[10px] text-[12.5px] text-ok-ink">
-          <span>✓</span>
+          <CheckIcon size={13} className="shrink-0" />
           <span>{props.bulkResult.text}</span>
         </div>
       )}
@@ -299,18 +300,18 @@ function ChangeRow({ row, group, author, menuOpen, ctx, onReview, onMenu }: {
       <button
         onClick={onReview}
         className={`flex items-center gap-[7px] whitespace-nowrap rounded-md border px-[13px] py-[6px] text-[12px] ${
-          conflict ? 'border-danger-edge bg-danger text-danger-ink hover:bg-danger-hover' : 'border-control bg-raised text-ink-body hover:bg-hover'
+          conflict ? 'border-danger-edge bg-danger text-danger-ink hover:bg-danger-hover' : 'border-control bg-raised text-control-ink hover:bg-hover'
         }`}
       >
-        {conflict ? 'Resolve' : 'Review'} <span className={conflict ? 'text-danger-ink/70' : 'text-ink-label'}>→</span>
+        {conflict ? 'Resolve' : 'Review'}<ArrowRightIcon size={12} className={conflict ? 'text-danger-ink/70' : 'text-ink-label'} />
       </button>
       <div className="relative">
         <button
           onClick={() => onMenu(!menuOpen)}
           title="More actions"
-          className="flex h-[26px] w-[26px] items-center justify-center rounded-[5px] text-[14px] text-ink-label hover:bg-hover hover:text-ink"
+          className="flex h-[26px] w-[26px] items-center justify-center rounded-[5px] text-ink-label hover:bg-hover hover:text-ink"
         >
-          ⋯
+          <MoreIcon size={14} />
         </button>
         {menuOpen && (
           <ActionMenu

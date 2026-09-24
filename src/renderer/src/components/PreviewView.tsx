@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Marked } from 'marked'
 
 import { escapeHtml, previewMetaLine } from '../../../shared/preview-html.ts'
+import { BackIcon, CloseIcon, ForwardIcon } from '../icons.tsx'
 
 /** Fence language → Monaco language id, for the common shorthands. */
 const LANG_ALIASES: Record<string, string> = {
@@ -305,9 +306,9 @@ function FindBar({ containerRef, scrollRef, html, seq, onClose }: {
       <span className="min-w-[44px] text-right font-mono text-[11px] text-ink-label">
         {query === '' ? '' : `${ranges.length === 0 ? 0 : active + 1}/${ranges.length}`}
       </span>
-      <FindButton title="Previous match (⇧⏎)" onClick={() => step(-1)}>‹</FindButton>
-      <FindButton title="Next match (⏎)" onClick={() => step(1)}>›</FindButton>
-      <FindButton title="Close (esc)" onClick={onClose}>✕</FindButton>
+      <FindButton title="Previous match (⇧⏎)" onClick={() => step(-1)}><BackIcon size={14} /></FindButton>
+      <FindButton title="Next match (⏎)" onClick={() => step(1)}><ForwardIcon size={14} /></FindButton>
+      <FindButton title="Close (esc)" onClick={onClose}><CloseIcon size={13} /></FindButton>
     </div>
   )
 }

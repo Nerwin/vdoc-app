@@ -259,8 +259,8 @@ function CommandRow({ row, ctx, selected, onClick, position }: {
         selected ? 'bg-selected shadow-[inset_2px_0_0_var(--color-select-edge)]' : 'hover:bg-row-hover'
       }`}
     >
-      <span className={`text-center text-[12px] ${row.disabled ? 'text-ink-disabled' : TINT[command.tint ?? ''] ?? 'text-ink-mute'}`}>
-        {command.icon}
+      <span className={`flex justify-center ${row.disabled ? 'text-ink-disabled' : TINT[command.tint ?? ''] ?? 'text-ink-mute'}`}>
+        <command.icon size={14} />
       </span>
       <span className={`min-w-0 truncate text-[13px] ${row.disabled ? 'text-ink-disabled' : 'text-ink'}`}>
         <Highlight text={label} indices={row.indices ?? []} />

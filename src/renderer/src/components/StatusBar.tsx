@@ -4,8 +4,8 @@ import type { CliOutcome } from '../../../shared/cli-status.ts'
 import type { AppUpdateStatus, AuthStatus, ChangesScope } from '../../../shared/types.ts'
 import { humanTtl } from '../../../shared/time.ts'
 import { shortcutLabel } from '../commands.ts'
-import { OUTCOME_META } from '../state-meta.ts'
-import { StateGlyph } from './StateGlyph.tsx'
+import { CloseIcon } from '../icons.tsx'
+import { OutcomeIcon, StateGlyph } from './StateGlyph.tsx'
 
 interface Props {
   auth: AuthStatus | null
@@ -27,7 +27,6 @@ interface Props {
 
 export function StatusBar(props: Props) {
   useMinuteTick() // re-render each minute so the token countdown stays fresh
-  const logs = OUTCOME_META[props.cliOutcome]
 
   return (
     <footer data-tour="statusbar" className="flex h-[30px] shrink-0 items-center gap-2 border-t border-line bg-chrome px-[14px] text-[11.5px]">
@@ -43,7 +42,7 @@ export function StatusBar(props: Props) {
                   style={{ width: props.checking.total ? `${(props.checking.done / props.checking.total) * 100}%` : '0%' }}
                 />
               </ProgressTrack>
-              <button onClick={props.onCancelCheck} title="Cancel" className="flex h-[18px] w-[18px] items-center justify-center rounded text-[10px] text-ink-label hover:bg-hover hover:text-ink">✕</button>
+              <button onClick={props.onCancelCheck} title="Cancel" className="flex h-[18px] w-[18px] items-center justify-center rounded text-[10px] text-ink-label hover:bg-hover hover:text-ink"><CloseIcon size={11} /></button>
             </div>
           )
         : props.busyOp
@@ -76,7 +75,7 @@ export function StatusBar(props: Props) {
       <div className="flex-1" />
 
       <BarButton title={`CLI logs - ${shortcutLabel('app.logs')}`} onClick={props.onOpenLogs}>
-        <span className={`font-mono text-[10.5px] ${logs.color}`}>{logs.glyph}</span>CLI logs
+        <OutcomeIcon outcome={props.cliOutcome} size={11} />CLI logs
       </BarButton>
 
       {props.appVersion && <UpdateControl version={props.appVersion} status={props.update} onCheck={props.onCheckUpdate} onInstall={props.onInstallUpdate} />}
@@ -194,7 +193,7 @@ function ConnectionButton({ auth, site, onRefresh }: { auth: AuthStatus | null, 
   const label = !auth
     ? { glyph: '○', text: 'Connecting…', tone: 'text-ink-label' }
     : !auth.ok || expired
-      ? { glyph: '✕', text: 'Not connected', tone: 'text-conflict' }
+      ? { glyph: <CloseIcon size={11} />, text: 'Not connected', tone: 'text-conflict' }
       : expiringSoon
         ? { glyph: '⚠', text: `Token expires in ${humanTtl(expiryMs!)}`, tone: 'text-warn' }
         : { glyph: '●', text: 'Confluence connected', tone: 'text-sync' }
@@ -206,7 +205,7 @@ function ConnectionButton({ auth, site, onRefresh }: { auth: AuthStatus | null, 
         title="Confluence - account, token and site"
         className={`flex items-center gap-[7px] whitespace-nowrap rounded px-[7px] py-[3px] hover:bg-hover ${label.tone === 'text-sync' ? 'text-ink-body' : label.tone}`}
       >
-        <span className={label.tone}>{label.glyph}</span>{label.text}
+        <span className={`flex ${label.tone}`}>{label.glyph}</span>{label.text}
       </button>
       {open && auth && (
         <div className="absolute bottom-full left-0 z-30 mb-1.5 w-[280px] rounded-lg border border-line-menu bg-overlay p-3 shadow-menu">

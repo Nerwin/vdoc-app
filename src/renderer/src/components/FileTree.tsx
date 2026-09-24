@@ -4,6 +4,7 @@ import type { SyncGroup } from '../../../shared/types.ts'
 import { displayState, needsAttention, syncGroup, type FileEntry } from '../../../shared/status.ts'
 import { buildTree, filesUnder, flattenVisible, orderPinnedFirst, type TreeNode } from '../../../shared/tree.ts'
 import { shortcutLabel, type SidebarMode } from '../commands.ts'
+import { ChevronDownIcon, ChevronRightIcon, FolderIcon, PinIcon } from '../icons.tsx'
 import { GROUP_META, STATE_META } from '../state-meta.ts'
 import { StateGlyph } from './StateGlyph.tsx'
 
@@ -284,13 +285,11 @@ function Row({ node, entries, selected, pinned, collapsed, subLabel, onClick, on
         style={indent}
         className={`flex w-full shrink-0 items-center gap-[7px] rounded-md pr-2.5 text-left hover:bg-row-hover ${sub ? 'py-[6px]' : 'h-[30px]'}`}
       >
-        <span className="w-2 text-[8px] text-ink-label">{collapsed ? '▸' : '▾'}</span>
-        <svg viewBox="0 0 16 16" aria-hidden="true" className="h-3 w-3 shrink-0 fill-current text-ink-label">
-          <path d="M1.5 3c0-.83.67-1.5 1.5-1.5h3.2c.4 0 .78.16 1.06.44L8.4 3h4.6c.83 0 1.5.67 1.5 1.5v7c0 .83-.67 1.5-1.5 1.5H3c-.83 0-1.5-.67-1.5-1.5V3Z" />
-        </svg>
+        <span className="flex w-2.5 shrink-0 justify-center text-ink-label">{collapsed ? <ChevronRightIcon size={10} /> : <ChevronDownIcon size={10} />}</span>
+        <FolderIcon size={14} className="shrink-0 text-ink-label" />
         <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
           <span className={`truncate text-[12.5px] ${node.depth === 0 ? 'font-medium text-ink' : 'text-ink-body'}`}>
-            {node.name}{pinned && <span className="ml-1.5 text-[9px] text-accent" title="Pinned on top">✦</span>}
+            {node.name}{pinned && <PinIcon size={11} className="ml-1.5 inline text-brand" aria-label="Pinned on top" />}
           </span>
           {sub && <span className={`text-[11px] ${sub.includes('attention') ? 'text-warn' : 'text-ink-label'}`}>{sub}</span>}
         </span>
@@ -318,11 +317,8 @@ function Row({ node, entries, selected, pinned, collapsed, subLabel, onClick, on
         {entry?.title ?? node.name}
       </span>
       {pinned && (
-        <span title="Pinned on top" className="shrink-0 text-accent">
-          <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 17v5" />
-            <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1z" />
-          </svg>
+        <span title="Pinned on top" className="shrink-0 text-brand">
+          <PinIcon size={11} />
         </span>
       )}
     </button>

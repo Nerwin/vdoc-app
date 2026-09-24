@@ -6,6 +6,7 @@ import { GuardedSaveQueue } from '../../../shared/save-queue.ts'
 import { displayState, displayTitle, syncGroup, type FileEntry } from '../../../shared/status.ts'
 import { timeAgo } from '../../../shared/time.ts'
 import { command, primaryAction, secondaryActions, shortcutLabel, type CommandContext, type ViewMode } from '../commands.ts'
+import { AlertIcon, ChevronDownIcon, MoreIcon } from '../icons.tsx'
 import { STATE_META } from '../state-meta.ts'
 import type { SyncEvent } from '../useApp.ts'
 import { ActionMenu } from './ActionMenu.tsx'
@@ -290,9 +291,9 @@ export function DetailPane(props: Props) {
               <button
                 onClick={() => setMenuOpen(open => !open)}
                 title="More actions"
-                className="flex h-[30px] w-[30px] items-center justify-center rounded-md border border-control bg-raised text-[14px] text-ink-body hover:bg-hover hover:text-ink"
+                className="flex h-[30px] w-[30px] items-center justify-center rounded-md border border-control bg-raised text-control-ink hover:bg-hover hover:text-ink"
               >
-                ⋯
+                <MoreIcon size={15} />
               </button>
               {menuOpen && <ActionMenu ctx={ctx} ids={secondaryActions(state)} onClose={() => setMenuOpen(false)} />}
             </div>
@@ -304,7 +305,7 @@ export function DetailPane(props: Props) {
             key={note.text}
             className={`flex items-center gap-[9px] rounded-[7px] border px-3 py-[9px] ${note.error ? 'border-bad-edge bg-bad-bg' : 'border-banner-edge bg-banner-bg'}`}
           >
-            <span className={`text-[12px] ${note.error ? 'text-conflict' : 'text-banner-glyph'}`}>⚠</span>
+            <AlertIcon size={13} className={`shrink-0 ${note.error ? 'text-conflict' : 'text-banner-glyph'}`} />
             <span className={`flex-1 text-[12px] leading-relaxed ${note.error ? 'text-bad-ink' : 'text-banner-ink'}`}>{note.text}</span>
             {note.help && (
               <button onClick={props.onHelp} className="shrink-0 whitespace-nowrap text-[12px] text-accent hover:underline">
@@ -321,9 +322,9 @@ export function DetailPane(props: Props) {
             <button
               onClick={() => setLayoutOpen(open => !open)}
               title="Layout: Editor / Editor + Preview"
-              className="-ml-2 pr-2 text-[10px] text-ink-mute hover:text-ink"
+              className="-ml-2 pr-2 text-ink-mute hover:text-ink"
             >
-              ▾
+              <ChevronDownIcon size={12} />
             </button>
             {layoutOpen && (
               <ActionMenu

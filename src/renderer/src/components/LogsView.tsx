@@ -4,7 +4,9 @@ import { cliStatus, detectFormat, documentOf, interpretCli, type CliOutcome, typ
 import type { VdocLogEntry } from '../../../shared/types.ts'
 import { shellCommand, type ShellKind } from '../../../shared/shell-command.ts'
 import { shortcutLabel } from '../commands.ts'
+import { AlertIcon, ArrowRightIcon, ChevronDownIcon, ChevronRightIcon, SearchIcon } from '../icons.tsx'
 import { OUTCOME_META } from '../state-meta.ts'
+import { OutcomeIcon } from './StateGlyph.tsx'
 
 interface Props {
   entries: VdocLogEntry[]
@@ -144,7 +146,7 @@ export function LogsView({ entries, known, selection, notify, onOpenDocument, on
 
         <div className="flex items-center gap-3 border-b border-line px-[22px] pb-3">
           <div className="field-ring flex min-w-0 flex-1 items-center gap-2 rounded-md border border-control bg-sidebar px-2.5 py-[5px]">
-            <span className="text-[11px] text-ink-label">⌕</span>
+            <SearchIcon size={12} className="shrink-0 text-ink-label" />
             <input
               value={query}
               onChange={event => setQuery(event.target.value)}
@@ -156,10 +158,10 @@ export function LogsView({ entries, known, selection, notify, onOpenDocument, on
           <div className="flex overflow-hidden rounded-md border border-control">
             <SegmentButton active={segment === 'all'} onClick={() => setSegment('all')}>All</SegmentButton>
             <SegmentButton active={segment === 'findings'} onClick={() => setSegment('findings')}>
-              <span className="text-warn-text">●</span> Findings <Count value={counts.findings + counts.warning} />
+              <OutcomeIcon outcome="findings" size={11} /> Findings <Count value={counts.findings + counts.warning} />
             </SegmentButton>
             <SegmentButton active={segment === 'errors'} onClick={() => setSegment('errors')}>
-              <span className="text-conflict">✕</span> Errors <Count value={counts.error} />
+              <OutcomeIcon outcome="error" size={11} /> Errors <Count value={counts.error} />
             </SegmentButton>
           </div>
           <label className={`flex items-center gap-1.5 text-[12px] ${selection ? 'text-ink-body' : 'text-ink-label'}`} title={selection ?? 'No document open'}>
@@ -265,11 +267,11 @@ function LogRow({ entry, status, command, document, open, focused, onToggle, onC
       >
         <span className="font-mono text-[11px] text-ink-label">{time(entry.at)}</span>
         <span className={`flex items-center gap-[7px] text-[11.5px] ${meta.color}`} title={status.summary}>
-          <span className="font-mono text-[10.5px]">{meta.glyph}</span>{meta.label}
+          <OutcomeIcon outcome={status.outcome} />{meta.label}
         </span>
         <span className={`selectable min-w-0 truncate font-mono text-[12px] text-ink-body ${open ? 'whitespace-normal break-all' : ''}`}>{command}</span>
         <span className="text-right font-mono text-[11px] text-ink-label">{duration(entry.durationMs)}</span>
-        <span className="text-center text-[11px] text-ink-label">{open ? '▾' : '▸'}</span>
+        <span className="flex justify-center text-ink-label">{open ? <ChevronDownIcon size={12} /> : <ChevronRightIcon size={12} />}</span>
       </div>
 
       {open && (
@@ -291,10 +293,10 @@ function LogRow({ entry, status, command, document, open, focused, onToggle, onC
           <OutputBlock label="stderr" text={entry.stderr} onCopy={onCopy} />
           {interpretation && (
             <div className="flex items-center gap-[9px] rounded-[7px] border border-banner-edge bg-banner-bg px-3 py-[9px]">
-              <span className="text-[12px] text-banner-glyph">⚠</span>
+              <AlertIcon size={13} className="shrink-0 text-banner-glyph" />
               <span className="flex-1 text-[12px] leading-relaxed text-banner-ink">{interpretation}</span>
               {document && (
-                <button onClick={() => onOpenDocument(document)} className="shrink-0 text-[12px] text-accent hover:underline">Review document →</button>
+                <button onClick={() => onOpenDocument(document)} className="inline-flex shrink-0 items-center gap-1 text-[12px] text-link hover:text-link-hover hover:underline">Review document<ArrowRightIcon size={12} /></button>
               )}
             </div>
           )}

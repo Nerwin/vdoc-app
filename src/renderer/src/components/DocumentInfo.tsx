@@ -3,7 +3,8 @@ import type { FileEntry } from '../../../shared/status.ts'
 import type { VdocLogEntry } from '../../../shared/types.ts'
 import { shellCommand } from '../../../shared/shell-command.ts'
 import { command, shortcutLabel, type CommandContext } from '../commands.ts'
-import { OUTCOME_META } from '../state-meta.ts'
+import { CloseIcon, ExternalIcon } from '../icons.tsx'
+import { OutcomeIcon } from './StateGlyph.tsx'
 import type { SyncEvent } from '../useApp.ts'
 
 interface Props {
@@ -31,13 +32,13 @@ export function DocumentInfo({ ctx, entry, labels, lastSync, lastCli, onOpenLogs
       <div className="flex items-center gap-2">
         <span className="text-[11px] uppercase tracking-[0.09em] text-ink-label">Document info</span>
         <span className="flex-1" />
-        <button onClick={onClose} title={`Hide panel - ${shortcutLabel('view.info')}`} className="text-[12px] text-ink-label hover:text-ink-body">✕</button>
+        <button onClick={onClose} title={`Hide panel - ${shortcutLabel('view.info')}`} className="text-ink-label hover:text-ink-body"><CloseIcon size={12} /></button>
       </div>
 
       <dl className="flex flex-col gap-[11px] text-[11.5px]">
         <Row label="Confluence">
           {pageId
-            ? <button onClick={() => command('file.browser').run(ctx)} className="font-mono text-accent hover:underline">{pageId} ↗</button>
+            ? <button onClick={() => command('file.browser').run(ctx)} className="inline-flex items-center gap-1 font-mono text-link hover:text-link-hover hover:underline">{pageId}<ExternalIcon size={11} /></button>
             : <span className="text-ink-label">no page linked</span>}
         </Row>
         <Row label="Local version"><Mono value={check?.localVersion} /></Row>
@@ -63,7 +64,7 @@ export function DocumentInfo({ ctx, entry, labels, lastSync, lastCli, onOpenLogs
         {lastCli && status
           ? (
               <div className="flex items-center gap-[9px] rounded-md border border-line-subtle bg-raised-row px-2.5 py-[9px]">
-                <span className={`font-mono text-[11px] ${OUTCOME_META[status.outcome].color}`}>{OUTCOME_META[status.outcome].glyph}</span>
+                <OutcomeIcon outcome={status.outcome} />
                 <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
                   <span className="truncate font-mono text-[11px] text-ink-body">{shellCommand(['vdoc', ...lastCli.args], window.vdoc.platform === 'win32' ? 'powershell' : 'posix')}</span>
                   <span className="truncate text-[10.5px] text-ink-label">

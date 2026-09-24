@@ -5,6 +5,7 @@ import { displayTitle, type FileEntry } from '../../../shared/status.ts'
 import { timeAgo } from '../../../shared/time.ts'
 import type { DiffResult, VersionEntry } from '../../../shared/types.ts'
 import { IS_MAC } from '../commands.ts'
+import { BackIcon, CheckIcon } from '../icons.tsx'
 import { StateGlyph } from './StateGlyph.tsx'
 
 interface Props {
@@ -82,7 +83,7 @@ export function ConflictView({ entry, diff, author, busy, onBack, onError, onMer
   return (
     <div className="flex h-full min-w-0 flex-col bg-pane">
       <div className="flex flex-col gap-[14px] px-[30px] pt-[18px]">
-        <button onClick={onBack} className="self-start text-[12px] text-ink-mute hover:text-ink">‹ Changes</button>
+        <button onClick={onBack} className="flex items-center gap-0.5 self-start text-[12px] text-ink-mute hover:text-ink"><BackIcon size={13} />Changes</button>
         <div className="flex items-start gap-5">
           <div className="flex min-w-0 flex-1 flex-col gap-[7px]">
             <h1 className="truncate text-[20px] font-semibold tracking-[-0.2px] text-ink">{displayTitle(entry)}</h1>
@@ -174,7 +175,7 @@ function HunkBand({ hunk, choice, focused, onFocus, onDecide, onUndo }: {
         {choice
           ? (
               <>
-                <span className="text-[11.5px] text-sync-text">✓ {CHOICE_LABEL[choice]}</span>
+                <span className="flex items-center gap-1 text-[11.5px] text-sync-text"><CheckIcon size={12} />{CHOICE_LABEL[choice]}</span>
                 <span className="flex-1" />
                 <button onClick={onUndo} className="text-[11.5px] text-accent hover:underline">Change</button>
               </>

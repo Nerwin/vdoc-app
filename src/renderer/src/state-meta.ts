@@ -1,5 +1,8 @@
+import type { ComponentType } from 'react'
+import type { LucideProps } from 'lucide-react'
 import type { CliOutcome } from '../../shared/cli-status.ts'
 import type { DisplayState, SyncGroup } from '../../shared/types.ts'
+import { AlertIcon, CheckIcon, CloseIcon, DotIcon } from './icons.tsx'
 
 interface GroupMeta {
   glyph: string
@@ -16,8 +19,8 @@ export const GROUP_META: Record<SyncGroup, GroupMeta> = {
   remote: { glyph: '↓', label: 'Remote changes', color: 'text-behind' },
   conflict: { glyph: '⚠', label: 'Conflict', color: 'text-conflict' },
   unchecked: { glyph: '○', label: 'Not checked', color: 'text-ink-label' },
-  unlinked: { glyph: '–', label: 'No page linked', color: 'text-ink-label' },
-  ignored: { glyph: '⊘', label: 'Ignored', color: 'text-ink-label' },
+  unlinked: { glyph: '○', label: 'No page linked', color: 'text-ink-label' },
+  ignored: { glyph: '○', label: 'Ignored', color: 'text-ink-label' },
 }
 
 interface StateMeta {
@@ -40,10 +43,16 @@ export const STATE_META: Record<DisplayState, StateMeta> = {
   'ignored': { label: 'Ignored', hint: 'confluenceIgnore is set in the frontmatter - checks, diffs and sync skip this file. Right-click it in the tree to include it again' },
 }
 
+interface OutcomeMeta {
+  icon: ComponentType<LucideProps>
+  label: string
+  color: string
+}
+
 /** CLI result status from the JSON, not the exit code - see shared/cli-status. */
-export const OUTCOME_META: Record<CliOutcome, GroupMeta> = {
-  success: { glyph: '✓', label: 'Success', color: 'text-sync-text' },
-  findings: { glyph: '●', label: 'Findings', color: 'text-warn-text' },
-  warning: { glyph: '⚠', label: 'Warning', color: 'text-warn-text' },
-  error: { glyph: '✕', label: 'Error', color: 'text-conflict' },
+export const OUTCOME_META: Record<CliOutcome, OutcomeMeta> = {
+  success: { icon: CheckIcon, label: 'Success', color: 'text-sync-text' },
+  findings: { icon: DotIcon, label: 'Findings', color: 'text-warn-text' },
+  warning: { icon: AlertIcon, label: 'Warning', color: 'text-warn-text' },
+  error: { icon: CloseIcon, label: 'Error', color: 'text-conflict' },
 }

@@ -4,6 +4,7 @@ import type { AuthStatus, CredentialKey, Settings, SettingsInfo } from "../../..
 import { humanTtl } from "../../../shared/time.ts";
 import { extractVersion, isVersionBelowMinimum } from "../../../shared/version.ts";
 import { ModalButton } from "./Modal.tsx";
+import { ArrowRightIcon, CloseIcon, InfoIcon, ReloadIcon } from "../icons.tsx";
 
 interface Props {
   settings: SettingsInfo;
@@ -56,9 +57,9 @@ export function SettingsModal(props: Props) {
           <button
             onClick={props.onClose}
             title="Close - esc"
-            className="flex h-6 w-6 items-center justify-center rounded text-[13px] text-ink-mute hover:bg-hover hover:text-ink"
+            className="flex h-6 w-6 items-center justify-center rounded text-ink-mute hover:bg-hover hover:text-ink"
           >
-            ✕
+            <CloseIcon size={14} />
           </button>
         </header>
 
@@ -171,9 +172,9 @@ function Folders({ settings, spaceMapping, busy, onAddFolder, onPickDocsRoot, on
             <button
               onClick={() => onRemoveFolder(dir)}
               title={`Remove ${dir} from the tree`}
-              className="flex h-6 w-6 items-center justify-center rounded text-[12px] text-ink-mute hover:bg-danger hover:text-conflict"
+              className="flex h-6 w-6 items-center justify-center rounded text-ink-mute hover:bg-danger hover:text-conflict"
             >
-              ✕
+              <CloseIcon size={12} />
             </button>
           </div>
         ))}
@@ -197,7 +198,7 @@ function Folders({ settings, spaceMapping, busy, onAddFolder, onPickDocsRoot, on
               </option>
             ))}
           </select>
-          <span className="text-ink-mute">→</span>
+          <ArrowRightIcon size={12} className="shrink-0 text-ink-mute" />
           <input
             value={mapSpace}
             onChange={(event) => setMapSpace(event.target.value.toUpperCase())}
@@ -426,9 +427,9 @@ function Cli({ settings, busy, onUpdate, onReloadVersion }: Props) {
             onReloadVersion();
           }}
           title="Reload version"
-          className="rounded border border-control px-1.5 py-0.5 text-ink-dim hover:bg-hover hover:text-ink"
+          className="flex items-center rounded border border-control px-1.5 py-1 text-ink-dim hover:bg-hover hover:text-ink"
         >
-          ↻
+          <ReloadIcon size={12} />
         </button>
       </div>
       {outdated && settings.cliRequirement && (
@@ -533,7 +534,7 @@ function Segmented<T extends string>({ options, value, onPick }: { options: Arra
 function InfoStrip({ children }: { children: ReactNode }) {
   return (
     <p className="flex items-start gap-2 rounded-md border border-line-subtle bg-sidebar px-3 py-2 text-[11.5px] leading-[1.55] text-ink-dim">
-      <span className="text-ink-mute">ⓘ</span>
+      <InfoIcon size={13} className="mt-px shrink-0 text-ink-mute" />
       <span>{children}</span>
     </p>
   );

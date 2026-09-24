@@ -1,6 +1,7 @@
 import darkLogo from '../assets/dark-logo.png'
 import lightLogo from '../assets/light-logo.png'
 import { IS_MAC, shortcutLabel } from '../commands.ts'
+import { BackIcon, ForwardIcon, HomeIcon, SearchIcon, SettingsIcon } from '../icons.tsx'
 
 interface Props {
   theme: 'dark' | 'light'
@@ -24,8 +25,8 @@ export function TopBar(props: Props) {
       <img src={props.theme === 'dark' ? darkLogo : lightLogo} alt="VOSKER DOC" className="h-[22px] w-auto shrink-0" />
 
       <div className="flex items-center gap-0.5">
-        <ChromeButton title={`Back - ${shortcutLabel('file.back')}`} onClick={props.onBack} disabled={!props.canGoBack}>‹</ChromeButton>
-        <ChromeButton title={`Forward - ${shortcutLabel('file.forward')}`} onClick={props.onForward} disabled={!props.canGoForward}>›</ChromeButton>
+        <ChromeButton title={`Back - ${shortcutLabel('file.back')}`} onClick={props.onBack} disabled={!props.canGoBack}><BackIcon size={16} /></ChromeButton>
+        <ChromeButton title={`Forward - ${shortcutLabel('file.forward')}`} onClick={props.onForward} disabled={!props.canGoForward}><ForwardIcon size={16} /></ChromeButton>
       </div>
 
       <div className="flex min-w-0 flex-1 items-center justify-center">
@@ -33,7 +34,7 @@ export function TopBar(props: Props) {
           onClick={props.onOpenSearch}
           className="flex w-[380px] max-w-full items-center gap-[9px] rounded-md border border-line bg-sidebar px-2.5 py-[5px] text-left hover:border-line-active"
         >
-          <span className="text-[11px] text-ink-label">⌕</span>
+          <SearchIcon size={13} className="shrink-0 text-ink-label" />
           <span className="flex-1 truncate text-[12.5px] text-ink-label">Search documents or run a command</span>
           <span className="rounded-[3px] border border-line bg-row-hover px-[5px] py-px font-mono text-[10.5px] text-ink-mute">{shortcutLabel('file.goto')}</span>
         </button>
@@ -53,10 +54,10 @@ export function TopBar(props: Props) {
           </>
         )}
         <ChromeButton title={`Changes - ${shortcutLabel('view.changes')}`} onClick={props.onOpenChanges}>
-          <Icon d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />
+          <HomeIcon size={16} />
         </ChromeButton>
         <ChromeButton title={`Settings - ${shortcutLabel('app.settings')}`} onClick={props.onOpenSettings}>
-          <Icon d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+          <SettingsIcon size={16} />
         </ChromeButton>
       </div>
     </header>
@@ -69,18 +70,10 @@ function ChromeButton({ title, onClick, disabled, children }: { title: string, o
       onClick={onClick}
       title={title}
       disabled={disabled}
-      className="flex h-[30px] w-[30px] items-center justify-center rounded-md text-[15px] text-ink-mute hover:bg-hover hover:text-ink disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-ink-mute"
+      className="flex h-[30px] w-[30px] items-center justify-center rounded-md text-ink-mute hover:bg-hover hover:text-ink disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-ink-mute"
     >
       {children}
     </button>
   )
 }
 
-/** 18px stroke icon on a 24-unit grid. */
-function Icon({ d }: { d: string }) {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d={d} />
-    </svg>
-  )
-}

@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 
 import type { SyncGroup } from '../../../shared/types.ts'
 import { command, keycaps, type CommandContext } from '../commands.ts'
+import { CheckIcon, CloseIcon } from '../icons.tsx'
 import { ModalButton } from './Modal.tsx'
 import { StateGlyph } from './StateGlyph.tsx'
 
@@ -46,7 +47,7 @@ function CheckRow({ ok, label, detail }: { ok: boolean | null, label: string, de
   const tone = ok === null ? 'text-ink-label' : ok ? 'text-sync' : 'text-warn'
   return (
     <div className="flex items-baseline gap-2">
-      <span className={`w-3 shrink-0 text-center ${tone}`}>{ok === null ? '…' : ok ? '✓' : '✗'}</span>
+      <span className={`flex w-3 shrink-0 justify-center self-center ${tone}`}>{ok === null ? '…' : ok ? <CheckIcon size={12} /> : <CloseIcon size={12} />}</span>
       <span className="w-32 shrink-0 text-ink">{label}</span>
       <span className="min-w-0 break-words text-ink-dim">{detail}</span>
     </div>
@@ -109,7 +110,7 @@ const STEPS: Step[] = [
           first, and nothing is ever overwritten without asking. Quick health check:
         </p>
         <SetupChecks ctx={ctx} />
-        <p>Anything marked ✗ is fixed in Settings - this list updates live.</p>
+        <p>Anything marked with a cross is fixed in Settings - this list updates live.</p>
         <TryButton id="app.settings" label="Open Settings…" ctx={ctx} />
       </>
     ),
@@ -159,7 +160,7 @@ const STEPS: Step[] = [
       <>
         <p>
           The app always opens on Changes: every document needing attention, grouped as Remote
-          changes, Local changes and Conflicts, with one <Strong>Review →</Strong> per row and a bulk
+          changes, Local changes and Conflicts, with one <Strong>Review</Strong> per row and a bulk
           link per group. Documents without a baseline sit in the strip above.
         </p>
         <p>Esc returns there from any document.</p>
@@ -225,7 +226,7 @@ export function Tour({ ctx, onClose }: { ctx: CommandContext, onClose(): void })
       <div className="flex items-center gap-3 border-b border-line-subtle px-4 py-3">
         <h2 className="min-w-0 flex-1 truncate text-[13px] font-semibold text-ink">{step.title}</h2>
         <span className="shrink-0 text-[11px] text-ink-label">{index + 1} / {STEPS.length}</span>
-        <button onClick={onClose} title="Close the tour" className="shrink-0 text-ink-mute hover:text-ink">✕</button>
+        <button onClick={onClose} title="Close the tour" className="shrink-0 text-ink-mute hover:text-ink"><CloseIcon size={14} /></button>
       </div>
       <div className="max-h-[60vh] space-y-2 overflow-y-auto px-4 py-3 text-[12px] leading-relaxed text-ink-dim">
         {step.body(ctx)}
