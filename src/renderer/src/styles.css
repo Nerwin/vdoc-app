@@ -7,90 +7,103 @@
  */
 @theme {
   /* Surfaces */
-  --color-bg: #101113;
-  --color-chrome: #1a1c1e;
-  --color-sidebar: #17181a;
-  --color-pane: #17181a;
-  --color-content: #131416;
-  --color-overlay: #1c1e21;
+  --color-bg: #1e2126;
+  --color-chrome: #22262c;
+  --color-sidebar: #1a1d22;
+  --color-pane: #1e2126;
+  --color-content: #1e2126;
+  --color-overlay: #23272d;
+  --color-raised-row: #232730;
+  --color-well: #15181c;
 
   /* Borders */
-  --color-line: #2c2f33;
-  --color-line-subtle: #23262a;
-  --color-control: #2c2f33;
-  --color-divider: #23262a;
-  --color-line-menu: #383d42;
-  --color-line-active: #3a4046;
+  --color-line: #343a43;
+  --color-line-subtle: #2b3038;
+  --color-control: #363c46;
+  --color-divider: #2b3038;
+  --color-line-menu: #424953;
+  --color-line-active: #4a5670;
+  --color-row-sep: #2a2f37;
+  --color-log-sep: #282d35;
 
   /* Text */
-  --color-ink: #e6e9ec;
-  --color-ink-body: #d7dadd;
-  --color-ink-mid: #b6bdc4;
-  --color-ink-dim: #9aa1a8;
-  --color-ink-mute: #8a9098;
-  --color-ink-label: #7f858c;
-  --color-ink-faint: #6a7076;
-  --color-ink-ghost: #5d6369;
-  --color-glyph: #4e545a;
-  --color-sep: #35393d;
+  --color-ink: #eef1f4;
+  --color-ink-body: #dde1e6;
+  --color-ink-mid: #c0c7cf;
+  --color-ink-dim: #a3abb5;
+  --color-ink-mute: #959da8;
+  --color-ink-label: #8b93a0;
+  /* #8b93a0 is the floor - nothing lighter carries text (5.0:1 on #1e2126). */
+  --color-ink-faint: #8b93a0;
+  --color-ink-ghost: #8b93a0;
+  --color-glyph: #8b93a0;
+  --color-sep: #454c56;
 
   /* States */
-  --color-sync: #6fbf8b;
-  --color-sync-text: #6fbf8b;
-  --color-behind: #5aa1e0;
-  --color-warn: #d8a44f;
-  --color-warn-text: #d8a44f;
-  --color-conflict: #d1707a;
-  --color-attention: #d9a2a7;
-  --color-dot-neutral: #3a3f44;
-  --color-accent: #5aa1e0;
-  --color-select-edge: #5aa1e0;
-  --color-match: #8cc0f0;
+  --color-sync: #6fcf97;
+  --color-sync-text: #6fcf97;
+  --color-behind: #69b0f5;
+  --color-warn: #f0b458;
+  --color-warn-text: #f0b458;
+  --color-conflict: #f07d88;
+  --color-attention: #f2b3bb;
+  --color-dot-neutral: #4a515b;
+  --color-accent: #69b0f5;
+  --color-select-edge: #69b0f5;
+  --color-match: #9dcbff;
 
   /* Composites */
-  --color-primary: #2f5b86;
-  --color-primary-edge: #3d6f9f;
-  --color-primary-hover: #36699a;
-  --color-primary-badge: #23486d;
-  --color-primary-ink: #eaf2fa;
-  --color-raised: #1f2123;
-  --color-row-hover: #1f2123;
-  --color-hover: #26292c;
-  --color-selected: #2c3136;
-  --color-selected-ink: #e6e9ec;
-  --color-track: #26292c;
-  --color-danger-bg: #2a1c1c;
-  --color-pill-bg: #2a2318;
-  --color-pill-edge: #4a3a1d;
-  --color-pill-ink: #d8a44f;
-  --color-banner-bg: #211d15;
-  --color-banner-edge: #4a3a1d;
-  --color-banner-ink: #c9b183;
-  --color-banner-glyph: #d8a44f;
-  --color-ok-bg: #18231c;
-  --color-ok-edge: #284a33;
-  --color-ok-ink: #6fbf8b;
-  --color-info-bg: #17222b;
-  --color-info-edge: #274257;
-  --color-info-ink: #5aa1e0;
-  --color-bad-bg: #231719;
-  --color-bad-edge: #5a2d31;
-  --color-bad-ink: #d9a2a7;
-  --color-keycap-bg: #26292c;
-  --color-keycap-edge: #3a3f44;
-  --color-keycap-ink: #d7dadd;
+  --color-primary: #3b74b3;
+  --color-primary-edge: #4a86c8;
+  --color-primary-hover: #4482c6;
+  --color-primary-badge: #2c5a8e;
+  --color-primary-ink: #f2f8ff;
+  --color-raised: #2a2f37;
+  --color-row-hover: #282d35;
+  --color-hover: #323841;
+  --color-selected: #2f3d55;
+  --color-selected-ink: #eef1f4;
+  --color-track: #323841;
+  --color-danger-bg: #3a262c;
+  --color-danger: #4a2a31;
+  --color-danger-edge: #6e3d48;
+  --color-danger-hover: #573139;
+  --color-danger-ink: #f5d9dd;
+  --color-diff-add: #1f3327;
+  --color-diff-remove: #3a2329;
+  --color-json-key: #8ec4f7;
+  --color-json-string: #d3a276;
+  --color-pill-bg: #332a1a;
+  --color-pill-edge: #5c4823;
+  --color-pill-ink: #f0c674;
+  --color-banner-bg: #2f2818;
+  --color-banner-edge: #5c4823;
+  --color-banner-ink: #dccb9f;
+  --color-banner-glyph: #f0b458;
+  --color-ok-bg: #1f3328;
+  --color-ok-edge: #33553f;
+  --color-ok-ink: #bfe3cb;
+  --color-info-bg: #1d2b3b;
+  --color-info-edge: #2f4c6b;
+  --color-info-ink: #8ec4f7;
+  --color-bad-bg: #3a2329;
+  --color-bad-edge: #6b3a44;
+  --color-bad-ink: #f2b3bb;
+  --color-keycap-bg: #2c3139;
+  --color-keycap-edge: #444b56;
+  --color-keycap-ink: #dde1e6;
 
-  --shadow-menu: 0 14px 34px rgba(0, 0, 0, 0.55);
-  --shadow-modal: 0 18px 48px rgba(0, 0, 0, 0.5);
-  --shadow-palette: 0 20px 52px rgba(0, 0, 0, 0.5);
+  --shadow-menu: 0 14px 34px rgba(0, 0, 0, 0.45);
+  --shadow-modal: 0 18px 48px rgba(0, 0, 0, 0.42);
+  --shadow-palette: 0 20px 52px rgba(0, 0, 0, 0.42);
 
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, "Cascadia Mono", Consolas, "Liberation Mono", monospace;
 }
 
 :root {
-  --focus-ring: 0 0 0 3px rgba(90, 161, 224, 0.22);
-  --scrim: rgba(0, 0, 0, 0.5);
+  --focus-ring: 0 0 0 3px rgba(105, 176, 245, 0.26);
+  --scrim: rgba(8, 10, 14, 0.5);
 }
 
 :root[data-theme="light"] {
@@ -100,6 +113,8 @@
   --color-pane: #ffffff;
   --color-content: #fbfcfd;
   --color-overlay: #ffffff;
+  --color-raised-row: #f8f9fb;
+  --color-well: #f2f4f7;
 
   --color-line: #d5d9df;
   --color-line-subtle: #e2e5ea;
@@ -107,6 +122,8 @@
   --color-divider: #eef0f3;
   --color-line-menu: #c3c9d1;
   --color-line-active: #b9d0ea;
+  --color-row-sep: #e2e5ea;
+  --color-log-sep: #eef0f3;
 
   --color-ink: #14171a;
   --color-ink-body: #23272b;
@@ -144,6 +161,14 @@
   --color-selected-ink: #14406e;
   --color-track: #dfe3e8;
   --color-danger-bg: #f7e6e4;
+  --color-danger: #f7e6e4;
+  --color-danger-edge: #eab8b3;
+  --color-danger-hover: #f1d6d3;
+  --color-danger-ink: #a32218;
+  --color-diff-add: #e9f6ee;
+  --color-diff-remove: #f7e6e4;
+  --color-json-key: #0f5fb0;
+  --color-json-string: #8a5a2b;
   --color-pill-bg: #fdf3dc;
   --color-pill-edge: #e0c58a;
   --color-pill-ink: #7a5405;
@@ -182,6 +207,13 @@ body,
 body {
   user-select: none;
   overflow: hidden;
+}
+
+/* Machine output the user may copy: real text, never a drag target. */
+.selectable {
+  user-select: text;
+  -webkit-user-drag: none;
+  cursor: text;
 }
 
 .drag-region {

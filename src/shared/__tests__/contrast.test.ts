@@ -70,10 +70,22 @@ test('the disabled token stays above the 3:1 non-text floor', () => {
   assert.ok(contrast(light['--color-ink-ghost'], light['--color-pane']) >= 3)
 })
 
-test('the dark column still ships the values it shipped', () => {
-  const dark = tokens('@theme {')
-  assert.equal(dark['--color-sidebar'], '#17181a')
-  assert.equal(dark['--color-content'], '#131416')
-  assert.equal(dark['--color-ink'], '#e6e9ec')
-  assert.equal(dark['--color-accent'], '#5aa1e0')
+const dark = tokens('@theme {')
+
+test('the dark column ships the lifted blue-grey surfaces', () => {
+  assert.equal(dark['--color-pane'], '#1e2126')
+  assert.equal(dark['--color-sidebar'], '#1a1d22')
+  assert.equal(dark['--color-chrome'], '#22262c')
+  assert.equal(dark['--color-well'], '#15181c')
+  assert.equal(dark['--color-accent'], '#69b0f5')
+})
+
+test('every dark text token clears 4.5:1 on its surface', () => {
+  for (const [text, surface] of TEXT_ON_SURFACE) {
+    const ratio = contrast(dark[text], dark[surface])
+    assert.ok(ratio >= 4.5, `${text} (${dark[text]}) on ${surface} (${dark[surface]}) is ${ratio.toFixed(2)}:1`)
+  }
+  for (const token of ['--color-ink-faint', '--color-ink-ghost', '--color-glyph']) {
+    assert.equal(dark[token], dark['--color-ink-label'], `${token} must sit on the text floor`)
+  }
 })

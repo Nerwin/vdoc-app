@@ -97,7 +97,7 @@ function createWindow(theme: Settings['theme']): BrowserWindow {
     ...(process.platform === 'darwin'
       ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 16, y: 14 } }
       : existsSync(icon) ? { icon } : {}),
-    backgroundColor: dark ? '#101113' : '#f2f4f7',
+    backgroundColor: dark ? '#1e2126' : '#f2f4f7',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       ...SECURE_WEB_PREFERENCES,
