@@ -1,70 +1,73 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 
-import type { DiffResult } from '../../../shared/types.ts'
+import type { DiffResult, VdocLogEntry } from '../../../shared/types.ts'
 import { resolveRelative } from '../../../shared/links.ts'
 import { GuardedSaveQueue } from '../../../shared/save-queue.ts'
-import { displayState, type FileEntry } from '../../../shared/status.ts'
-import { shortcutLabel, type ViewMode } from '../commands.ts'
+import { displayState, displayTitle, syncGroup, type FileEntry } from '../../../shared/status.ts'
+import { timeAgo } from '../../../shared/time.ts'
+import { command, primaryAction, secondaryActions, shortcutLabel, type CommandContext, type ViewMode } from '../commands.ts'
 import { STATE_META } from '../state-meta.ts'
+import type { SyncEvent } from '../useApp.ts'
+import { ActionMenu } from './ActionMenu.tsx'
 import { CommentsView } from './CommentsView.tsx'
+import { DocumentInfo } from './DocumentInfo.tsx'
 import { PreviewView } from './PreviewView.tsx'
+import { StateGlyph } from './StateGlyph.tsx'
 
 const CodeView = lazy(() => import('./CodeView.tsx').then(module => ({ default: module.CodeView })))
 const DiffView = lazy(() => import('./DiffView.tsx').then(module => ({ default: module.DiffView })))
 
+export type SourceLayout = 'content' | 'split'
+
 interface Props {
+  ctx: CommandContext
   entry: FileEntry
   diff: { path: string, result: DiffResult } | null
   diffLoading: string | null
   busyOp: string | null
   theme: 'dark' | 'light'
   connected: boolean
-  allowLossyPush: boolean
-  /** The active tab - owned by App so the ⌘1–4 commands can drive it. */
+  lastChecked: Date | null
+  lastSync: SyncEvent | undefined
+  lastCli: VdocLogEntry | undefined
+  /** The active tab - owned by App so commands can drive it. */
   view: ViewMode
+  /** Source tab layout, persisted per workspace. */
+  sourceLayout: SourceLayout
+  infoOpen: boolean
   /** Bumped by the Reload-from-disk command to re-read the file. */
   reloadKey: number
   /** Bumped by ⌘F - opens (or refocuses) the preview's find bar. */
   findSeq: number
   onView(view: ViewMode): void
+  onSourceLayout(layout: SourceLayout): void
+  onToggleInfo(): void
+  onOpenLogs(): void
   onError(error: unknown): void
   onRegisterFlush(flush: (() => Promise<boolean>) | null): void
-  /** Open the sync-concepts help modal (the state banners link to it). */
+  /** Open the sync-concepts help modal (the state strips link to it). */
   onHelp(): void
   /** Navigate to another file in the tree (backlink row, local link in the preview). */
   onSelect(path: string): void
   onDiff(path: string): void
-  onCheck(path: string): void
   onMarkVerified(path: string): void
-  onPull(path: string): void
-  /** Opens the red confirm - pull that overwrites local content. */
-  onForcePull(path: string): void
-  onPush(path: string, force: boolean, allowLossy?: boolean): void
   onLint(path: string): void
-  onSync(path: string): void
-  onCreate(path: string): void
-  onOpenConfluence(path: string): void
-  onOpenEditor(path: string): void
-  onRevealFinder(path: string): void
 }
 
-type PushMode = 'normal' | 'force' | 'disabled'
-
-/** Push is normal when local is the newer side, force when Confluence moved, off otherwise. */
-function pushModeFor(state: ReturnType<typeof displayState>): PushMode {
-  if (state === 'ahead' || state === 'local-edits' || state === 'no-version' || state === 'unverified') return 'normal'
-  if (state === 'behind' || state === 'conflict') return 'force'
-  return 'disabled'
+const TONE = {
+  primary: 'border-primary-edge bg-primary text-primary-ink hover:bg-primary-hover',
+  secondary: 'border-control bg-raised text-ink-body hover:bg-hover',
+  danger: 'border-danger-edge bg-danger text-danger-ink hover:bg-danger-hover',
 }
 
 export function DetailPane(props: Props) {
-  const { entry, view, onError } = props
+  const { ctx, entry, view, onError } = props
   const [content, setContent] = useState<string | null>(null)
   const [readFailed, setReadFailed] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [layoutOpen, setLayoutOpen] = useState(false)
   const [editorLoaded, setEditorLoaded] = useState(false)
   const [saveState, setSaveState] = useState<'saved' | 'unsaved' | 'saving' | 'blocked'>('saved')
-  const actionsRef = useRef<HTMLButtonElement>(null)
 
   const path = entry.path
 
@@ -207,256 +210,215 @@ export function DetailPane(props: Props) {
   }, [diffReady, onView])
 
   const state = displayState(entry)
+  const group = syncGroup(state)
   const meta = STATE_META[state]
   const check = entry.check
   const busy = props.busyOp !== null
   const ignored = state === 'ignored'
   const loadingDiff = props.diffLoading === path
-  const pushMode = pushModeFor(state)
-  const canPull = entry.tracked && !ignored && state !== 'untracked' && state !== 'not-found'
   const showDiff = view === 'diff' && diffReady && props.diff
-  const segments = path.split('/')
-  const name = segments.at(-1) ?? path
-  const parentDir = segments.at(-2)
+  const primary = primaryAction(state)
+  const primaryCommand = primary ? command(primary.commandId) : null
+  const primaryReason = primaryCommand?.reason?.(ctx)
 
   const openDiffTab = (): void => (diffReady ? onView('diff') : props.onDiff(path))
-
-  // The single filled button is derived from state; everything else lives in the menu.
-  const primary = !entry.tracked
-    ? { label: 'Create', run: () => props.onCreate(path) }
-    : state === 'behind'
-      ? { label: 'Pull', run: () => props.onPull(path) }
-      : state === 'ahead' || state === 'local-edits' || state === 'no-version'
-        ? { label: 'Push', run: () => props.onPush(path, false) }
-        : state === 'conflict'
-          ? { label: 'Diff', run: openDiffTab }
-          : state === 'unverified'
-            ? { label: 'Verify', run: () => props.onMarkVerified(path) }
-            : { label: 'Check', run: () => props.onCheck(path) }
+  const openSource = (): void => onView(props.sourceLayout)
 
   const notes: Array<{ text: string, error: boolean, help?: boolean }> = []
-  if (meta.hint && (state === 'unverified' || state === 'no-version' || state === 'conflict' || state === 'not-found')) {
-    notes.push({ text: meta.hint, error: state === 'conflict' || state === 'not-found', help: true })
-  }
-  if (ignored && meta.hint) {
-    notes.push({ text: meta.hint, error: false })
+  if (meta.hint && (state === 'conflict' || state === 'not-found' || state === 'no-version' || ignored)) {
+    notes.push({ text: meta.hint, error: state === 'conflict' || state === 'not-found', help: !ignored })
   }
   if (check?.titleMismatch) {
     notes.push({ text: 'Frontmatter title differs from the body H1 - pushes use the frontmatter title.', error: false })
   }
 
+  const versionsTitle = check
+    ? `Local version ${check.localVersion ?? '-'} · Confluence version ${check.remoteVersion ?? '-'}${props.lastSync ? ` · last synchronized ${new Date(props.lastSync.at).toLocaleString()}` : ''}`
+    : undefined
+
   return (
     <div className="flex h-full min-w-0 flex-col bg-pane">
-      <div className="flex items-center gap-4 px-[18px] pb-[13px] pt-3.5">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          {parentDir && (
-            <span title={path} className="whitespace-nowrap text-[12px] text-ink-faint">{parentDir} /</span>
-          )}
-          <h1 title={path} className="truncate text-[15px] font-medium text-ink">{name}</h1>
-          <div className="flex shrink-0 gap-0.5">
-            <IconButton title={`Open in editor - ${shortcutLabel('file.editor')}`} onClick={() => props.onOpenEditor(path)}>✎</IconButton>
-            <IconButton title="Show in folder" onClick={() => props.onRevealFinder(path)}>⊞</IconButton>
+      <div className="flex flex-col gap-[14px] px-[30px] pt-[22px]">
+        <div className="flex items-start gap-5">
+          <div className="flex min-w-0 flex-1 flex-col gap-[7px]">
+            <h1 className="truncate text-[20px] font-semibold tracking-[-0.2px] text-ink" title={displayTitle(entry)}>{displayTitle(entry)}</h1>
+            <div className="flex flex-wrap items-center gap-[11px] text-[12.5px]">
+              <StateGlyph group={group} word={meta.label} />
+              {check && (check.localVersion !== undefined || check.remoteVersion !== undefined) && (
+                <>
+                  <Sep />
+                  <span title={versionsTitle} className="text-ink-dim">
+                    {group === 'remote' ? `Confluence v${check.remoteVersion ?? '-'} · Local v${check.localVersion ?? '-'}` : `Local v${check.localVersion ?? '-'} · Confluence v${check.remoteVersion ?? '-'}`}
+                  </span>
+                </>
+              )}
+              {check && props.lastChecked && (
+                <>
+                  <Sep />
+                  <span className="text-ink-label">checked {timeAgo(props.lastChecked)}</span>
+                </>
+              )}
+              {state === 'unchecked' && <><Sep /><span className="text-ink-label">no baseline recorded</span></>}
+              {saveState !== 'saved' && (
+                <>
+                  <Sep />
+                  <span className={saveState === 'blocked' ? 'text-conflict' : 'text-ink-label'}>
+                    {saveState === 'unsaved' ? 'Unsaved' : saveState === 'saving' ? 'Saving…' : 'Save blocked'}
+                  </span>
+                </>
+              )}
+            </div>
+            {/* Ellipsised from the left so the filename stays visible. */}
+            <span dir="rtl" className="truncate text-left font-mono text-[11px] text-ink-label" title={path}>
+              <bdi dir="ltr">{path}</bdi>
+            </span>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2">
+            {primary && primaryCommand && (
+              <button
+                onClick={() => primaryCommand.run(ctx)}
+                disabled={primaryReason !== undefined}
+                title={primaryReason ? `${primary.label} - ${primaryReason}` : `${primary.label} - ${shortcutLabel('doc.primary')}`}
+                className={`flex items-center gap-2 whitespace-nowrap rounded-md border px-[15px] py-[7px] text-[12.5px] font-medium disabled:opacity-40 ${TONE[primary.tone]}`}
+              >
+                {primary.label}
+                {busy && <span className="h-3 w-3 animate-spin rounded-full border border-current/60 border-t-transparent" />}
+              </button>
+            )}
+            <div className="relative">
+              <button
+                onClick={() => setMenuOpen(open => !open)}
+                title="More actions"
+                className="flex h-[30px] w-[30px] items-center justify-center rounded-md border border-control bg-raised text-[14px] text-ink-mid hover:bg-hover hover:text-ink"
+              >
+                ⋯
+              </button>
+              {menuOpen && <ActionMenu ctx={ctx} ids={secondaryActions(state)} onClose={() => setMenuOpen(false)} />}
+            </div>
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
-          <div className={`flex items-center gap-[7px] whitespace-nowrap rounded-full border px-2.5 py-1 text-[12px] ${meta.chip}`}>
-            <span className={`h-[7px] w-[7px] rounded-full bg-current ${busy ? 'animate-pulse' : ''}`} />
-            <span>{meta.label}</span>
-          </div>
-
-          {check && (check.localVersion !== undefined || check.remoteVersion !== undefined) && (
-            <div className="flex items-center gap-2 whitespace-nowrap rounded-full border border-control bg-raised px-[11px] py-1 text-[12px]">
-              <span className="hidden text-ink-label @min-[1080px]:inline">local</span>
-              <span className="text-ink-body">v{check.localVersion ?? '-'}</span>
-              <span className="text-glyph">{relationGlyph(state)}</span>
-              <span className="hidden text-ink-label @min-[1080px]:inline">remote</span>
-              <span className="text-ink-body">v{check.remoteVersion ?? '-'}</span>
-            </div>
-          )}
-
-          {entry.gitDirty && (
-            <div
-              title="Git: uncommitted local changes"
-              className="hidden items-center rounded-full border border-control bg-raised px-2.5 py-1 text-[12px] text-warn-text @min-[1000px]:flex"
-            >
-              ±
-            </div>
-          )}
-
-          {check?.pageId && (
-            <button
-              onClick={() => props.onOpenConfluence(path)}
-              title={`Open Confluence page ${check.pageId}`}
-              className="group flex items-center gap-[7px] whitespace-nowrap rounded-full border border-control bg-raised px-[11px] py-1 text-[12px]"
-            >
-              <span className="text-ink-label">page</span>
-              <span className="text-accent group-hover:underline">{check.pageId}</span>
-              <span className="text-[10px] text-ink-ghost">↗</span>
-            </button>
-          )}
-
-          <div className="mx-0.5 h-[22px] w-px bg-line" />
-
-          <button
-            onClick={primary.run}
-            disabled={busy || !props.connected || ignored}
-            className="flex items-center gap-2 whitespace-nowrap rounded-md border border-primary-edge bg-primary px-4 py-1.5 text-[12.5px] text-primary-ink hover:bg-primary-hover disabled:opacity-40"
+        {notes.map(note => (
+          <div
+            key={note.text}
+            className={`flex items-center gap-[9px] rounded-[7px] border px-3 py-[9px] ${note.error ? 'border-bad-edge bg-bad-bg' : 'border-banner-edge bg-banner-bg'}`}
           >
-            {primary.label}
-            {busy && <span className="h-3 w-3 animate-spin rounded-full border border-primary-ink/60 border-t-transparent" />}
-          </button>
+            <span className={`text-[12px] ${note.error ? 'text-conflict' : 'text-banner-glyph'}`}>⚠</span>
+            <span className={`flex-1 text-[12px] leading-relaxed ${note.error ? 'text-bad-ink' : 'text-banner-ink'}`}>{note.text}</span>
+            {note.help && (
+              <button onClick={props.onHelp} className="shrink-0 whitespace-nowrap text-[12px] text-accent hover:underline">
+                What do these terms mean?
+              </button>
+            )}
+          </div>
+        ))}
 
-          <div className="relative">
+        <div className="flex items-center gap-1 border-b border-line-subtle">
+          <Tab label="Preview" active={view === 'preview'} disabled={content === null} onClick={() => onView('preview')} />
+          <div className="relative flex items-center">
+            <Tab label="Source" active={view === 'content' || view === 'split'} disabled={content === null} onClick={openSource} />
             <button
-              ref={actionsRef}
-              onClick={() => setMenuOpen(open => !open)}
-              disabled={ignored}
-              title={ignored ? 'confluenceIgnore is set - Confluence actions are off for this file' : undefined}
-              className="whitespace-nowrap rounded-md border border-control bg-raised px-3 py-1.5 text-[12.5px] text-ink-body hover:bg-hover disabled:opacity-40 disabled:hover:bg-raised"
+              onClick={() => setLayoutOpen(open => !open)}
+              title="Layout: Editor / Editor + Preview"
+              className="-ml-2 pr-2 text-[10px] text-ink-mute hover:text-ink"
             >
-              Actions ▾
+              ▾
             </button>
-            {menuOpen && (
-              <ActionsMenu
-                entry={entry}
-                primaryLabel={primary.label}
-                canPull={canPull}
-                pushMode={pushMode}
-                allowLossyPush={props.allowLossyPush}
-                busy={busy}
-                connected={props.connected}
-                onClose={() => {
-                  setMenuOpen(false)
-                  actionsRef.current?.focus()
-                }}
-                onPull={() => props.onPull(path)}
-                onForcePull={() => props.onForcePull(path)}
-                onPush={force => props.onPush(path, force)}
-                onLossyPush={() => props.onPush(path, pushMode === 'force', true)}
-                onSync={() => props.onSync(path)}
-                onCreate={() => props.onCreate(path)}
-                onOpenConfluence={() => props.onOpenConfluence(path)}
+            {layoutOpen && (
+              <ActionMenu
+                ctx={ctx}
+                ids={['view.content', 'view.split']}
+                align="left"
+                onClose={() => setLayoutOpen(false)}
               />
             )}
           </div>
+          <Tab
+            label={loadingDiff ? 'Diff…' : 'Diff'}
+            active={Boolean(showDiff)}
+            disabled={!entry.tracked || ignored || loadingDiff}
+            onClick={openDiffTab}
+          />
+          <Tab label="Comments" active={view === 'comments'} disabled={!entry.tracked || ignored} onClick={() => onView('comments')} />
+          <div className="flex-1" />
+          {backlinks.length > 0 && <BacklinksButton links={backlinks} onPick={onSelect} />}
+          <button
+            onClick={() => props.onLint(path)}
+            disabled={busy}
+            className="px-[11px] py-[9px] text-[11.5px] text-ink-label hover:text-ink-mid disabled:opacity-40"
+          >
+            Lint
+          </button>
         </div>
       </div>
 
-      {notes.map(note => (
-        <div
-          key={note.text}
-          className={`mx-[18px] mb-3.5 flex items-center gap-[9px] rounded-[5px] border px-3 py-[9px] ${
-            note.error ? 'border-bad-edge bg-bad-bg' : 'border-banner-edge bg-banner-bg'
-          }`}
-        >
-          <span className={`text-[12px] ${note.error ? 'text-conflict' : 'text-banner-glyph'}`}>⚠</span>
-          <span className={`flex-1 text-[12px] leading-relaxed ${note.error ? 'text-bad-ink' : 'text-banner-ink'}`}>
-            {note.text}
-          </span>
-          {note.help && (
-            <button
-              onClick={props.onHelp}
-              className="shrink-0 whitespace-nowrap text-[12px] text-accent hover:underline"
-            >
-              What do these terms mean?
-            </button>
-          )}
-        </div>
-      ))}
-
-      <div className="flex items-center gap-1 border-b border-line px-[18px]">
-        <Tab label="Content" active={view === 'content' || (view === 'diff' && !showDiff)} onClick={() => onView('content')} />
-        <Tab label="Preview" active={view === 'preview'} disabled={content === null} onClick={() => onView('preview')} />
-        <Tab label="Split" active={view === 'split'} disabled={content === null} onClick={() => onView('split')} />
-        <Tab
-          label={loadingDiff ? 'Diff…' : 'Diff'}
-          active={Boolean(showDiff)}
-          disabled={!entry.tracked || ignored || loadingDiff}
-          onClick={openDiffTab}
-        />
-        <Tab label="Comments" active={view === 'comments'} disabled={!entry.tracked || ignored} onClick={() => onView('comments')} />
-        <div className="flex-1" />
-        {saveState !== 'saved' && (
-          <span className={`px-2 text-[11px] ${saveState === 'blocked' ? 'text-conflict' : 'text-ink-faint'}`}>
-            {saveState === 'unsaved' ? 'Unsaved' : saveState === 'saving' ? 'Saving…' : 'Save blocked'}
-          </span>
-        )}
-        {labels.length > 0 && (
-          <div className="hidden items-center gap-1 px-1 @min-[860px]:flex" title="Confluence labels">
-            {labels.map(label => (
-              <span
-                key={label}
-                className="whitespace-nowrap rounded-full border border-control bg-raised px-2 py-0.5 text-[10.5px] text-ink-dim"
-              >
-                {label}
-              </span>
-            ))}
-          </div>
-        )}
-        {backlinks.length > 0 && <BacklinksButton links={backlinks} onPick={onSelect} />}
-        <button
-          onClick={() => props.onLint(path)}
-          disabled={busy}
-          className="px-3 py-2 text-[12px] text-ink-label hover:text-ink disabled:opacity-40"
-        >
-          Lint
-        </button>
-      </div>
-
-      <div className="min-h-0 flex-1 bg-content">
-        {view === 'comments'
-          ? <CommentsView path={path} onError={props.onError} />
-          : showDiff && props.diff
-          ? (
-              props.diff.result.identical
-                ? (
-                    <div className="flex h-full flex-col items-center justify-center gap-3">
-                      <p className="text-[12px] text-sync-text">No content differences with Confluence</p>
-                      {state === 'unverified' && !props.diff.result.versionDrift && (
-                        <button
-                          onClick={() => props.onMarkVerified(path)}
-                          disabled={busy}
-                          className="rounded-md border border-ok-edge px-3 py-1.5 text-[12px] text-sync-text hover:bg-ok-bg disabled:opacity-40"
-                          title="Content is identical - record the local-edit baseline so this file shows Synced"
-                        >
-                          Verify
-                        </button>
+      <div className="flex min-h-0 flex-1">
+        <div className="min-w-0 flex-1 bg-content">
+          {view === 'comments'
+            ? <CommentsView path={path} onError={props.onError} />
+            : showDiff && props.diff
+            ? (
+                props.diff.result.identical
+                  ? (
+                      <div className="flex h-full flex-col items-center justify-center gap-3">
+                        <p className="text-[12.5px] text-sync-text">No content differences with Confluence</p>
+                        {state === 'unverified' && !props.diff.result.versionDrift && (
+                          <button
+                            onClick={() => props.onMarkVerified(path)}
+                            disabled={busy}
+                            className="rounded-md border border-ok-edge px-3 py-1.5 text-[12px] text-sync-text hover:bg-ok-bg disabled:opacity-40"
+                            title="Content is identical - record the baseline so this document shows Synced"
+                          >
+                            Verify
+                          </button>
+                        )}
+                      </div>
+                    )
+                  : (
+                      <div className="flex h-full flex-col">
+                        <div className="flex border-b border-line text-[11px] uppercase tracking-[0.08em] text-ink-label">
+                          <span className="flex-1 px-4 py-1.5">Local <span className="font-mono normal-case tracking-normal">v{props.diff.result.localVersion ?? '-'}</span></span>
+                          <span className="flex-1 border-l border-line px-4 py-1.5">Confluence <span className="font-mono normal-case tracking-normal">v{props.diff.result.remoteVersion}</span></span>
+                        </div>
+                        <div className="min-h-0 flex-1">
+                          <Suspense fallback={<CenterNote text="Loading diff…" />}>
+                            <DiffView remote={props.diff.result.remote} local={props.diff.result.local} theme={props.theme} />
+                          </Suspense>
+                        </div>
+                      </div>
+                    )
+              )
+            : content === null
+              ? <CenterNote text="Loading…" />
+              : (
+                  // Once loaded, editor and preview stay mounted so their state survives tab switches.
+                  <div className="flex h-full">
+                    <div className={`min-w-0 ${view === 'split' ? 'flex-1' : view === 'preview' ? 'hidden' : 'flex-1'}`}>
+                      {editorLoaded && (
+                        <Suspense fallback={<CenterNote text="Loading editor…" />}>
+                          <CodeView content={content} onChange={readFailed ? undefined : handleEdit} onSave={flush} theme={props.theme} />
+                        </Suspense>
                       )}
                     </div>
-                  )
-                : (
-                    <div className="flex h-full flex-col">
-                      <div className="flex border-b border-line font-mono text-[11px] text-ink-dim">
-                        <span className="flex-1 px-4 py-1.5">Confluence - v{props.diff.result.remoteVersion}</span>
-                        <span className="flex-1 border-l border-line px-4 py-1.5">Local - v{props.diff.result.localVersion ?? '-'}</span>
-                      </div>
-                      <div className="min-h-0 flex-1">
-                        <Suspense fallback={<CenterNote text="Loading diff…" tone="text-ink-faint" />}>
-                          <DiffView remote={props.diff.result.remote} local={props.diff.result.local} theme={props.theme} />
-                        </Suspense>
-                      </div>
+                    {view === 'split' && <div className="w-px shrink-0 bg-line" />}
+                    <div className={`min-w-0 ${view === 'split' ? 'flex-1' : view === 'preview' ? 'flex-1' : 'hidden'}`}>
+                      {previewContent !== null && <PreviewView content={previewContent} theme={props.theme} findSeq={props.findSeq} onOpenLink={openLink} />}
                     </div>
-                  )
-            )
-          : content === null
-            ? <CenterNote text="Loading…" tone="text-ink-faint" />
-            : (
-                // Once loaded, editor and preview stay mounted so their state survives tab switches.
-                <div className="flex h-full">
-                  <div className={`min-w-0 ${view === 'split' ? 'flex-1' : view === 'preview' ? 'hidden' : 'flex-1'}`}>
-                    {editorLoaded && (
-                      <Suspense fallback={<CenterNote text="Loading editor…" tone="text-ink-faint" />}>
-                        <CodeView content={content} onChange={readFailed ? undefined : handleEdit} onSave={flush} theme={props.theme} />
-                      </Suspense>
-                    )}
                   </div>
-                  {view === 'split' && <div className="w-px shrink-0 bg-line" />}
-                  <div className={`min-w-0 ${view === 'split' ? 'flex-1' : view === 'preview' ? 'flex-1' : 'hidden'}`}>
-                    {previewContent !== null && <PreviewView content={previewContent} theme={props.theme} findSeq={props.findSeq} onOpenLink={openLink} />}
-                  </div>
-                </div>
-              )}
+                )}
+        </div>
+        {props.infoOpen && (
+          <DocumentInfo
+            ctx={ctx}
+            entry={entry}
+            labels={labels}
+            lastSync={props.lastSync}
+            lastCli={props.lastCli}
+            onOpenLogs={props.onOpenLogs}
+            onClose={props.onToggleInfo}
+          />
+        )}
       </div>
     </div>
   )
@@ -486,130 +448,11 @@ function useDebouncedContent(value: string | null, ms: number): string | null {
   return debounced
 }
 
-/** = equal · → local behind remote · ← local ahead · ≠ diverged. */
-function relationGlyph(state: ReturnType<typeof displayState>): string {
-  if (state === 'behind') return '→'
-  if (state === 'ahead' || state === 'local-edits') return '←'
-  if (state === 'conflict') return '≠'
-  return '='
+function Sep() {
+  return <span className="text-sep">·</span>
 }
 
-function ActionsMenu({ entry, primaryLabel, canPull, pushMode, allowLossyPush, busy, connected, onClose, onPull, onForcePull, onPush, onLossyPush, onSync, onCreate, onOpenConfluence }: {
-  entry: FileEntry
-  primaryLabel: string
-  canPull: boolean
-  pushMode: PushMode
-  allowLossyPush: boolean
-  busy: boolean
-  connected: boolean
-  onClose(): void
-  onPull(): void
-  onForcePull(): void
-  onPush(force: boolean): void
-  onLossyPush(): void
-  onSync(): void
-  onCreate(): void
-  onOpenConfluence(): void
-}) {
-  const menuRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') {
-        event.stopPropagation()
-        onClose()
-        return
-      }
-      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
-      event.preventDefault()
-      const items = [...(menuRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [])]
-      if (items.length === 0) return
-      const index = items.findIndex(item => item === document.activeElement)
-      const next = event.key === 'ArrowDown'
-        ? items[(index + 1) % items.length]
-        : items[(index - 1 + items.length) % items.length]
-      next.focus()
-    }
-    const onClick = (event: MouseEvent): void => {
-      // The wrapper also holds the Actions button - its own onClick handles the toggle.
-      if (!menuRef.current?.parentElement?.contains(event.target as Node)) onClose()
-    }
-    window.addEventListener('keydown', onKey, true)
-    window.addEventListener('mousedown', onClick)
-    return () => {
-      window.removeEventListener('keydown', onKey, true)
-      window.removeEventListener('mousedown', onClick)
-    }
-  }, [onClose])
-
-  const check = entry.check
-  const confluenceOff = busy || !connected
-  const item = (action: () => void) => (): void => {
-    onClose()
-    action()
-  }
-
-  return (
-    <div
-      ref={menuRef}
-      className="absolute right-0 top-full z-30 mt-1 w-[232px] rounded-lg border border-line-menu bg-overlay p-1.5 shadow-menu"
-    >
-      <div className="px-2.5 pb-1 pt-[7px] text-[10.5px] tracking-[0.12em] text-ink-ghost">CONFLUENCE</div>
-      {primaryLabel !== 'Pull' && (
-        <ActionItem
-          label={`Pull remote${check?.remoteVersion ? ` v${check.remoteVersion}` : ''}`}
-          shortcut={shortcutLabel('sync.pull')}
-          disabled={!canPull || confluenceOff}
-          onClick={item(onPull)}
-        />
-      )}
-      <ActionItem
-        label="Force pull (overwrite local)"
-        disabled={!canPull || confluenceOff}
-        onClick={item(onForcePull)}
-      />
-      {primaryLabel !== 'Push' && (
-        <ActionItem
-          label={`Push local${check?.localVersion ? ` v${check.localVersion}` : ''}`}
-          shortcut={shortcutLabel('sync.push')}
-          disabled={pushMode === 'disabled' || confluenceOff}
-          onClick={item(() => onPush(pushMode === 'force'))}
-        />
-      )}
-      {entry.tracked && (
-        <ActionItem
-          label="Push force (overwrite remote)"
-          disabled={!allowLossyPush || confluenceOff}
-          reason={!allowLossyPush ? 'after blocked push' : undefined}
-          onClick={item(onLossyPush)}
-        />
-      )}
-      <ActionItem
-        label="Find matching page"
-        disabled={entry.tracked || confluenceOff}
-        reason={entry.tracked ? 'already linked' : undefined}
-        onClick={item(onSync)}
-      />
-      {primaryLabel !== 'Create' && (
-        <ActionItem
-          label="Create page"
-          disabled={entry.tracked || busy}
-          reason={entry.tracked ? 'page exists' : undefined}
-          onClick={item(onCreate)}
-        />
-      )}
-      {entry.tracked && (
-        <>
-          <div className="mx-2 my-[5px] h-px bg-line" />
-          <div className="px-2.5 pb-1 pt-[7px] text-[10.5px] tracking-[0.12em] text-ink-ghost">OPEN</div>
-          <ActionItem label="Confluence page ↗" onClick={item(onOpenConfluence)} />
-        </>
-      )}
-    </div>
-  )
-}
-
-/** Docs linking to this one - click a row to open it. Same popover idiom as ActionsMenu. */
+/** Docs linking to this one - click a row to open it. */
 function BacklinksButton({ links, onPick }: { links: string[], onPick(path: string): void }) {
   const [open, setOpen] = useState(false)
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -637,10 +480,10 @@ function BacklinksButton({ links, onPick }: { links: string[], onPick(path: stri
     <div ref={wrapperRef} className="relative">
       <button
         onClick={() => setOpen(current => !current)}
-        title={`${links.length} doc(s) link to this file`}
-        className={`px-3 py-2 text-[12px] hover:text-ink ${open ? 'text-ink' : 'text-ink-label'}`}
+        title={`${links.length} document(s) link to this one`}
+        className={`px-[11px] py-[9px] text-[11.5px] hover:text-ink-mid ${open ? 'text-ink' : 'text-ink-label'}`}
       >
-        ⭠ {links.length} linked from
+        {links.length} linked from
       </button>
       {open && (
         <div className="absolute right-0 top-full z-30 mt-1 max-h-80 w-[300px] overflow-y-auto rounded-lg border border-line-menu bg-overlay p-1.5 shadow-menu">
@@ -654,7 +497,7 @@ function BacklinksButton({ links, onPick }: { links: string[], onPick(path: stri
               className="flex w-full flex-col items-start rounded px-2.5 py-1.5 text-left hover:bg-selected"
             >
               <span className="w-full truncate text-[12.5px] text-ink-body">{link.split('/').at(-1)}</span>
-              <span className="w-full truncate text-[10.5px] text-ink-ghost">{link.split('/').slice(0, -1).join('/')}</span>
+              <span className="w-full truncate font-mono text-[10.5px] text-ink-label">{link.split('/').slice(0, -1).join('/')}</span>
             </button>
           ))}
         </div>
@@ -663,46 +506,13 @@ function BacklinksButton({ links, onPick }: { links: string[], onPick(path: stri
   )
 }
 
-function ActionItem({ label, shortcut, reason, disabled, onClick }: {
-  label: string
-  shortcut?: string
-  reason?: string
-  disabled?: boolean
-  onClick(): void
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className="flex w-full items-center justify-between gap-2 rounded px-2.5 py-1.5 text-[12.5px] text-ink-body hover:bg-selected disabled:text-ink-ghost disabled:hover:bg-transparent"
-    >
-      <span className="truncate">{label}</span>
-      {reason
-        ? <span className="shrink-0 text-[10.5px] text-ink-ghost">{reason}</span>
-        : shortcut && <span className="shrink-0 text-[11px] text-ink-ghost">{shortcut}</span>}
-    </button>
-  )
-}
-
-function IconButton({ title, onClick, children }: { title: string, onClick(): void, children: React.ReactNode }) {
-  return (
-    <button
-      title={title}
-      onClick={onClick}
-      className="flex h-6 w-6 items-center justify-center rounded-[5px] text-[12.5px] text-ink-ghost hover:bg-hover hover:text-ink"
-    >
-      {children}
-    </button>
-  )
-}
-
 function Tab({ label, active, disabled, onClick }: { label: string, active: boolean, disabled?: boolean, onClick(): void }) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`whitespace-nowrap border-b-2 px-3 py-2 text-[12.5px] disabled:cursor-not-allowed disabled:opacity-40 ${
-        active ? 'border-accent text-ink' : 'border-transparent text-ink-dim hover:text-ink'
+      className={`whitespace-nowrap border-b-2 px-[13px] py-[9px] text-[12.5px] disabled:cursor-not-allowed disabled:opacity-40 ${
+        active ? 'border-accent font-medium text-ink' : 'border-transparent text-ink-dim hover:text-ink'
       }`}
     >
       {label}
@@ -710,6 +520,6 @@ function Tab({ label, active, disabled, onClick }: { label: string, active: bool
   )
 }
 
-function CenterNote({ text, tone }: { text: string, tone: string }) {
-  return <div className={`flex h-full items-center justify-center text-[12px] ${tone}`}>{text}</div>
+function CenterNote({ text }: { text: string }) {
+  return <div className="flex h-full items-center justify-center text-[12px] text-ink-label">{text}</div>
 }

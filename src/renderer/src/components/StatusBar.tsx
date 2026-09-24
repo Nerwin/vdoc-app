@@ -1,19 +1,23 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
-import type { AppUpdateStatus, AuthStatus, TriageFilter } from '../../../shared/types.ts'
-import { humanTtl, timeAgo } from '../../../shared/time.ts'
-import { StateDot } from './StateDot.tsx'
+import type { CliOutcome } from '../../../shared/cli-status.ts'
+import type { AppUpdateStatus, AuthStatus, ChangesScope } from '../../../shared/types.ts'
+import { humanTtl } from '../../../shared/time.ts'
+import { shortcutLabel } from '../commands.ts'
+import { OUTCOME_META } from '../state-meta.ts'
+import { StateGlyph } from './StateGlyph.tsx'
 
 interface Props {
   auth: AuthStatus | null
-  counts: { attention: number, behind: number, unverified: number, dirty: number }
+  site: string | null
+  counts: { attention: number, remote: number, unchecked: number }
   checking: { done: number, total: number } | null
-  lastChecked: Date | null
   busyOp: string | null
   appVersion: string | null
   update: AppUpdateStatus | null
-  stateFilter: TriageFilter
-  onFilterState(filter: TriageFilter): void
+  /** Most severe CLI result this session - the ambient error indicator. */
+  cliOutcome: CliOutcome
+  onOpenChanges(scope: ChangesScope): void
   onOpenToken(): void
   onOpenLogs(): void
   onCancelCheck(): void
@@ -22,181 +26,99 @@ interface Props {
 }
 
 export function StatusBar(props: Props) {
-  useMinuteTick() // re-render each minute so the relative times below stay fresh
-  const offline = props.auth !== null && !props.auth.ok
+  useMinuteTick() // re-render each minute so the token countdown stays fresh
+  const logs = OUTCOME_META[props.cliOutcome]
 
   return (
-    <footer data-tour="statusbar" className="flex h-8 shrink-0 items-center gap-3 border-t border-line bg-chrome px-3 font-mono text-[11.5px]">
-      <AuthChip auth={props.auth} onClick={props.onOpenToken} />
+    <footer data-tour="statusbar" className="flex h-[30px] shrink-0 items-center gap-2 border-t border-line bg-chrome px-[14px] text-[11.5px]">
+      <ConnectionButton auth={props.auth} site={props.site} onRefresh={props.onOpenToken} />
 
-      <div className="h-4 w-px bg-line" />
-
-      {offline
+      {props.checking
         ? (
-            <button onClick={props.onOpenToken} className="whitespace-nowrap rounded-[5px] px-2 py-[3px] text-conflict hover:bg-hover">
-              Not connected - reconnect
-            </button>
-          )
-        : (
-            <div className="flex min-w-0 items-center gap-1">
-              {props.counts.attention > 0 && (
-                <Counter
-                  active={props.stateFilter === 'attention'}
-                  title="Filter tree: needs attention"
-                  tone="text-attention"
-                  onClick={() => props.onFilterState(props.stateFilter === 'attention' ? null : 'attention')}
-                >
-                  <span>⚠</span>
-                  <span>{props.counts.attention}<span className="hidden min-[1100px]:inline"> needs attention</span></span>
-                </Counter>
-              )}
-              {props.counts.behind > 0 && (
-                <Counter
-                  active={props.stateFilter === 'behind'}
-                  title="Filter tree: behind remote"
-                  tone="text-ink-dim"
-                  onClick={() => props.onFilterState(props.stateFilter === 'behind' ? null : 'behind')}
-                >
-                  <span className="text-behind">↓</span>
-                  <span>{props.counts.behind}<span className="hidden min-[1100px]:inline"> behind</span></span>
-                </Counter>
-              )}
-              {props.counts.unverified > 0 && (
-                <Counter
-                  active={props.stateFilter === 'unverified'}
-                  title="Filter tree: unverified"
-                  tone="text-ink-dim"
-                  onClick={() => props.onFilterState(props.stateFilter === 'unverified' ? null : 'unverified')}
-                >
-                  <StateDot state="unverified" />
-                  <span>{props.counts.unverified}<span className="hidden min-[1100px]:inline"> unverified</span></span>
-                </Counter>
-              )}
-              {props.counts.attention === 0 && props.counts.behind === 0 && props.counts.unverified === 0 && props.lastChecked && (
-                <span className="flex items-center gap-1.5 whitespace-nowrap px-2 text-sync-text">
-                  <StateDot state="in-sync" />
-                  All tracked files in sync
-                </span>
-              )}
+            <div className="flex items-center gap-2.5 pl-2">
+              <span className="whitespace-nowrap text-ink-dim">Checking {props.checking.done} of {props.checking.total || '…'}</span>
+              <ProgressTrack>
+                <div
+                  className="h-full rounded-full bg-accent transition-[width] duration-200 ease-linear"
+                  style={{ width: props.checking.total ? `${(props.checking.done / props.checking.total) * 100}%` : '0%' }}
+                />
+              </ProgressTrack>
+              <button onClick={props.onCancelCheck} title="Cancel" className="flex h-[18px] w-[18px] items-center justify-center rounded text-[10px] text-ink-label hover:bg-hover hover:text-ink">✕</button>
             </div>
-          )}
+          )
+        : props.busyOp
+          ? (
+              <div className="flex items-center gap-2.5 pl-2">
+                <span className="whitespace-nowrap text-ink-dim">{taskLabel(props.busyOp)}</span>
+                <ProgressTrack><div className="indeterminate-fill h-full w-[30%] rounded-full bg-accent" /></ProgressTrack>
+              </div>
+            )
+          : (
+              <>
+                {props.counts.attention > 0 && (
+                  <BarButton title="Open Changes" onClick={() => props.onOpenChanges(null)}>
+                    <span className="text-warn">⚠</span>{props.counts.attention} attention
+                  </BarButton>
+                )}
+                {props.counts.remote > 0 && (
+                  <BarButton title="Open Changes - remote changes only" onClick={() => props.onOpenChanges('remote')}>
+                    <StateGlyph group="remote" />{props.counts.remote} remote
+                  </BarButton>
+                )}
+                {props.counts.unchecked > 0 && (
+                  <BarButton title="Open Changes - the not-checked strip" muted onClick={() => props.onOpenChanges(null)}>
+                    <StateGlyph group="unchecked" />{props.counts.unchecked} not checked
+                  </BarButton>
+                )}
+              </>
+            )}
 
       <div className="flex-1" />
 
-      <TaskSlot
-        checking={props.checking}
-        busyOp={props.busyOp}
-        lastChecked={props.lastChecked}
-        onCancelCheck={props.onCancelCheck}
-      />
+      <BarButton title={`CLI logs - ${shortcutLabel('app.logs')}`} onClick={props.onOpenLogs}>
+        <span className={`font-mono text-[10.5px] ${logs.color}`}>{logs.glyph}</span>CLI logs
+      </BarButton>
 
-      <div className="h-4 w-px bg-line" />
-      <button
-        onClick={props.onOpenLogs}
-        title="Every CLI command this session, with its output"
-        className="whitespace-nowrap rounded-[5px] px-2 py-[3px] text-ink-ghost hover:bg-hover hover:text-ink"
-      >
-        Logs
-      </button>
-
-      {props.appVersion && (
-        <>
-          <div className="h-4 w-px bg-line" />
-          <UpdateControl
-            version={props.appVersion}
-            status={props.update}
-            onCheck={props.onCheckUpdate}
-            onInstall={props.onInstallUpdate}
-          />
-        </>
-      )}
+      {props.appVersion && <UpdateControl version={props.appVersion} status={props.update} onCheck={props.onCheckUpdate} onInstall={props.onInstallUpdate} />}
     </footer>
   )
 }
 
-function Counter({ active, title, tone, onClick, children }: {
-  active: boolean
-  title: string
-  tone: string
-  onClick(): void
-  children: React.ReactNode
-}) {
+function BarButton({ title, muted, onClick, children }: { title: string, muted?: boolean, onClick(): void, children: React.ReactNode }) {
   return (
     <button
       onClick={onClick}
       title={title}
-      className={`flex items-center gap-1.5 whitespace-nowrap rounded-[5px] px-2 py-[3px] ${tone} ${active ? 'bg-hover' : 'hover:bg-hover hover:text-ink'}`}
+      className={`flex items-center gap-[7px] whitespace-nowrap rounded px-[7px] py-[3px] hover:bg-hover ${muted ? 'text-ink-dim' : 'text-ink-mid'}`}
     >
       {children}
     </button>
   )
 }
 
-/** Only ever one task in the slot; idle shows the last-checked time - never blank. */
-function TaskSlot({ checking, busyOp, lastChecked, onCancelCheck }: {
-  checking: { done: number, total: number } | null
-  busyOp: string | null
-  lastChecked: Date | null
-  onCancelCheck(): void
-}) {
-  if (checking) {
-    return (
-      <div className="flex shrink-0 items-center gap-2.5">
-        <span className="whitespace-nowrap text-ink-dim">Checking files</span>
-        <span className="whitespace-nowrap text-ink-faint">{checking.done} / {checking.total || '…'}</span>
-        <ProgressTrack>
-          <div
-            className="h-full rounded-full bg-accent transition-[width] duration-200 ease-linear"
-            style={{ width: checking.total ? `${(checking.done / checking.total) * 100}%` : '0%' }}
-          />
-        </ProgressTrack>
-        <button
-          onClick={onCancelCheck}
-          title="Cancel"
-          className="flex h-[18px] w-[18px] items-center justify-center rounded text-[10px] text-ink-faint hover:bg-hover hover:text-ink"
-        >
-          ✕
-        </button>
-      </div>
-    )
-  }
-  if (busyOp) {
-    return (
-      <div className="flex shrink-0 items-center gap-2.5">
-        <span className="whitespace-nowrap text-ink-dim">{taskLabel(busyOp)}</span>
-        <ProgressTrack>
-          <div className="indeterminate-fill h-full w-[30%] rounded-full bg-accent" />
-        </ProgressTrack>
-      </div>
-    )
-  }
-  if (lastChecked) {
-    return <span className="whitespace-nowrap text-ink-faint">last checked {timeAgo(lastChecked)}</span>
-  }
-  return null
-}
-
 function ProgressTrack({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="h-1 w-[132px] overflow-hidden rounded-full bg-track max-[960px]:w-[72px]">
-      {children}
-    </div>
-  )
+  return <div className="h-1 w-[132px] overflow-hidden rounded-full bg-track max-[960px]:w-[72px]">{children}</div>
 }
 
 const TASK_LABELS: Record<string, string> = {
   'pull': 'Pulling',
   'push': 'Pushing',
   'push preview': 'Preparing push',
+  'merge': 'Merging',
   'check': 'Checking',
   'check folder': 'Checking folder',
   'sync': 'Finding page',
   'create': 'Creating page',
   'lint': 'Linting',
   'verify': 'Verifying',
+  'get': 'Fetching page',
+  'ignore': 'Updating frontmatter',
+  'pin': 'Updating frontmatter',
+  'initialize frontmatter': 'Initializing frontmatter',
   'save token': 'Saving token',
   'save API key': 'Saving API key',
   'switch auth': 'Switching auth',
+  'remove credential': 'Removing credential',
   'check update': 'Checking for updates',
   'install update': 'Installing update',
 }
@@ -206,21 +128,12 @@ function taskLabel(op: string): string {
   return TASK_LABELS[op] ?? op
 }
 
-function UpdateControl(props: {
-  version: string
-  status: AppUpdateStatus | null
-  onCheck(): void
-  onInstall(): void
-}) {
+function UpdateControl(props: { version: string, status: AppUpdateStatus | null, onCheck(): void, onInstall(): void }) {
   const { status } = props
 
   if (status?.phase === 'downloaded') {
     return (
-      <button
-        onClick={props.onInstall}
-        title={`Restart and install V-DOC ${status.latest ?? 'update'}`}
-        className="whitespace-nowrap rounded-[5px] px-2 py-[3px] text-accent hover:bg-hover"
-      >
+      <button onClick={props.onInstall} title={`Restart and install V-DOC ${status.latest ?? 'update'}`} className="whitespace-nowrap rounded px-[7px] py-[3px] text-accent hover:bg-hover">
         Restart to update to v{status.latest ?? '?'}
       </button>
     )
@@ -229,59 +142,106 @@ function UpdateControl(props: {
   if (status?.phase === 'available' || status?.phase === 'downloading') {
     const progress = status.progress === undefined ? '' : ` ${status.progress}%`
     return (
-      <span title="The verified update will install when V-DOC exits" className="whitespace-nowrap px-2 py-[3px] text-accent">
+      <span title="The verified update will install when V-DOC exits" className="whitespace-nowrap px-[7px] py-[3px] font-mono text-[11px] text-accent">
         Downloading v{status.latest ?? '?'}{progress}
       </span>
     )
   }
 
-  if (status?.phase === 'checking') {
-    return <span className="whitespace-nowrap px-2 py-[3px] text-ink-ghost">Checking for updates...</span>
-  }
-
-  const title = status?.phase === 'error'
-    ? 'The last update check failed - try again'
-    : status?.phase === 'unsupported'
-      ? 'Automatic updates are available in packaged builds'
-      : 'Check for updates'
+  const title = status?.phase === 'checking'
+    ? 'Checking for updates…'
+    : status?.phase === 'error'
+      ? 'The last update check failed - try again'
+      : status?.phase === 'unsupported'
+        ? 'Automatic updates are available in packaged builds'
+        : 'Check for updates'
 
   return (
-    <button
-      onClick={props.onCheck}
-      title={title}
-      className="whitespace-nowrap rounded-[5px] px-2 py-[3px] text-ink-ghost hover:bg-hover hover:text-ink"
-    >
+    <button onClick={props.onCheck} title={title} className="flex items-center gap-1.5 whitespace-nowrap rounded px-[7px] py-[3px] font-mono text-[11px] text-ink-label hover:bg-hover hover:text-ink-mid">
       v{props.version}
+      {status?.phase === 'checking' && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />}
     </button>
   )
 }
 
-function AuthChip({ auth, onClick }: { auth: AuthStatus | null, onClick(): void }) {
-  if (!auth) return <button onClick={onClick} className="text-ink-ghost">auth…</button>
+/** `● Confluence connected` - identity and token live in the popover, not the bar. */
+function ConnectionButton({ auth, site, onRefresh }: { auth: AuthStatus | null, site: string | null, onRefresh(): void }) {
+  const [open, setOpen] = useState(false)
+  const wrapperRef = useRef<HTMLDivElement>(null)
 
-  const expiryMs = auth.tokenExp ? auth.tokenExp * 1000 - Date.now() : null
+  useEffect(() => {
+    if (!open) return
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        event.stopPropagation()
+        setOpen(false)
+      }
+    }
+    const onClick = (event: MouseEvent): void => {
+      if (!wrapperRef.current?.contains(event.target as Node)) setOpen(false)
+    }
+    window.addEventListener('keydown', onKey, true)
+    window.addEventListener('mousedown', onClick)
+    return () => {
+      window.removeEventListener('keydown', onKey, true)
+      window.removeEventListener('mousedown', onClick)
+    }
+  }, [open])
+
+  const expiryMs = auth?.tokenExp ? auth.tokenExp * 1000 - Date.now() : null
   const expired = expiryMs !== null && expiryMs <= 0
   const expiringSoon = expiryMs !== null && !expired && expiryMs < 24 * 3600 * 1000
-  const dot = !auth.ok || expired ? 'bg-conflict' : expiringSoon ? 'bg-warn' : 'bg-sync'
-  const title = !auth.ok
-    ? (auth.error ?? 'Not authenticated - click to update credentials')
-    : auth.tokenExp
-      ? `Authenticated - token expires ${new Date(auth.tokenExp * 1000).toLocaleString()}`
-      : 'Authenticated'
+  const label = !auth
+    ? { glyph: '○', text: 'Connecting…', tone: 'text-ink-label' }
+    : !auth.ok || expired
+      ? { glyph: '✕', text: 'Not connected', tone: 'text-conflict' }
+      : expiringSoon
+        ? { glyph: '⚠', text: `Token expires in ${humanTtl(expiryMs!)}`, tone: 'text-warn' }
+        : { glyph: '●', text: 'Confluence connected', tone: 'text-sync' }
 
   return (
-    <button onClick={onClick} title={title} className="flex shrink-0 items-center gap-2 whitespace-nowrap">
-      <span className={`h-[7px] w-[7px] rounded-full ${dot}`} />
-      <span className="text-ink-mid">{auth.displayName ?? (auth.ok ? 'authenticated' : 'not authenticated')}</span>
-      {auth.ok && expiryMs !== null && (
-        <span className="hidden items-center gap-2 min-[1000px]:flex">
-          <span className="text-sep">·</span>
-          <span className={expired ? 'text-conflict' : expiringSoon ? 'text-warn' : 'text-ink-label'}>
-            {expired ? 'token expired' : `token ${humanTtl(expiryMs)}${expiringSoon ? ' ⚠' : ''}`}
-          </span>
-        </span>
+    <div ref={wrapperRef} className="relative">
+      <button
+        onClick={() => setOpen(value => !value)}
+        title="Confluence - account, token and site"
+        className={`flex items-center gap-[7px] whitespace-nowrap rounded px-[7px] py-[3px] hover:bg-hover ${label.tone === 'text-sync' ? 'text-ink-mid' : label.tone}`}
+      >
+        <span className={label.tone}>{label.glyph}</span>{label.text}
+      </button>
+      {open && auth && (
+        <div className="absolute bottom-full left-0 z-30 mb-1.5 w-[280px] rounded-lg border border-line-menu bg-overlay p-3 shadow-menu">
+          <dl className="flex flex-col gap-2 text-[11.5px]">
+            <PopoverRow label="Account">{auth.displayName ?? (auth.ok ? 'authenticated' : 'not authenticated')}</PopoverRow>
+            <PopoverRow label="Method">{auth.method}</PopoverRow>
+            {expiryMs !== null && (
+              <PopoverRow label="Token">
+                <span className={expired ? 'text-conflict' : expiringSoon ? 'text-warn' : ''}>{expired ? 'expired' : `expires in ${humanTtl(expiryMs)}`}</span>
+              </PopoverRow>
+            )}
+            <PopoverRow label="Site"><span className="font-mono">{site ?? '-'}</span></PopoverRow>
+            {!auth.ok && auth.error && <PopoverRow label="Error"><span className="text-conflict">{auth.error}</span></PopoverRow>}
+          </dl>
+          <button
+            onClick={() => {
+              setOpen(false)
+              onRefresh()
+            }}
+            className="mt-3 w-full rounded-md border border-control bg-raised px-3 py-1.5 text-[12px] text-ink-body hover:bg-hover"
+          >
+            Refresh credentials
+          </button>
+        </div>
       )}
-    </button>
+    </div>
+  )
+}
+
+function PopoverRow({ label, children }: { label: string, children: React.ReactNode }) {
+  return (
+    <div className="flex items-baseline gap-2">
+      <dt className="w-[64px] shrink-0 text-ink-label">{label}</dt>
+      <dd className="min-w-0 flex-1 break-words text-ink-mid">{children}</dd>
+    </div>
   )
 }
 

@@ -1,5 +1,5 @@
-import type { DisplayState } from '../../shared/types.ts'
-import { displayState, type FileEntry } from '../../shared/status.ts'
+import type { ChangesScope, DisplayState } from '../../shared/types.ts'
+import { displayState, syncGroup, type FileEntry } from '../../shared/status.ts'
 import type { AppStore } from './useApp.ts'
 
 /**
@@ -25,6 +25,8 @@ export interface KeyBinding {
 
 export type ViewMode = 'content' | 'preview' | 'split' | 'diff' | 'comments'
 
+export type SidebarMode = 'changes' | 'all'
+
 /** Everything a command needs to decide whether it can run, and to run. */
 export interface CommandContext {
   app: AppStore
@@ -33,6 +35,7 @@ export interface CommandContext {
   state: DisplayState | null
   theme: 'dark' | 'light'
   view: ViewMode
+  sidebarMode: SidebarMode
   checking: boolean
   busy: boolean
   connected: boolean
@@ -42,12 +45,17 @@ export interface CommandContext {
   openLogs(): void
   openHelp(): void
   openTour(): void
-  focusFilter(): void
   setView(view: ViewMode): void
-  openDiff(): void
+  setSidebarMode(mode: SidebarMode): void
+  openChanges(scope?: ChangesScope): void
+  /** Select the document and open its diff. */
+  openDiff(path: string): void
+  /** Select the document and open the per-hunk conflict review. */
+  openResolve(path: string): void
   /** Open (or refocus) the in-document find bar over the preview. */
   openFind(): void
   toggleSidebar(): void
+  toggleInfo(): void
   toggleTheme(): void
   reloadFile(): void
 }
@@ -59,7 +67,7 @@ export interface Command {
   label: string
   icon: string
   /** Icon tint; the palette maps it to a state colour. */
-  tint?: 'pull' | 'push' | 'create'
+  tint?: 'pull' | 'push' | 'create' | 'danger'
   keys?: KeyBinding
   /** `undefined` = available. A string says why not, and is shown inline in the palette. */
   reason?(ctx: CommandContext): string | undefined
@@ -68,20 +76,21 @@ export interface Command {
   run(ctx: CommandContext): void
 }
 
-const LINKED_STATES: DisplayState[] = ['in-sync', 'behind', 'ahead', 'local-edits', 'conflict', 'no-version', 'unverified', 'not-found']
-
-const noFile = (ctx: CommandContext): string | undefined => (ctx.selection ? undefined : 'no file selected')
+const noFile = (ctx: CommandContext): string | undefined => (ctx.selection ? undefined : 'no document selected')
 
 const notIgnored = (ctx: CommandContext): string | undefined =>
-  (ctx.entry?.ignored ? 'file is excluded from Confluence sync' : undefined)
+  (ctx.entry?.ignored ? 'document is excluded from Confluence sync' : undefined)
 
+/** Linked = a confluencePageId in the frontmatter; whether it was checked yet is a separate question. */
 const linked = (ctx: CommandContext): string | undefined =>
-  noFile(ctx) ?? notIgnored(ctx)
-    ?? (ctx.entry?.tracked && LINKED_STATES.includes(ctx.state!) ? undefined : 'file has no Confluence page')
+  noFile(ctx) ?? notIgnored(ctx) ?? (ctx.entry?.tracked ? undefined : 'document has no Confluence page')
 
 const idle = (ctx: CommandContext): string | undefined => (ctx.busy || ctx.checking ? 'a task is running' : undefined)
 
 const online = (ctx: CommandContext): string | undefined => (ctx.connected ? undefined : 'not connected to Confluence')
+
+const inGroup = (groups: string[], why: string) => (ctx: CommandContext): string | undefined =>
+  (ctx.state && groups.includes(syncGroup(ctx.state)) ? undefined : why)
 
 /** First failing precondition wins - the palette shows exactly one reason. */
 const all = (...checks: Array<(ctx: CommandContext) => string | undefined>) =>
@@ -96,7 +105,7 @@ const all = (...checks: Array<(ctx: CommandContext) => string | undefined>) =>
 const versions = (ctx: CommandContext): string | undefined => {
   const check = ctx.entry?.check
   if (!check || (check.localVersion === undefined && check.remoteVersion === undefined)) return undefined
-  return `v${check.localVersion ?? '-'} → v${check.remoteVersion ?? '-'}`
+  return `Local v${check.localVersion ?? '-'} · Confluence v${check.remoteVersion ?? '-'}`
 }
 
 export const copy = (ctx: CommandContext, text: string, what: string): void => {
@@ -106,33 +115,88 @@ export const copy = (ctx: CommandContext, text: string, what: string): void => {
   )
 }
 
-const viewCommand = (view: ViewMode, label: string, digit: string): Command => ({
+/** OS-native absolute path for pasting outside the app (app-internal paths always use '/'). */
+export const absolutePath = (root: string, path: string): string =>
+  (root.includes('\\') ? `${root}\\${path.replaceAll('/', '\\')}` : `${root}/${path}`)
+
+/** The same registry, aimed at another document - Changes rows run commands without selecting. */
+export function forPath(ctx: CommandContext, path: string): CommandContext {
+  const entry = ctx.app.entries.get(path) ?? null
+  return { ...ctx, selection: path, entry, state: selectionState(entry) }
+}
+
+export interface PrimaryAction {
+  label: string
+  commandId: string
+  tone: 'primary' | 'secondary' | 'danger'
+}
+
+/** One primary per document, derived from its state. Synced is the only calm (secondary) one. */
+export function primaryAction(state: DisplayState | null): PrimaryAction | null {
+  if (!state) return null
+  switch (syncGroup(state)) {
+    case 'synced': return { label: 'Recheck', commandId: 'sync.check', tone: 'secondary' }
+    case 'local': return { label: 'Push to Confluence', commandId: 'sync.push', tone: 'primary' }
+    case 'remote': return { label: 'Review changes', commandId: 'view.diff', tone: 'primary' }
+    case 'conflict': return state === 'conflict'
+      ? { label: 'Resolve conflict', commandId: 'sync.resolve', tone: 'danger' }
+      : { label: 'Recheck', commandId: 'sync.check', tone: 'secondary' }
+    case 'unchecked': return state === 'unverified'
+      ? { label: 'Verify document', commandId: 'sync.baseline', tone: 'primary' }
+      : { label: 'Check document', commandId: 'sync.check', tone: 'primary' }
+    case 'unlinked': return { label: 'Create page', commandId: 'sync.create', tone: 'primary' }
+    case 'ignored': return null
+  }
+}
+
+/** What `⋯` offers per state - everything that is not the primary. */
+export function secondaryActions(state: DisplayState | null): string[] {
+  const common = ['file.editor', 'file.finder', 'file.copyUrl', 'file.browser', 'file.copyPath', 'file.ignore']
+  if (!state) return common
+  switch (syncGroup(state)) {
+    case 'synced': return ['sync.push', 'sync.pull', 'sync.lossyPush', ...common]
+    case 'local': return ['sync.forcePull', 'sync.lossyPush', 'view.diff', ...common]
+    case 'remote': return ['sync.pull', 'sync.forcePush', 'sync.lossyPush', ...common]
+    case 'conflict': return ['sync.forcePush', 'sync.forcePull', 'sync.lossyPush', 'view.diff', ...common]
+    case 'unchecked': return ['sync.baseline', 'sync.push', 'sync.pull', 'view.diff', ...common]
+    case 'unlinked': return ['sync.link', 'file.init', ...common]
+    case 'ignored': return common
+  }
+}
+
+const viewCommand = (view: ViewMode, label: string, keys?: KeyBinding): Command => ({
   id: `view.${view}`,
   group: 'View',
   label,
   icon: '▤',
-  keys: { key: digit, meta: true },
-  reason: view === 'content'
-    ? noFile
-    : view === 'preview' || view === 'split'
-      ? noFile
-      : all(noFile, notIgnored, ctx => (ctx.entry?.tracked ? undefined : 'file is not linked')),
-  run: ctx => (view === 'diff' ? ctx.openDiff() : ctx.setView(view)),
-})
-
-const filterCommand = (filter: 'attention' | 'behind' | 'unverified' | null, label: string): Command => ({
-  id: `view.filter.${filter ?? 'all'}`,
-  group: 'View',
-  label,
-  icon: '⚑',
-  run: ctx => ctx.app.setStateFilter(filter),
+  keys,
+  reason: view === 'diff' || view === 'comments'
+    ? all(noFile, notIgnored, ctx => (ctx.entry?.tracked ? undefined : 'document is not linked'))
+    : noFile,
+  run: ctx => (view === 'diff' ? ctx.openDiff(ctx.selection!) : ctx.setView(view)),
 })
 
 export const COMMANDS: Command[] = [
   {
+    id: 'doc.primary',
+    group: 'Sync',
+    label: 'Run the primary action',
+    icon: '⏎',
+    keys: { key: 'Enter', meta: true },
+    reason: ctx => {
+      const primary = primaryAction(ctx.state)
+      return primary ? command(primary.commandId).reason?.(ctx) : 'no primary action here'
+    },
+    suffix: ctx => primaryAction(ctx.state)?.label,
+    run: ctx => {
+      const primary = primaryAction(ctx.state)
+      if (primary) command(primary.commandId).run(ctx)
+    },
+  },
+  {
     id: 'sync.check',
     group: 'Sync',
-    label: 'Check this file',
+    label: 'Check this document',
     icon: '⟳',
     keys: { key: 'r', meta: true },
     reason: all(linked, idle, online),
@@ -141,60 +205,98 @@ export const COMMANDS: Command[] = [
   {
     id: 'sync.checkAll',
     group: 'Sync',
-    label: 'Check all files',
+    label: 'Check workspace',
     icon: '⟳',
     keys: { key: 'r', meta: true, shift: true },
     reason: all(ctx => (ctx.checking ? 'a check is already running' : undefined), online),
     run: ctx => void ctx.app.checkAll(),
   },
   {
+    id: 'sync.baseline',
+    group: 'Sync',
+    label: 'Verify against Confluence',
+    icon: '✓',
+    reason: all(linked, ctx => (ctx.state === 'unverified' ? undefined : 'document already has a baseline'), idle, online),
+    run: ctx => void ctx.app.markVerified(ctx.selection!),
+  },
+  {
     id: 'sync.pull',
     group: 'Sync',
-    label: 'Pull page into this file',
+    label: 'Pull without reviewing',
     icon: '↓',
     tint: 'pull',
     keys: { key: 'd', meta: true, shift: true },
-    reason: all(
-      linked,
-      ctx => (ctx.state === 'behind' || ctx.state === 'conflict' ? undefined : 'local file is not behind'),
-      idle,
-      online,
-    ),
+    reason: all(linked, inGroup(['remote', 'synced', 'unchecked'], 'nothing to pull'), idle, online),
     suffix: versions,
     run: ctx => ctx.app.requestPull(ctx.selection!),
   },
   {
     id: 'sync.pullAll',
     group: 'Sync',
-    label: 'Pull all behind files',
+    label: 'Pull all remote changes',
     icon: '⇊',
     tint: 'pull',
     keys: { key: 'd', meta: true, alt: true },
-    reason: all(
-      ctx => (ctx.app.counts.behind > 0 ? undefined : 'nothing is behind'),
-      idle,
-      online,
-    ),
-    suffix: ctx => (ctx.app.counts.behind > 0 ? `${ctx.app.counts.behind} file(s)` : undefined),
-    run: ctx => ctx.app.pullAllBehind(),
+    reason: all(ctx => (ctx.app.counts.remote > 0 ? undefined : 'nothing has remote changes'), idle, online),
+    suffix: ctx => (ctx.app.counts.remote > 0 ? `${ctx.app.counts.remote} document(s)` : undefined),
+    run: ctx => ctx.app.pullAll(pathsIn(ctx, 'remote')),
+  },
+  {
+    id: 'sync.forcePull',
+    group: 'Sync',
+    label: 'Discard local changes (keep all theirs)',
+    icon: '↓',
+    tint: 'danger',
+    reason: all(linked, ctx => (ctx.state === 'not-found' ? 'page not found' : undefined), idle, online),
+    run: ctx => ctx.app.setPullConfirm({ paths: [ctx.selection!], force: true }),
   },
   {
     id: 'sync.push',
     group: 'Sync',
-    label: 'Push this file to Confluence',
+    label: 'Push to Confluence',
     icon: '↑',
     tint: 'push',
     keys: { key: 'u', meta: true, shift: true },
-    reason: all(
-      linked,
-      ctx => (ctx.state === 'ahead' || ctx.state === 'local-edits' || ctx.state === 'no-version' || ctx.state === 'unverified'
-        ? undefined
-        : 'no local changes to publish'),
-      idle,
-      online,
-    ),
+    reason: all(linked, inGroup(['local', 'synced', 'unchecked'], 'nothing to push'), idle, online),
     suffix: versions,
     run: ctx => void ctx.app.requestPush(ctx.selection!, false),
+  },
+  {
+    id: 'sync.pushAll',
+    group: 'Sync',
+    label: 'Push all local changes',
+    icon: '⇈',
+    tint: 'push',
+    reason: all(ctx => (ctx.app.counts.local > 0 ? undefined : 'nothing has local changes'), idle, online),
+    suffix: ctx => (ctx.app.counts.local > 0 ? `${ctx.app.counts.local} document(s), one preview each` : undefined),
+    run: ctx => ctx.app.pushAll(pathsIn(ctx, 'local')),
+  },
+  {
+    id: 'sync.forcePush',
+    group: 'Sync',
+    label: 'Push over remote changes (keep all mine)',
+    icon: '↑',
+    tint: 'danger',
+    reason: all(linked, inGroup(['remote', 'conflict'], 'Confluence has not moved'), idle, online),
+    run: ctx => void ctx.app.requestPush(ctx.selection!, true),
+  },
+  {
+    id: 'sync.lossyPush',
+    group: 'Sync',
+    label: 'Push force (overwrite remote)',
+    icon: '↑',
+    tint: 'danger',
+    reason: all(linked, ctx => (ctx.app.lossyPushPaths.has(ctx.selection!) ? undefined : 'only after a push was blocked as lossy'), idle, online),
+    run: ctx => void ctx.app.requestPush(ctx.selection!, ['remote', 'conflict'].includes(syncGroup(ctx.state!)), true),
+  },
+  {
+    id: 'sync.resolve',
+    group: 'Sync',
+    label: 'Resolve conflict',
+    icon: '⚠',
+    tint: 'danger',
+    reason: all(linked, ctx => (ctx.state === 'conflict' ? undefined : 'document is not in conflict'), online),
+    run: ctx => ctx.openResolve(ctx.selection!),
   },
   {
     id: 'sync.create',
@@ -203,7 +305,7 @@ export const COMMANDS: Command[] = [
     icon: '+',
     tint: 'create',
     keys: { key: 'n', meta: true },
-    reason: all(noFile, notIgnored, ctx => (ctx.entry?.tracked ? 'file already has a page' : undefined), idle, online),
+    reason: all(noFile, notIgnored, ctx => (ctx.entry?.tracked ? 'document already has a page' : undefined), idle, online),
     run: ctx => ctx.app.setCreateForm({ path: ctx.selection! }),
   },
   {
@@ -224,16 +326,8 @@ export const COMMANDS: Command[] = [
     group: 'Sync',
     label: 'Link to existing page…',
     icon: '⚯',
-    reason: all(noFile, notIgnored, ctx => (ctx.entry?.tracked ? 'file already has a page' : undefined), idle, online),
+    reason: all(noFile, notIgnored, ctx => (ctx.entry?.tracked ? 'document already has a page' : undefined), idle, online),
     run: ctx => void ctx.app.syncFile(ctx.selection!),
-  },
-  {
-    id: 'sync.baseline',
-    group: 'Sync',
-    label: 'Verify against Confluence',
-    icon: '✓',
-    reason: all(linked, ctx => (ctx.state === 'unverified' ? undefined : 'file already has a baseline'), idle, online),
-    run: ctx => void ctx.app.markVerified(ctx.selection!),
   },
   {
     id: 'sync.cancel',
@@ -248,25 +342,25 @@ export const COMMANDS: Command[] = [
   {
     id: 'file.back',
     group: 'File',
-    label: 'Back to previous file',
+    label: 'Back to previous document',
     icon: '‹',
     keys: { key: '[', meta: true },
-    reason: ctx => (ctx.app.canGoBack ? undefined : 'no previous file'),
+    reason: ctx => (ctx.app.canGoBack ? undefined : 'no previous document'),
     run: ctx => ctx.app.goBack(),
   },
   {
     id: 'file.forward',
     group: 'File',
-    label: 'Forward to next file',
+    label: 'Forward to next document',
     icon: '›',
     keys: { key: ']', meta: true },
-    reason: ctx => (ctx.app.canGoForward ? undefined : 'no next file'),
+    reason: ctx => (ctx.app.canGoForward ? undefined : 'no next document'),
     run: ctx => ctx.app.goForward(),
   },
   {
     id: 'file.goto',
     group: 'File',
-    label: 'Go to file…',
+    label: 'Search documents…',
     icon: '⌕',
     keys: { key: 'p', meta: true },
     run: ctx => ctx.openPalette('file'),
@@ -274,10 +368,17 @@ export const COMMANDS: Command[] = [
   {
     id: 'file.recent',
     group: 'File',
-    label: 'Recent files…',
+    label: 'Recent documents…',
     icon: '◷',
-    reason: ctx => (ctx.app.recents.length > 0 ? undefined : 'no files opened yet'),
+    reason: ctx => (ctx.app.recents.length > 0 ? undefined : 'no documents opened yet'),
     run: ctx => ctx.openPalette('recent'),
+  },
+  {
+    id: 'file.search',
+    group: 'File',
+    label: 'Search in documents…',
+    icon: '⌕',
+    run: ctx => ctx.openPalette('search'),
   },
   {
     id: 'file.init',
@@ -297,18 +398,11 @@ export const COMMANDS: Command[] = [
     run: ctx => void ctx.app.openEditor(ctx.selection!),
   },
   {
-    id: 'file.search',
-    group: 'File',
-    label: 'Search in files…',
-    icon: '⌕',
-    keys: { key: 'f', meta: true, shift: true },
-    run: ctx => ctx.openPalette('search'),
-  },
-  {
     id: 'file.finder',
     group: 'File',
     label: 'Show in folder',
     icon: '⊞',
+    keys: { key: 'f', meta: true, shift: true },
     reason: noFile,
     run: ctx => void ctx.app.revealFinder(ctx.selection!),
   },
@@ -330,13 +424,30 @@ export const COMMANDS: Command[] = [
     run: ctx => copy(ctx, (ctx.entry!.check?.pageId ?? ctx.entry!.pageId)!, 'Page ID'),
   },
   {
+    id: 'file.copyPath',
+    group: 'File',
+    label: 'Copy document path',
+    icon: '⧉',
+    reason: noFile,
+    run: ctx => copy(ctx, absolutePath(ctx.app.root, ctx.selection!), 'Document path'),
+  },
+  {
     id: 'file.browser',
     group: 'File',
-    label: 'Open page in browser',
+    label: 'Open page in Confluence',
     icon: '↗',
     keys: { key: 'o', meta: true, shift: true },
     reason: linked,
     run: ctx => void ctx.app.openConfluence(ctx.selection!),
+  },
+  {
+    id: 'file.ignore',
+    group: 'File',
+    label: 'Ignore this document',
+    icon: '⊘',
+    reason: all(noFile, idle),
+    suffix: ctx => (ctx.entry?.ignored ? 'currently ignored - include it again' : undefined),
+    run: ctx => void ctx.app.setIgnored(ctx.selection!, !ctx.entry?.ignored),
   },
   {
     id: 'file.reload',
@@ -348,18 +459,37 @@ export const COMMANDS: Command[] = [
     run: ctx => ctx.reloadFile(),
   },
 
-  viewCommand('content', 'Content', '1'),
-  viewCommand('preview', 'Preview', '2'),
-  viewCommand('split', 'Split editor + preview', '3'),
-  viewCommand('diff', 'Diff', '4'),
-  viewCommand('comments', 'Comments', '5'),
   {
-    id: 'view.dashboard',
+    id: 'view.changes',
     group: 'View',
-    label: 'Show dashboard',
-    icon: '⌂',
-    reason: ctx => (ctx.selection ? undefined : 'already on the dashboard'),
-    run: ctx => ctx.app.setSelection(null),
+    label: 'Changes',
+    icon: '⚠',
+    keys: { key: '1', meta: true },
+    run: ctx => {
+      ctx.setSidebarMode('changes')
+      ctx.openChanges()
+    },
+  },
+  {
+    id: 'view.all',
+    group: 'View',
+    label: 'All documents',
+    icon: '≡',
+    keys: { key: '2', meta: true },
+    run: ctx => ctx.setSidebarMode('all'),
+  },
+  viewCommand('preview', 'Preview'),
+  viewCommand('content', 'Source: editor'),
+  viewCommand('split', 'Source: editor + preview'),
+  viewCommand('diff', 'Diff', { key: 'd', meta: true }),
+  viewCommand('comments', 'Comments'),
+  {
+    id: 'view.info',
+    group: 'View',
+    label: 'Toggle document info panel',
+    icon: 'ⓘ',
+    keys: { key: 'i', meta: true },
+    run: ctx => ctx.toggleInfo(),
   },
   {
     id: 'view.sidebar',
@@ -370,8 +500,6 @@ export const COMMANDS: Command[] = [
     run: ctx => ctx.toggleSidebar(),
   },
   {
-    // Shares ⌘F with the filter field below: with the preview on screen this one
-    // wins (commandFor takes the first available match); elsewhere ⌘F filters.
     id: 'view.find',
     group: 'View',
     label: 'Find in document',
@@ -380,18 +508,6 @@ export const COMMANDS: Command[] = [
     reason: all(noFile, ctx => (ctx.view === 'preview' || ctx.view === 'split' ? undefined : 'open the Preview tab first')),
     run: ctx => ctx.openFind(),
   },
-  {
-    id: 'view.filterField',
-    group: 'View',
-    label: 'Focus filter field',
-    icon: '⌕',
-    keys: { key: 'f', meta: true },
-    run: ctx => ctx.focusFilter(),
-  },
-  filterCommand('attention', 'Filter: needs attention'),
-  filterCommand('behind', 'Filter: behind'),
-  filterCommand('unverified', 'Filter: unverified'),
-  filterCommand(null, 'Filter: all files'),
   {
     id: 'view.theme',
     group: 'View',
@@ -420,7 +536,7 @@ export const COMMANDS: Command[] = [
   {
     id: 'app.renewToken',
     group: 'App',
-    label: 'Renew session token…',
+    label: 'Refresh credentials…',
     icon: '⚿',
     run: ctx => ctx.openToken(),
   },
@@ -429,6 +545,7 @@ export const COMMANDS: Command[] = [
     group: 'App',
     label: 'CLI logs',
     icon: '≣',
+    keys: { key: 'j', meta: true },
     run: ctx => ctx.openLogs(),
   },
   {
@@ -478,6 +595,10 @@ export const COMMANDS: Command[] = [
   },
 ]
 
+function pathsIn(ctx: CommandContext, group: 'remote' | 'local'): string[] {
+  return [...ctx.app.entries.values()].filter(entry => syncGroup(displayState(entry)) === group).map(entry => entry.path)
+}
+
 const BY_ID = new Map(COMMANDS.map(command => [command.id, command]))
 
 export function command(id: string): Command {
@@ -499,7 +620,7 @@ export function keycaps(keys: KeyBinding | undefined): string[] {
     if (keys.alt) caps.push('Alt')
     if (keys.shift) caps.push('Shift')
   }
-  caps.push(keys.key === 'Escape' ? 'esc' : keys.key.length === 1 ? keys.key.toUpperCase() : keys.key)
+  caps.push(keys.key === 'Escape' ? 'esc' : keys.key === 'Enter' ? '⏎' : keys.key.length === 1 ? keys.key.toUpperCase() : keys.key)
   return caps
 }
 
@@ -508,7 +629,7 @@ export function shortcutLabel(id: string): string {
   return keycaps(command(id).keys).join(IS_MAC ? '' : '+')
 }
 
-/** `Sync: Check this file` - the palette label, also used for fuzzy matching. */
+/** `Sync: Check this document` - the palette label, also used for fuzzy matching. */
 export function fullLabel(cmd: Command): string {
   return `${cmd.group}: ${cmd.label}`
 }

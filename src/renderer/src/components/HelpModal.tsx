@@ -1,6 +1,8 @@
 import type { DisplayState } from '../../../shared/types.ts'
+import { syncGroup } from '../../../shared/status.ts'
 import { STATE_META } from '../state-meta.ts'
 import { Modal, ModalButton } from './Modal.tsx'
+import { StateGlyph } from './StateGlyph.tsx'
 
 const CONCEPTS: Array<{ term: string, text: string }> = [
   {
@@ -9,11 +11,15 @@ const CONCEPTS: Array<{ term: string, text: string }> = [
   },
   {
     term: 'Baseline',
-    text: 'A fingerprint of the file\'s content, stored in .vdoc/state.json inside the docs repository whenever local and Confluence are known to be identical (after a pull, push, get, or successful Verify). It is how local edits are detected: no baseline means a version match cannot prove the contents still agree - the file shows as Unverified.',
+    text: 'A fingerprint of the file\'s content, stored in .vdoc/state.json inside the docs repository whenever local and Confluence are known to be identical (after a pull, push, get, or successful Verify). It is how local edits are detected: no baseline means a version match cannot prove the contents still agree - the document shows as Not checked.',
   },
   {
     term: 'Verify',
-    text: 'Fetches the page and compares the actual content. Identical → records the baseline and the file becomes Synced. Different → opens the diff so you decide: Pull to take Confluence, or Push to publish your local version.',
+    text: 'Fetches the page and compares the actual content. Identical → records the baseline and the document becomes Synced. Different → opens the diff so you decide: Pull to take Confluence, or Push to publish your local version.',
+  },
+  {
+    term: 'Conflict',
+    text: 'Both sides changed since the baseline. Resolve keeps or discards each hunk (mine, theirs, or both), writes the merged document, and pushes it as one force push after the usual preview and red confirmation. Nothing is ever auto-merged.',
   },
   {
     term: 'Pull',
@@ -25,8 +31,8 @@ const CONCEPTS: Array<{ term: string, text: string }> = [
   },
 ]
 
-/** States with a hint, in lifecycle order - the confusing one (unverified) up front. */
-const STATE_ORDER: DisplayState[] = ['unverified', 'behind', 'ahead', 'local-edits', 'conflict', 'no-version', 'not-found', 'untracked']
+/** States with a hint, in lifecycle order - the confusing one (not checked) up front. */
+const STATE_ORDER: DisplayState[] = ['unverified', 'behind', 'ahead', 'local-edits', 'conflict', 'no-version', 'not-found', 'untracked', 'ignored']
 
 export function HelpModal({ onClose }: { onClose(): void }) {
   return (
@@ -40,13 +46,11 @@ export function HelpModal({ onClose }: { onClose(): void }) {
         ))}
 
         <div className="pt-1">
-          <div className="border-t border-line-subtle pb-2 pt-3 text-[10.5px] tracking-[0.12em] text-ink-ghost">FILE STATES</div>
+          <div className="border-t border-line-subtle pb-2 pt-3 text-[10.5px] tracking-[0.12em] text-ink-label">DOCUMENT STATES</div>
           <div className="space-y-2">
             {STATE_ORDER.map(state => (
               <div key={state}>
-                <span className={`mr-2 inline-block rounded-full border px-2 py-px text-[11px] ${STATE_META[state].chip}`}>
-                  {STATE_META[state].label}
-                </span>
+                <StateGlyph group={syncGroup(state)} word={STATE_META[state].label} className="mr-2 text-[11.5px]" />
                 <span className="leading-relaxed">{STATE_META[state].hint}</span>
               </div>
             ))}

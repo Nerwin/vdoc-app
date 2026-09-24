@@ -1,9 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react'
 
-import type { DisplayState } from '../../../shared/types.ts'
-import { STATE_META } from '../state-meta.ts'
+import type { SyncGroup } from '../../../shared/types.ts'
 import { command, keycaps, type CommandContext } from '../commands.ts'
 import { ModalButton } from './Modal.tsx'
+import { StateGlyph } from './StateGlyph.tsx'
 
 /**
  * Guided welcome tour: a centered setup check on the first step, then a floating
@@ -26,12 +26,8 @@ function Keys({ id }: { id: string }) {
   )
 }
 
-function Chip({ state }: { state: DisplayState }) {
-  return (
-    <span className={`mr-1 inline-block rounded-full border px-2 py-px text-[11px] ${STATE_META[state].chip}`}>
-      {STATE_META[state].label}
-    </span>
-  )
+function Chip({ group }: { group: SyncGroup }) {
+  return <StateGlyph group={group} word className="mr-2 text-[11.5px]" />
 }
 
 /** Runs a registry command from a step - greyed out with its reason when unavailable. */
@@ -119,20 +115,20 @@ const STEPS: Step[] = [
     ),
   },
   {
-    title: 'The file tree',
+    title: 'The sidebar',
     target: 'tree',
     body: ctx => (
       <>
         <p>
-          Every Markdown file under your configured folders, each with its live sync state - for
-          example <Chip state="in-sync" /><Chip state="behind" /><Chip state="unverified" />.
+          Two modes: <Keys id="view.all" /> <Strong>All</Strong> lists every document with its state
+          glyph - <Chip group="synced" /><Chip group="remote" /><Chip group="unchecked" /> - and
+          {' '}<Keys id="view.changes" /> <Strong>Changes</Strong> narrows the tree to the documents needing attention.
         </p>
         <p>
-          <Keys id="view.filterField" /> filters by name, <Keys id="file.goto" /> jumps to any
-          file, and the coloured counters in the status bar filter by state. Right-click a folder
+          <Keys id="file.goto" /> searches documents (type <Strong>&gt;</Strong> for commands). Right-click a folder
           to pin it, check only it, or open it.
         </p>
-        <TryButton id="file.goto" label="Try it - go to a file…" ctx={ctx} />
+        <TryButton id="file.goto" label="Try it - search documents…" ctx={ctx} />
       </>
     ),
   },
@@ -142,32 +138,32 @@ const STEPS: Step[] = [
     body: ctx => (
       <>
         <p>
-          <Strong>Check</Strong> (<Keys id="sync.check" />, all files <Keys id="sync.checkAll" />)
-          is read-only: has Confluence moved? <Strong>Pull</Strong> refreshes local files that are
-          behind. <Strong>Push</Strong> publishes local changes - always after a dry-run preview.
+          <Strong>Check</Strong> (<Keys id="sync.check" />, the workspace <Keys id="sync.checkAll" />)
+          is read-only: has Confluence moved? <Strong>Pull</Strong> refreshes documents with remote
+          changes. <Strong>Push</Strong> publishes local changes - always after a dry-run preview.
           {' '}<Strong>Verify</Strong> compares actual content and records the baseline that makes
           local-edit detection possible.
         </p>
         <p>
-          Files with local edits are never overwritten silently, and anything destructive
-          (force push, force pull) needs an explicit red confirmation.
+          Documents with local changes are never overwritten silently, conflicts are resolved hunk by
+          hunk, and anything destructive (force push, force pull) needs an explicit red confirmation.
         </p>
-        <TryButton id="sync.checkAll" label="Check all files now" ctx={ctx} />
+        <TryButton id="sync.checkAll" label="Check the workspace now" ctx={ctx} />
       </>
     ),
   },
   {
-    title: 'The dashboard',
+    title: 'Changes - the home screen',
     target: 'main',
     body: ctx => (
       <>
         <p>
-          With no file selected, the main pane is the dashboard: everything needing attention
-          (and who last changed it on Confluence), bulk actions like Verify all, quick actions,
-          and your recent files.
+          The app always opens on Changes: every document needing attention, grouped as Remote
+          changes, Local changes and Conflicts, with one <Strong>Review →</Strong> per row and a bulk
+          link per group. Documents without a baseline sit in the strip above.
         </p>
-        <p>Esc returns there from any file.</p>
-        <TryButton id="view.dashboard" label="Show the dashboard" ctx={ctx} />
+        <p>Esc returns there from any document.</p>
+        <TryButton id="view.changes" label="Show Changes" ctx={ctx} />
       </>
     ),
   },
@@ -177,10 +173,11 @@ const STEPS: Step[] = [
     body: () => (
       <>
         <p>
-          Selecting a file opens it in <Strong>Preview</Strong>. The tabs
-          - <Keys id="view.content" /> … <Keys id="view.comments" /> - switch between Content
-          (an editor that auto-saves as you type), Preview, Split, Diff against the live page,
-          and Comments.
+          Selecting a document opens it in <Strong>Preview</Strong>. The tabs switch between
+          Preview, Source (an editor that auto-saves as you type, alone or beside the preview),
+          Diff against the live page (<Keys id="view.diff" />) and Comments. The header carries
+          one primary action for the document's state - <Keys id="doc.primary" /> runs it - and
+          <Keys id="view.info" /> toggles the info panel with versions, page id and the last CLI result.
         </p>
         <p>
           Links to other local docs navigate in-app (<Keys id="file.back" /> goes back), and the
@@ -200,9 +197,9 @@ const STEPS: Step[] = [
           glossary.
         </p>
         <p>
-          The status bar shows the connection, state counts (click one to filter), and
-          {' '}<Strong>Logs</Strong> - every CLI command the app ran, with its output. First stop
-          when something misbehaves.
+          The status bar shows the connection, the attention counters (click one to open Changes),
+          and <Strong>CLI logs</Strong> (<Keys id="app.logs" />) - every CLI command the app ran,
+          with its semantic status and selectable output. First stop when something misbehaves.
         </p>
         <p>Relaunch this tour any time: palette → <Strong>App: Welcome tour</Strong>.</p>
         <TryButton id="app.help" label="Open the glossary" ctx={ctx} />

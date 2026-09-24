@@ -49,12 +49,11 @@ export function syncGroup(state: DisplayState): SyncGroup {
 }
 
 /** Groups on the Changes screen, in the fixed order cheap work first, conflicts last. */
-const CHANGE_GROUPS: SyncGroup[] = ['remote', 'local', 'conflict']
-
-/** States that need the user's attention, in severity order. */
-export const ATTENTION_STATES: DisplayState[] = ['conflict', 'not-found', 'local-edits', 'ahead', 'behind']
+export const CHANGE_GROUPS: SyncGroup[] = ['remote', 'local', 'conflict']
 
 /** "Needs attention" is the sum of the actionable groups - a counter, never a state. */
 export function needsAttention(state: DisplayState): boolean {
   return CHANGE_GROUPS.includes(syncGroup(state))
 }
+
+export const displayTitle = (entry: FileEntry): string => entry.title ?? entry.path.split('/').at(-1) ?? entry.path

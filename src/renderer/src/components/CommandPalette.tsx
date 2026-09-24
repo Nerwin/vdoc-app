@@ -1,10 +1,10 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 
-import { displayState, type FileEntry } from '../../../shared/status.ts'
+import { displayState, syncGroup, type FileEntry } from '../../../shared/status.ts'
 import { fuzzyMatch, fuzzyRank, type FuzzyMatch } from '../../../shared/fuzzy.ts'
 import type { SearchHit } from '../../../shared/search.ts'
 import { COMMANDS, fullLabel, keycaps, type Command, type CommandContext } from '../commands.ts'
-import { StateDot } from './StateDot.tsx'
+import { StateGlyph } from './StateGlyph.tsx'
 
 interface Props {
   ctx: CommandContext
@@ -160,11 +160,11 @@ export function CommandPalette({ ctx, entries, mode, recents, onPick, onRun, onC
   }
 
   const poolSize = mode === 'recent' ? recents.length : entries.size
-  const noun = mode === 'recent' ? 'recent' : 'files'
+  const noun = mode === 'recent' ? 'recent' : 'documents'
   const counter = commandMode
     ? (search === '' ? `${COMMANDS.length} commands` : `${rows.length} of ${COMMANDS.length}`)
     : mode === 'search'
-    ? (search.trim().length < 2 ? 'content search' : `${rows.length} file(s)`)
+    ? (search.trim().length < 2 ? 'content search' : `${rows.length} document(s)`)
     : (search === '' ? `${poolSize} ${noun}` : `${rows.length} of ${poolSize}`)
 
   return (
@@ -186,7 +186,7 @@ export function CommandPalette({ ctx, entries, mode, recents, onPick, onRun, onC
               if (event.key === 'Backspace' && commandMode && query.replace(/^>\s*/, '') === '') setQuery('')
               onKeyDown(event)
             }}
-            placeholder={commandMode ? 'Type a command…' : mode === 'search' ? 'Search in files…' : mode === 'recent' ? 'Recent files…' : 'Go to file…'}
+            placeholder={commandMode ? 'Type a command…' : mode === 'search' ? 'Search in documents…' : mode === 'recent' ? 'Recent documents…' : 'Search documents, or > for a command'}
             spellCheck={false}
             className="min-w-0 flex-1 border-none bg-transparent font-mono text-[13px] text-ink placeholder-ink-faint outline-none focus:shadow-none"
           />
@@ -199,8 +199,8 @@ export function CommandPalette({ ctx, entries, mode, recents, onPick, onRun, onC
               {commandMode
                 ? 'No matching command'
                 : mode === 'search' && search.trim().length < 2
-                ? 'Type at least 2 characters to search file contents'
-                : 'No matching files'}
+                ? 'Type at least 2 characters to search document contents'
+                : 'No matching documents'}
             </li>
           )}
           {rows.map((row, position) => {
@@ -208,7 +208,7 @@ export function CommandPalette({ ctx, entries, mode, recents, onPick, onRun, onC
             return (
               <li key={row.key}>
                 {header && (
-                  <div className="px-[14px] pb-[5px] pt-[7px] font-mono text-[10.5px] tracking-[0.11em] text-ink-mute">
+                  <div className="px-[14px] pb-[5px] pt-[7px] text-[10.5px] tracking-[0.11em] text-ink-label">
                     {row.group}
                   </div>
                 )}
@@ -300,7 +300,7 @@ function FileRow({ path, snippet, entries, selected, onClick, position }: {
         selected ? 'bg-selected shadow-[inset_2px_0_0_var(--color-select-edge)]' : 'hover:bg-row-hover'
       }`}
     >
-      <span className="flex justify-center"><StateDot state={entry ? displayState(entry) : 'unchecked'} /></span>
+      <span className="flex justify-center text-[9px]"><StateGlyph group={syncGroup(entry ? displayState(entry) : 'unchecked')} /></span>
       <span className="min-w-0">
         <span className="block truncate">
           <span className="text-ink">{path.slice(slash + 1)}</span>

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { FileTree } from './components/FileTree.tsx'
-import { DetailPane } from './components/DetailPane.tsx'
-import { Dashboard } from './components/Dashboard.tsx'
+import { DetailPane, type SourceLayout } from './components/DetailPane.tsx'
+import { ChangesView } from './components/ChangesView.tsx'
+import { ConflictView } from './components/ConflictView.tsx'
 import { StatusBar } from './components/StatusBar.tsx'
 import { TopBar } from './components/TopBar.tsx'
 import { TokenPanel } from './components/TokenPanel.tsx'
@@ -16,8 +17,9 @@ import { Tour } from './components/Tour.tsx'
 import { Toast } from './components/Toast.tsx'
 import { Modal, ModalButton } from './components/Modal.tsx'
 import { CliVersionWarning } from './components/CliVersionWarning.tsx'
-import { commandFor, copy, isMod, selectionState, type CommandContext, type ViewMode } from './commands.ts'
+import { absolutePath, commandFor, copy, isMod, selectionState, type CommandContext, type SidebarMode, type ViewMode } from './commands.ts'
 import { useApp } from './useApp.ts'
+import { cliStatus, documentOf, worstOutcome } from '../../shared/cli-status.ts'
 import { isVersionBelowMinimum } from '../../shared/version.ts'
 
 const SIDEBAR_MIN = 240
@@ -45,15 +47,18 @@ export function App() {
   const [helpOpen, setHelpOpen] = useState(false)
   const [tourOpen, setTourOpen] = useState(() => localStorage.getItem('tourSeen') === null)
   const [view, setView] = useState<ViewMode>('preview')
+  const [sidebarMode, setSidebarMode] = useState<SidebarMode>('all')
+  const [infoOpen, setInfoOpen] = useState(() => localStorage.getItem('infoPanel') !== '0')
+  /** The document under per-hunk conflict review, when any. */
+  const [resolving, setResolving] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
   /** Bumped by ⌘F - opens (or refocuses) the preview's find bar. */
   const [findSeq, setFindSeq] = useState(0)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = Number(localStorage.getItem('sidebarWidth'))
-    return saved >= SIDEBAR_MIN && saved <= SIDEBAR_MAX ? saved : 306
+    return saved >= SIDEBAR_MIN && saved <= SIDEBAR_MAX ? saved : 258
   })
-  const filterRef = useRef<HTMLInputElement>(null)
   const editorFlushRef = useRef<() => Promise<boolean>>(async () => true)
 
   const registerEditorFlush = useCallback((flush: (() => Promise<boolean>) | null) => {
@@ -77,10 +82,22 @@ export function App() {
     document.documentElement.dataset.theme = theme
   }, [theme])
 
-  const totals = useMemo(() => ({
-    files: app.entries.size,
-    tracked: [...app.entries.values()].filter(entry => entry.tracked).length,
-  }), [app.entries])
+  // The Source tab layout persists per workspace.
+  const layoutKey = `sourceLayout:${app.root}`
+  const [sourceLayout, setSourceLayoutState] = useState<SourceLayout>('content')
+  useEffect(() => {
+    setSourceLayoutState(localStorage.getItem(layoutKey) === 'split' ? 'split' : 'content')
+  }, [layoutKey])
+  const setSourceLayout = (layout: SourceLayout): void => {
+    localStorage.setItem(layoutKey, layout)
+    setSourceLayoutState(layout)
+  }
+
+  const toggleInfo = (): void => setInfoOpen(open => {
+    localStorage.setItem('infoPanel', open ? '0' : '1')
+    return !open
+  })
+
   const selected = app.selection ? app.entries.get(app.selection) ?? null : null
   const taskRunning = app.checking !== null || app.busyOp !== null
   const connected = app.auth?.ok === true
@@ -89,23 +106,31 @@ export function App() {
     && app.settings.cliRequirement
     && isVersionBelowMinimum(app.settings.version, app.settings.cliRequirement.minimumVersion),
   )
+  const known = useCallback((path: string) => app.entries.has(path), [app.entries])
+  const cliOutcome = useMemo(() => worstOutcome(app.logs.map(entry => cliStatus(entry).outcome)), [app.logs])
+  const lastCli = useMemo(
+    () => (selected ? [...app.logs].reverse().find(entry => documentOf(entry.args, known) === selected.path) : undefined),
+    [app.logs, known, selected],
+  )
+  const lastSync = selected ? app.activity.find(event => event.path === selected.path) : undefined
 
-  // A new selection starts on Preview - reading is the common case; ⌘1 drops into
-  // the editor. A freshly loaded diff takes the stage (see DetailPane).
-  useEffect(() => setView('preview'), [app.selection])
-
+  // A new selection starts on Preview - reading is the common case - and leaves any conflict review.
   useEffect(() => {
-    if (app.selection) setLogsOpen(false)
+    setView('preview')
+    setResolving(current => (current === app.selection ? current : null))
   }, [app.selection])
 
-  /** OS-native absolute path for pasting outside the app (app-internal paths always use '/'). */
-  const absPath = (path: string): string =>
-    app.root.includes('\\') ? `${app.root}\\${path.replaceAll('/', '\\')}` : `${app.root}/${path}`
+  const openDiff = (path: string): void => {
+    app.setSelection(path)
+    setResolving(null)
+    if (app.diff?.path === path) setView('diff')
+    else void app.loadDiff(path, true)
+  }
 
-  const openDiff = (): void => {
-    if (!app.selection) return
-    if (app.diff?.path === app.selection) setView('diff')
-    else void app.loadDiff(app.selection, true)
+  const openResolve = (path: string): void => {
+    app.setSelection(path)
+    setResolving(path)
+    if (app.diff?.path !== path) void app.loadDiff(path, true)
   }
 
   const ctx: CommandContext = {
@@ -115,20 +140,30 @@ export function App() {
     state: selectionState(selected),
     theme,
     view,
+    sidebarMode,
     checking: app.checking !== null,
     busy: app.busyOp !== null,
     connected,
     openPalette: mode => setPalette(mode),
     openSettings: () => setSettingsOpen(true),
     openToken: () => setTokenOpen(true),
-    openLogs: () => setLogsOpen(true),
+    openLogs: () => setLogsOpen(open => !open),
     openHelp: () => setHelpOpen(true),
     openTour: () => setTourOpen(true),
-    focusFilter: () => filterRef.current?.focus(),
     setView,
+    setSidebarMode: mode => {
+      setSidebarMode(mode)
+      setSidebarOpen(true)
+    },
+    openChanges: scope => {
+      setResolving(null)
+      app.openChanges(scope)
+    },
     openDiff,
+    openResolve,
     openFind: () => setFindSeq(seq => seq + 1),
     toggleSidebar: () => setSidebarOpen(open => !open),
+    toggleInfo,
     toggleTheme: () => app.updateSettings({ theme: theme === 'dark' ? 'light' : 'dark' }),
     reloadFile: () => setReloadKey(key => key + 1),
   }
@@ -136,7 +171,7 @@ export function App() {
   ctxRef.current = ctx
 
   // Global shortcuts stand down while any dialog is open - each dialog owns its keys.
-  const dialogOpen = palette !== null || tokenOpen || settingsOpen || helpOpen
+  const dialogOpen = palette !== null || tokenOpen || settingsOpen || helpOpen || logsOpen
     || app.pushPreview !== null || app.pullConfirm !== null || app.createForm !== null || app.getForm !== null
 
   useEffect(() => {
@@ -154,14 +189,10 @@ export function App() {
         }
       }
       if (event.key === 'Escape' && !inField) {
-        // Esc clears the active filter first; a second Esc returns to the dashboard.
+        // Esc goes back: document → Changes, scoped Changes → all changes.
         const store = ctxRef.current.app
-        if (store.filterText !== '' || store.stateFilter !== null) {
-          store.setFilterText('')
-          store.setStateFilter(null)
-        } else {
-          store.setSelection(null)
-        }
+        if (store.selection !== null) store.openChanges(store.changesScope)
+        else store.setChangesScope(null)
       }
     }
     window.addEventListener('keydown', onKey)
@@ -183,29 +214,25 @@ export function App() {
     window.addEventListener('mouseup', onUp)
   }
 
+  const remotePaths = (): string[] => [...app.entries.values()]
+    .filter(entry => entry.tracked && !entry.ignored && entry.check?.state === 'behind')
+    .map(entry => entry.path)
+
   return (
-    <div className="flex h-screen flex-col bg-bg font-mono text-[12.5px] text-ink-body">
+    <div className="flex h-screen flex-col bg-bg font-sans text-[12.5px] text-ink-body">
       <TopBar
         theme={theme}
-        filterText={app.filterText}
-        behindCount={app.counts.behind}
-        unverifiedCount={app.counts.unverified}
+        remoteCount={app.counts.remote}
         busy={taskRunning}
         connected={connected}
         canGoBack={app.canGoBack}
         canGoForward={app.canGoForward}
-        filterRef={filterRef}
         onBack={app.goBack}
         onForward={app.goForward}
-        onFilterText={app.setFilterText}
-        onPullBehind={app.pullAllBehind}
-        onVerifyAll={app.verifyAllUnverified}
+        onPullAll={() => app.pullAll(remotePaths())}
         onOpenSettings={() => setSettingsOpen(true)}
-        onOpenPalette={() => setPalette('command')}
-        onOpenDashboard={() => {
-          setLogsOpen(false)
-          app.setSelection(null)
-        }}
+        onOpenSearch={() => setPalette('file')}
+        onOpenChanges={() => ctx.openChanges()}
       />
 
       {cliOutdated && app.settings?.version && app.settings.cliRequirement && (
@@ -223,16 +250,14 @@ export function App() {
           <aside data-tour="tree" style={{ width: sidebarWidth }} className="relative shrink-0 border-r border-line bg-sidebar">
             <FileTree
               entries={app.entries}
-              totals={totals}
-              selection={app.selection}
-              filterText={app.filterText}
-              stateFilter={app.stateFilter}
               counts={app.counts}
+              mode={sidebarMode}
+              selection={app.selection}
               rootDirs={app.settings?.contentDirs ?? []}
               pinnedDirs={app.settings?.pinnedDirs ?? []}
+              onSetMode={ctx.setSidebarMode}
               onSelect={app.setSelection}
-              onFilterState={app.setStateFilter}
-              onOpenDiff={path => void app.loadDiff(path, true)}
+              onOpenDiff={openDiff}
               onCheckFolder={app.checkFolder}
               onTogglePin={app.togglePin}
               onSetPinned={(path, pinned) => void app.setPinned(path, pinned)}
@@ -241,83 +266,96 @@ export function App() {
               onRemoveFolder={app.removeFolder}
               onSetIgnore={(path, ignored) => void app.setIgnored(path, ignored)}
               onCopyPageId={pageId => copy(ctx, pageId, 'Page ID')}
-              onCopyPath={path => copy(ctx, absPath(path), 'File path')}
+              onCopyPath={path => copy(ctx, absolutePath(app.root, path), 'Document path')}
             />
             <div onMouseDown={startSidebarResize} className="absolute inset-y-0 -right-0.5 z-10 w-1 cursor-col-resize" />
           </aside>
         )}
         <main data-tour="main" className="@container min-w-0 flex-1 bg-content">
-          {logsOpen
-            ? <LogsView notify={app.notify} onClose={() => setLogsOpen(false)} />
-            : selected
+          {selected && resolving === selected.path
             ? (
-                <DetailPane
+                <ConflictView
                   entry={selected}
-                  diff={app.diff}
-                  diffLoading={app.diffLoading}
-                  busyOp={app.busyOp}
-                  theme={theme}
-                  connected={connected}
-                  allowLossyPush={app.lossyPushPaths.has(selected.path)}
-                  view={view}
-                  reloadKey={reloadKey}
-                  findSeq={findSeq}
-                  onView={setView}
+                  diff={app.diff?.path === selected.path ? app.diff.result : null}
+                  author={selected.check?.remoteVersion !== undefined ? app.authors.get(`${selected.path}@v${selected.check.remoteVersion}`) : undefined}
+                  busy={app.busyOp !== null}
+                  onBack={() => ctx.openChanges()}
                   onError={app.reportError}
-                  onRegisterFlush={registerEditorFlush}
-                  onHelp={() => setHelpOpen(true)}
-                  onSelect={path => {
-                    if (app.entries.has(path)) app.setSelection(path)
-                    else app.notify(`${path} is not in the tree`)
+                  onMergeAndPush={(expected, merged) => {
+                    setResolving(null)
+                    void app.mergeAndPush(selected.path, expected, merged)
                   }}
-                  onDiff={path => void app.loadDiff(path, true)}
-                  onCheck={path => void app.checkOne(path)}
-                  onMarkVerified={path => void app.markVerified(path)}
-                  onPull={app.requestPull}
-                  onForcePull={path => app.setPullConfirm({ paths: [path], force: true })}
-                  onPush={(path, force, allowLossy) => void app.requestPush(path, force, allowLossy)}
-                  onLint={path => void app.runLint(path)}
-                  onSync={path => void app.syncFile(path)}
-                  onCreate={path => app.setCreateForm({ path })}
-                  onOpenConfluence={path => void app.openConfluence(path)}
-                  onOpenEditor={path => void app.openEditor(path)}
-                  onRevealFinder={path => void app.revealFinder(path)}
                 />
               )
-            : (
-                <Dashboard
-                  entries={app.entries}
-                  authors={app.authors}
-                  totals={totals}
-                  unverifiedCount={app.counts.unverified}
-                  busy={app.busyOp !== null}
-                  lastChecked={app.lastChecked}
-                  recents={app.recents}
-                  activity={app.activity}
-                  rootDirs={app.settings?.contentDirs ?? []}
-                  loadAuthors={app.loadAuthors}
-                  onSelect={app.setSelection}
-                  onVerifyAll={app.verifyAllUnverified}
-                  onCheckAll={() => void app.checkAll()}
-                  onOpenFilePalette={() => setPalette('file')}
-                  onOpenCommandPalette={() => setPalette('command')}
-                  onOpenGetForm={() => app.setGetForm({})}
-                  onFilterFolder={dir => app.setFilterText(`${dir}/`)}
-                />
-              )}
+            : selected
+              ? (
+                  <DetailPane
+                    ctx={ctx}
+                    entry={selected}
+                    diff={app.diff}
+                    diffLoading={app.diffLoading}
+                    busyOp={app.busyOp}
+                    theme={theme}
+                    connected={connected}
+                    lastChecked={app.lastChecked}
+                    lastSync={lastSync}
+                    lastCli={lastCli}
+                    view={view}
+                    sourceLayout={sourceLayout}
+                    infoOpen={infoOpen}
+                    reloadKey={reloadKey}
+                    findSeq={findSeq}
+                    onView={setView}
+                    onSourceLayout={setSourceLayout}
+                    onToggleInfo={toggleInfo}
+                    onOpenLogs={() => setLogsOpen(true)}
+                    onError={app.reportError}
+                    onRegisterFlush={registerEditorFlush}
+                    onHelp={() => setHelpOpen(true)}
+                    onSelect={path => {
+                      if (app.entries.has(path)) app.setSelection(path)
+                      else app.notify(`${path} is not in the tree`)
+                    }}
+                    onDiff={openDiff}
+                    onMarkVerified={path => void app.markVerified(path)}
+                    onLint={path => void app.runLint(path)}
+                  />
+                )
+              : (
+                  <ChangesView
+                    ctx={ctx}
+                    entries={app.entries}
+                    counts={app.counts}
+                    authors={app.authors}
+                    checking={app.checking}
+                    lastChecked={app.lastChecked}
+                    busy={app.busyOp !== null}
+                    scope={app.changesScope}
+                    bulkResult={app.bulkResult}
+                    loadAuthors={app.loadAuthors}
+                    onReview={openDiff}
+                    onResolve={openResolve}
+                    onPullAll={app.pullAll}
+                    onPushAll={app.pushAll}
+                    onCheckAll={() => void app.checkAll()}
+                    onCancelCheck={app.cancelCheck}
+                    onCheckUnchecked={app.checkUnchecked}
+                    onClearScope={() => app.setChangesScope(null)}
+                  />
+                )}
         </main>
       </div>
 
       <StatusBar
         auth={app.auth}
+        site={app.settings?.site ?? null}
         counts={app.counts}
         checking={app.checking}
-        lastChecked={app.lastChecked}
         busyOp={app.busyOp}
         appVersion={app.settings?.appVersion ?? null}
         update={app.update}
-        stateFilter={app.stateFilter}
-        onFilterState={app.setStateFilter}
+        cliOutcome={cliOutcome}
+        onOpenChanges={scope => ctx.openChanges(scope)}
         onOpenToken={() => setTokenOpen(true)}
         onOpenLogs={() => setLogsOpen(open => !open)}
         onCancelCheck={app.cancelCheck}
@@ -338,6 +376,20 @@ export function App() {
       )}
 
       {helpOpen && <HelpModal onClose={() => setHelpOpen(false)} />}
+
+      {logsOpen && (
+        <LogsView
+          entries={app.logs}
+          known={known}
+          selection={app.selection}
+          notify={app.notify}
+          onOpenDocument={path => {
+            setLogsOpen(false)
+            app.setSelection(path)
+          }}
+          onClose={() => setLogsOpen(false)}
+        />
+      )}
 
       {palette !== null && (
         <CommandPalette
@@ -371,11 +423,11 @@ export function App() {
 
       {app.pushPreview && (
         <Modal
-          title={`${app.pushPreview.allowLossy ? 'Push force' : app.pushPreview.force ? 'Force push' : 'Push'} ${app.pushPreview.path.split('/').at(-1)}`}
-          onClose={() => app.setPushPreview(null)}
+          title={`${app.pushPreview.allowLossy ? 'Push force' : app.pushPreview.force ? 'Force push' : 'Push'} ${app.pushPreview.path.split('/').at(-1)}${app.pushQueue.length > 0 ? ` · ${app.pushQueue.length} more queued` : ''}`}
+          onClose={app.cancelPushPreview}
           actions={(
             <>
-              <ModalButton label="Cancel" onClick={() => app.setPushPreview(null)} />
+              <ModalButton label={app.pushQueue.length > 0 ? 'Cancel all' : 'Cancel'} onClick={app.cancelPushPreview} />
               <ModalButton
                 label={app.pushPreview.allowLossy ? 'Push force - overwrite remote' : app.pushPreview.force ? 'Force push - overwrite remote' : 'Push to Confluence'}
                 primary={!app.pushPreview.force && !app.pushPreview.allowLossy}
@@ -457,7 +509,7 @@ export function App() {
 
       {app.pullConfirm && (
         <Modal
-          title={app.pullConfirm.force ? 'Overwrite local file?' : `Pull ${app.pullConfirm.paths.length} file(s)`}
+          title={app.pullConfirm.force ? 'Overwrite local document?' : `Pull ${app.pullConfirm.paths.length} document(s)`}
           onClose={() => app.setPullConfirm(null)}
           actions={(
             <>
@@ -474,7 +526,7 @@ export function App() {
         >
           {app.pullConfirm.force && (
             <p className="mb-2 text-conflict">
-              This file has (or may have) local edits. Pulling with force replaces the local body with the Confluence
+              This document has (or may have) local changes. Pulling with force replaces the local body with the Confluence
               version - compare first if unsure.
             </p>
           )}
@@ -485,7 +537,7 @@ export function App() {
                 <li key={path} className="truncate">
                   {path}
                   {entry?.check && (
-                    <span className="text-ink-faint"> v{entry.check.localVersion ?? '-'} → v{entry.check.remoteVersion ?? '-'}</span>
+                    <span className="text-ink-label"> v{entry.check.localVersion ?? '-'} → v{entry.check.remoteVersion ?? '-'}</span>
                   )}
                 </li>
               )
@@ -499,13 +551,13 @@ export function App() {
 
 function DryRunSummary({ preview }: { preview: { pageId: string, version: number, resolvedLinks?: number, unresolvedLinks?: number } }) {
   return (
-    <div className="space-y-1 font-mono text-[12px]">
-      <p>Page <span className="text-ink">{preview.pageId}</span> - currently v{preview.version}, push writes v{preview.version + 1}</p>
+    <div className="space-y-1 text-[12px]">
+      <p>Page <span className="font-mono text-ink">{preview.pageId}</span> - currently v{preview.version}, push writes v{preview.version + 1}</p>
       <p>{preview.resolvedLinks ?? 0} relative link(s) resolve to Confluence URLs</p>
       {(preview.unresolvedLinks ?? 0) > 0 && (
         <p className="text-warn">{preview.unresolvedLinks} link(s) cannot be resolved and stay as-is</p>
       )}
-      <p className="pt-1 text-ink-faint">Dry run verified against the live remote version. The source file is never rewritten - links resolve at push time only.</p>
+      <p className="pt-1 text-ink-label">Dry run verified against the live remote version. The source file is never rewritten - links resolve at push time only.</p>
     </div>
   )
 }

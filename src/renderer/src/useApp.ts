@@ -1,11 +1,11 @@
 import { captureException } from '@sentry/electron/renderer'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import type { AppUpdateStatus, AuthStatus, CheckFile, CredentialKey, DiffResult, PushFile, ScanFile, Settings, SettingsInfo, TriageFilter, VersionEntry } from '../../shared/types.ts'
+import { LOG_MAX, type AppUpdateStatus, type AuthStatus, type ChangesScope, type CheckFile, type CredentialKey, type DiffResult, type PushFile, type ScanFile, type Settings, type SettingsInfo, type VdocLogEntry, type VersionEntry } from '../../shared/types.ts'
 import { setFrontmatterFlag } from '../../shared/frontmatter.ts'
 import { initMessage } from '../../shared/init.ts'
 import { isLossyPushError } from '../../shared/lossy-push.ts'
-import { displayState, needsAttention, type FileEntry } from '../../shared/status.ts'
+import { displayState, needsAttention, syncGroup, type FileEntry } from '../../shared/status.ts'
 import { updateCheckMessage } from '../../shared/update.ts'
 import { verifyBatch } from '../../shared/verification.ts'
 import { STATE_META } from './state-meta.ts'
@@ -80,8 +80,14 @@ export function useApp() {
   const [history, setHistory] = useState<string[]>([])
   /** Files backed out of - Forward pops from the end; any new navigation clears it. */
   const [forward, setForward] = useState<string[]>([])
-  const [filterText, setFilterText] = useState('')
-  const [stateFilter, setStateFilter] = useState<TriageFilter>(null)
+  /** Changes screen narrowed to one group (status-bar counter). */
+  const [changesScope, setChangesScope] = useState<ChangesScope>(null)
+  /** Every CLI invocation this session, oldest first - one subscription feeds logs, status bar and info panel. */
+  const [logs, setLogs] = useState<VdocLogEntry[]>([])
+  /** Transient strip on the Changes screen after a bulk operation. */
+  const [bulkResult, setBulkResult] = useState<{ text: string, at: number } | null>(null)
+  /** Push all: files still waiting for their own dry-run preview. */
+  const [pushQueue, setPushQueue] = useState<string[]>([])
   const [auth, setAuth] = useState<AuthStatus | null>(null)
   const [checking, setChecking] = useState<{ done: number, total: number } | null>(null)
   const [lastChecked, setLastChecked] = useState<Date | null>(null)
@@ -266,6 +272,11 @@ export function useApp() {
     localStorage.setItem(CHECKS_KEY, JSON.stringify({ root, at: lastChecked?.getTime() ?? null, results } satisfies SavedChecks))
   }, [entries, lastChecked, root])
 
+  useEffect(() => {
+    void api.logs().then(setLogs).catch(() => undefined)
+    return api.onVdocLog(entry => setLogs(prev => [...prev.slice(-(LOG_MAX - 1)), entry]))
+  }, [api])
+
   useEffect(() => api.onCheckProgress(progress => {
     setChecking({ done: progress.done, total: progress.total })
     applyChecks(progress.results)
@@ -329,13 +340,16 @@ export function useApp() {
     return () => clearTimeout(timer)
   }, [message])
 
-  const runOp = useCallback(async (label: string, op: () => Promise<void>) => {
-    if (busyOp) return
+  /** Resolves true when the operation completed; failures surface as a toast and resolve false. */
+  const runOp = useCallback(async (label: string, op: () => Promise<void>): Promise<boolean> => {
+    if (busyOp) return false
     setBusyOp(label)
     try {
       await op()
+      return true
     } catch (error) {
       fail(error)
+      return false
     } finally {
       setBusyOp(null)
     }
@@ -351,6 +365,7 @@ export function useApp() {
     const detail = skipped.slice(0, 5).map(result => `${normalize(result.file).split('/').at(-1)} - ${result.summary ?? result.status}`)
     if (skipped.length > 5) detail.push(`… and ${skipped.length - 5} more`)
     setMessage({ kind: 'info', text: `Pull: ${pulled.length}/${results.length} file(s) updated`, detail: detail.length > 0 ? detail : undefined })
+    if (paths.length > 1 && pulled.length > 0) setBulkResult({ text: `${pulled.length} document${pulled.length > 1 ? 's' : ''} updated`, at: Date.now() })
     recordActivity('pulled', pulled.map(result => normalize(result.file)))
     setDiff(current => (current && paths.includes(current.path) ? null : current))
     await recheck(paths)
@@ -366,10 +381,9 @@ export function useApp() {
     }
   }, [doPull, entries])
 
-  const pullAllBehind = useCallback(() => {
-    const behind = [...entries.values()].filter(entry => displayState(entry) === 'behind').map(entry => entry.path)
-    if (behind.length > 0) setPullConfirm({ paths: behind, force: false })
-  }, [entries])
+  const pullAll = useCallback((paths: string[]) => {
+    if (paths.length > 0) setPullConfirm({ paths, force: false })
+  }, [])
 
   const requestPush = useCallback((path: string, force = false, allowLossy = false) => runOp('push preview', async () => {
     try {
@@ -382,6 +396,27 @@ export function useApp() {
       throw error
     }
   }), [api, runOp])
+
+  /** A failed preview ends the batch loudly rather than dropping the rest in silence. */
+  const previewNext = useCallback((path: string, rest: string[]) => {
+    setPushQueue(rest)
+    void requestPush(path, false).then(ok => {
+      if (ok || rest.length === 0) return
+      setPushQueue([])
+      setMessage(current => ({ kind: 'error', text: `${current?.text ?? 'Push preview failed'} - ${rest.length} queued document(s) not pushed` }))
+    })
+  }, [requestPush])
+
+  /** Push all: every file still gets its own dry-run preview - the guardrail never relaxes. */
+  const pushAll = useCallback((paths: string[]) => {
+    const [first, ...rest] = paths
+    if (first) previewNext(first, rest)
+  }, [previewNext])
+
+  const cancelPushPreview = useCallback(() => {
+    setPushPreview(null)
+    setPushQueue([])
+  }, [])
 
   const confirmPush = useCallback(() => {
     if (!pushPreview) return
@@ -408,8 +443,28 @@ export function useApp() {
       setMessage({ kind: 'info', text: `${allowLossy ? 'Push force completed for' : force ? 'Force pushed' : 'Pushed'} ${path} to v${result.version}` })
       setDiff(current => (current?.path === path ? null : current))
       await recheck([path])
+    }).then(ok => {
+      const [next, ...rest] = pushQueue
+      if (!next) return
+      if (ok) previewNext(next, rest)
+      else {
+        setPushQueue([])
+        setMessage(current => ({ kind: 'error', text: `${current?.text ?? 'Push failed'} - ${pushQueue.length} queued document(s) not pushed` }))
+      }
     })
-  }, [api, pushPreview, recheck, recordActivity, runOp])
+  }, [api, previewNext, pushPreview, pushQueue, recheck, recordActivity, runOp])
+
+  /**
+   * Conflict review outcome: the merged text replaces the local body (guarded against
+   * outside edits), then the push previews as a force push - Confluence moved, so the
+   * red confirm still stands.
+   */
+  const mergeAndPush = useCallback((path: string, expected: string, merged: string) => runOp('merge', async () => {
+    await api.writeFile({ path, expected, next: merged, revision: Date.now() })
+    setDiff(current => (current?.path === path ? null : current))
+    const { result, token } = await api.previewPush(path, true, false)
+    setPushPreview({ path, result, force: true, allowLossy: false, token })
+  }), [api, runOp])
 
   const checkOne = useCallback((path: string) => runOp('check', async () => {
     const results = await api.checkFiles([path])
@@ -551,6 +606,13 @@ export function useApp() {
       })
     })
   }, [api, entries, recheck, runOp])
+
+  /** Not-checked strip: check what was never checked first, then verify what has no baseline. */
+  const checkUnchecked = useCallback(() => {
+    const unchecked = [...entries.values()].some(entry => displayState(entry) === 'unchecked')
+    if (unchecked) void checkAll()
+    else verifyAllUnverified()
+  }, [checkAll, entries, verifyAllUnverified])
 
   const loadAuthors = useCallback((requests: Array<{ path: string, remoteVersion: number }>) => {
     const missing = requests.filter(request => !authors.has(`${request.path}@v${request.remoteVersion}`))
@@ -734,19 +796,23 @@ export function useApp() {
   }), [api, runOp])
 
   const counts = useMemo(() => {
-    let attention = 0
-    let behind = 0
-    let unverified = 0
-    let dirty = 0
+    const result = { files: 0, tracked: 0, attention: 0, synced: 0, local: 0, remote: 0, conflict: 0, unchecked: 0 }
     for (const entry of entries.values()) {
-      const state = displayState(entry)
-      if (needsAttention(state)) attention += 1
-      if (state === 'behind') behind += 1
-      if (state === 'unverified') unverified += 1
-      if (entry.gitDirty) dirty += 1
+      result.files += 1
+      if (entry.tracked) result.tracked += 1
+      const group = syncGroup(displayState(entry))
+      if (group === 'unlinked' || group === 'ignored') continue
+      result[group] += 1
+      if (needsAttention(displayState(entry))) result.attention += 1
     }
-    return { attention, behind, unverified, dirty }
+    return result
   }, [entries])
+
+  /** Home screen: no document selected, optionally narrowed to one group. */
+  const openChanges = useCallback((scope: ChangesScope = null) => {
+    setChangesScope(scope)
+    select(null)
+  }, [select])
 
   const cancelCheck = useCallback(() => {
     void api.checkCancel().catch(fail)
@@ -763,10 +829,12 @@ export function useApp() {
     canGoBack: history.length > 0,
     goForward,
     canGoForward: forward.length > 0,
-    filterText,
-    setFilterText,
-    stateFilter,
-    setStateFilter,
+    changesScope,
+    setChangesScope,
+    openChanges,
+    logs,
+    bulkResult,
+    pushQueue,
     auth,
     checking,
     lastChecked,
@@ -774,7 +842,7 @@ export function useApp() {
     diff,
     diffLoading,
     pushPreview,
-    setPushPreview,
+    cancelPushPreview,
     lossyPushPaths,
     pullConfirm,
     setPullConfirm,
@@ -809,6 +877,8 @@ export function useApp() {
     loadAuthors,
     markVerified,
     verifyAllUnverified,
+    checkUnchecked,
+    mergeAndPush,
     saveApiKey,
     setAuthMethod,
     clearCredential,
@@ -829,8 +899,9 @@ export function useApp() {
     loadDiff,
     requestPull,
     doPull,
-    pullAllBehind,
+    pullAll,
     requestPush,
+    pushAll,
     confirmPush,
     checkOne,
     syncFile,

@@ -1,35 +1,49 @@
-import type { DisplayState } from '../../shared/types.ts'
+import type { CliOutcome } from '../../shared/cli-status.ts'
+import type { DisplayState, SyncGroup } from '../../shared/types.ts'
+
+interface GroupMeta {
+  glyph: string
+  /** The word that always travels with the glyph. */
+  label: string
+  /** Tailwind text colour for glyph and word. */
+  color: string
+}
+
+/** The five R4 states plus the two app-only groups. Amber is never a document state. */
+export const GROUP_META: Record<SyncGroup, GroupMeta> = {
+  synced: { glyph: '●', label: 'Synced', color: 'text-sync-text' },
+  local: { glyph: '↑', label: 'Local changes', color: 'text-behind' },
+  remote: { glyph: '↓', label: 'Remote changes', color: 'text-behind' },
+  conflict: { glyph: '⚠', label: 'Conflict', color: 'text-conflict' },
+  unchecked: { glyph: '○', label: 'Not checked', color: 'text-ink-label' },
+  unlinked: { glyph: '–', label: 'No page linked', color: 'text-ink-label' },
+  ignored: { glyph: '⊘', label: 'Ignored', color: 'text-ink-label' },
+}
 
 interface StateMeta {
+  /** Finer label than the group word where the distinction matters. */
   label: string
-  /** Complete class set for a 7px state dot - filled = known state, ring = unverified. */
-  dot: string
-  /** Tailwind text color class for glyphs and labels. */
-  color: string
-  /** Chip tint: background + border + text (dark-spec tints from the redesign). */
-  chip: string
-  /** Tree right-edge glyph - only for states with something to report. */
-  glyph?: string
   hint?: string
 }
 
-const RING = 'border-[1.5px] border-warn'
-const CHIP_GREEN = 'bg-ok-bg border-ok-edge text-ok-ink'
-const CHIP_AMBER = 'bg-pill-bg border-pill-edge text-pill-ink'
-const CHIP_BLUE = 'bg-info-bg border-info-edge text-info-ink'
-const CHIP_RED = 'bg-bad-bg border-bad-edge text-bad-ink'
-const CHIP_GREY = 'bg-raised border-control text-ink-mute'
-
 export const STATE_META: Record<DisplayState, StateMeta> = {
-  'in-sync': { label: 'Synced', dot: 'bg-sync', color: 'text-sync-text', chip: CHIP_GREEN },
-  'behind': { label: 'Behind', dot: 'bg-behind', color: 'text-behind', chip: CHIP_BLUE, glyph: '↓', hint: 'Confluence moved ahead - pull to refresh the local file' },
-  'ahead': { label: 'Ahead', dot: 'bg-behind', color: 'text-behind', chip: CHIP_BLUE, glyph: '↑', hint: 'Local version is ahead of Confluence - push to publish' },
-  'local-edits': { label: 'Local edits', dot: 'bg-behind', color: 'text-behind', chip: CHIP_BLUE, glyph: '↑', hint: 'The local body changed since the last sync - push to publish' },
-  'conflict': { label: 'Diverged', dot: 'bg-conflict', color: 'text-conflict', chip: CHIP_RED, glyph: '≠', hint: 'Both sides changed. Inspect the diff and merge by hand - never auto-resolve' },
-  'no-version': { label: 'No version', dot: RING, color: 'text-warn-text', chip: CHIP_AMBER, hint: 'Tracked but never published by vdoc - push to publish it' },
-  'not-found': { label: 'Not found', dot: 'bg-conflict', color: 'text-conflict', chip: CHIP_RED, glyph: '⚠', hint: 'The Confluence page is gone or not accessible' },
-  'untracked': { label: 'Not linked', dot: 'bg-dot-neutral', color: 'text-ink-mute', chip: CHIP_GREY, hint: 'No confluencePageId - link it with Find matching page or publish with Create' },
-  'unverified': { label: 'Unverified', dot: RING, color: 'text-warn-text', chip: CHIP_AMBER, hint: 'Versions match, but the content was never compared - edits on either side would go unnoticed. Verify fetches the page: identical content records a baseline and turns this Synced; different content opens the diff so you choose (Pull takes Confluence, Push publishes local)' },
-  'unchecked': { label: 'Not checked', dot: 'bg-dot-neutral', color: 'text-ink-faint', chip: CHIP_GREY },
-  'ignored': { label: 'Ignored', dot: 'bg-dot-neutral', color: 'text-ink-faint', chip: CHIP_GREY, glyph: '⊘', hint: 'confluenceIgnore is set in the frontmatter - checks, diffs and sync skip this file. Right-click it in the tree to include it again' },
+  'in-sync': { label: 'Synced' },
+  'behind': { label: 'Remote changes', hint: 'Confluence moved ahead - pull to refresh the local file' },
+  'ahead': { label: 'Local changes', hint: 'Local version is ahead of Confluence - push to publish' },
+  'local-edits': { label: 'Local changes', hint: 'The local body changed since the last sync - push to publish' },
+  'conflict': { label: 'Conflict', hint: 'Both sides changed since the baseline. Resolve hunk by hunk - never auto-merged' },
+  'no-version': { label: 'Never published', hint: 'Tracked but never published by vdoc - push to publish it' },
+  'not-found': { label: 'Page not found', hint: 'The Confluence page is gone or not accessible' },
+  'untracked': { label: 'No page linked', hint: 'No confluencePageId - link it to an existing page or create one' },
+  'unverified': { label: 'Not checked', hint: 'Versions match, but the content was never compared - Check compares it against Confluence and records the baseline when identical' },
+  'unchecked': { label: 'Not checked', hint: 'No baseline recorded yet - Check compares the document against Confluence' },
+  'ignored': { label: 'Ignored', hint: 'confluenceIgnore is set in the frontmatter - checks, diffs and sync skip this file. Right-click it in the tree to include it again' },
+}
+
+/** CLI result status from the JSON, not the exit code - see shared/cli-status. */
+export const OUTCOME_META: Record<CliOutcome, GroupMeta> = {
+  success: { glyph: '✓', label: 'Success', color: 'text-sync-text' },
+  findings: { glyph: '●', label: 'Findings', color: 'text-warn-text' },
+  warning: { glyph: '⚠', label: 'Warning', color: 'text-warn-text' },
+  error: { glyph: '✕', label: 'Error', color: 'text-conflict' },
 }

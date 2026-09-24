@@ -16,14 +16,14 @@ type SyncState =
 /** UI-level state: CLI states plus three app-derived ones. */
 export type DisplayState = SyncState | 'unverified' | 'unchecked' | 'ignored'
 
-/** One shared tree filter driving the sidebar chips and the status-bar counters. */
-export type TriageFilter = 'attention' | 'behind' | 'unverified' | 'dirty' | null
-
 /**
  * The five R4 states every surface renders (synced, local, remote, conflict, unchecked)
  * plus the two app-only ones: no page linked, and confluenceIgnore.
  */
 export type SyncGroup = 'synced' | 'local' | 'remote' | 'conflict' | 'unchecked' | 'unlinked' | 'ignored'
+
+/** Changes-screen scope - a status-bar counter narrows the home screen to one group. */
+export type ChangesScope = SyncGroup | null
 
 export interface CheckFile {
   file: string
