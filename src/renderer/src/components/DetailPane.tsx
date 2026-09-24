@@ -10,7 +10,6 @@ import { timeAgo } from '../../../shared/time.ts'
 import { command, isPinned, primaryAction, secondaryActions, shortcutLabel, type CommandContext, type ViewMode } from '../commands.ts'
 import { AlertIcon, BanIcon, ChevronDownIcon, ExternalIcon, MoreIcon, PinIcon } from '../icons.tsx'
 import { STATE_META } from '../state-meta.ts'
-import type { SyncEvent } from '../useApp.ts'
 import { ActionMenu } from './ActionMenu.tsx'
 import { CommentsView } from './CommentsView.tsx'
 import { DocumentInfo } from './DocumentInfo.tsx'
@@ -30,8 +29,8 @@ interface Props {
   busyOp: string | null
   theme: 'dark' | 'light'
   connected: boolean
-  lastChecked: Date | null
-  lastSync: SyncEvent | undefined
+  /** Epoch ms when local and Confluence last matched, when known. */
+  lastSync: number | undefined
   lastCli: VdocLogEntry | undefined
   /** The active tab - owned by App so commands can drive it. */
   view: ViewMode
@@ -263,7 +262,7 @@ export function DetailPane(props: Props) {
   }
 
   const versionsTitle = check
-    ? `Local version ${check.localVersion ?? '-'} · Confluence version ${check.remoteVersion ?? '-'}${props.lastSync ? ` · last synchronized ${new Date(props.lastSync.at).toLocaleString()}` : ''}`
+    ? `Local version ${check.localVersion ?? '-'} · Confluence version ${check.remoteVersion ?? '-'}${props.lastSync ? ` · last synchronized ${new Date(props.lastSync).toLocaleString()}` : ''}`
     : undefined
 
   return (
@@ -309,7 +308,7 @@ export function DetailPane(props: Props) {
                             </button>
                           </>
                         )}
-                        {check && props.lastChecked && <><Sep /><span className="text-ink-mute">checked {timeAgo(props.lastChecked)}</span></>}
+                        {check && entry.checkedAt && <><Sep /><span className="text-ink-mute">checked {timeAgo(entry.checkedAt)}</span></>}
                       </>
                     )}
                 {saveState !== 'saved' && (

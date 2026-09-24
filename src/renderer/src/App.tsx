@@ -20,6 +20,7 @@ import { CliVersionWarning } from './components/CliVersionWarning.tsx'
 import { absolutePath, commandFor, copy, isMod, selectionState, type CommandContext, type SidebarMode, type ViewMode } from './commands.ts'
 import { useApp } from './useApp.ts'
 import { cliStatus, documentOf, worstOutcome } from '../../shared/cli-status.ts'
+import { lastSyncAt } from '../../shared/status.ts'
 import { isVersionBelowMinimum } from '../../shared/version.ts'
 
 const SIDEBAR_MIN = 240
@@ -127,7 +128,13 @@ export function App() {
     () => (selected ? [...app.logs].reverse().find(entry => documentOf(entry.args, known) === selected.path) : undefined),
     [app.logs, known, selected],
   )
-  const lastSync = selected ? app.activity.find(event => event.path === selected.path) : undefined
+  const remoteVersion = selected && !selected.ignored ? selected.check?.remoteVersion : undefined
+  const latestVersion = selected && remoteVersion !== undefined ? app.authors.get(`${selected.path}@v${remoteVersion}`) : undefined
+  const lastSync = selected ? lastSyncAt(selected.check, latestVersion, app.activity.find(event => event.path === selected.path)?.at) : undefined
+  const { loadAuthors } = app
+  useEffect(() => {
+    if (selected && remoteVersion !== undefined && connected) loadAuthors([{ path: selected.path, remoteVersion }])
+  }, [connected, loadAuthors, remoteVersion, selected])
 
   // A new selection starts on Preview - reading is the common case - and leaves any conflict review.
   useEffect(() => {
@@ -298,7 +305,7 @@ export function App() {
                 <ConflictView
                   entry={selected}
                   diff={app.diff?.path === selected.path ? app.diff.result : null}
-                  author={selected.check?.remoteVersion !== undefined ? app.authors.get(`${selected.path}@v${selected.check.remoteVersion}`) : undefined}
+                  author={latestVersion}
                   busy={app.busyOp !== null}
                   onBack={() => ctx.openChanges()}
                   onError={app.reportError}
@@ -318,7 +325,6 @@ export function App() {
                     busyOp={app.busyOp}
                     theme={theme}
                     connected={connected}
-                    lastChecked={app.lastChecked}
                     lastSync={lastSync}
                     lastCli={lastCli}
                     view={view}

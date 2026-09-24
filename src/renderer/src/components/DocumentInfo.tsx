@@ -6,19 +6,20 @@ import type { FileEntry } from '../../../shared/status.ts'
 import type { VdocLogEntry } from '../../../shared/types.ts'
 import { shellCommand } from '../../../shared/shell-command.ts'
 import { command, isPinned, shortcutLabel, type CommandContext } from '../commands.ts'
-import { ArrowRightIcon, ExternalIcon, PinIcon } from '../icons.tsx'
-import type { SyncEvent } from '../useApp.ts'
+import { timeAgo } from '../../../shared/time.ts'
+import { ChevronDownIcon, ChevronRightIcon, ExternalIcon, PinIcon } from '../icons.tsx'
 import type { OutlineItem } from './PreviewView.tsx'
 import { OutcomeIcon } from './StateGlyph.tsx'
 
-type InspectorTab = 'outline' | 'info'
+type SectionId = 'outline' | 'info'
+type OpenSections = Record<SectionId, boolean>
 
 const WIDTH_MIN = 260
 const WIDTH_MAX = 420
 const clampWidth = (width: number): number => Math.min(WIDTH_MAX, Math.max(WIDTH_MIN, width))
 
-/** Keys the Sync section already shows - the Outline's compact frontmatter skips them. */
-const SYNC_KEYS = new Set(['title', 'confluencePageId', 'confluencePageVersion', 'confluenceSpace'])
+/** Keys the header and the Sync section already show. */
+const SHOWN_ELSEWHERE = new Set(['title', 'confluencePageId', 'confluencePageVersion', 'confluenceSpace'])
 
 interface Props {
   ctx: CommandContext
@@ -27,7 +28,8 @@ interface Props {
   content: string | null
   space: string | undefined
   labels: string[]
-  lastSync: SyncEvent | undefined
+  /** Epoch ms when local and Confluence last matched, when known. */
+  lastSync: number | undefined
   /** Most recent CLI command that named this document. */
   lastCli: VdocLogEntry | undefined
   outline: OutlineItem[]
@@ -47,21 +49,31 @@ function pinPosition(path: string, pinned: string[]): string {
 
 const stamp = (at: number): string => new Date(at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 
+function loadSections(root: string): OpenSections {
+  try {
+    const saved = JSON.parse(localStorage.getItem(`inspectorSections:${root}`) ?? '{}') as Partial<OpenSections>
+    return { outline: saved.outline !== false, info: saved.info !== false }
+  } catch {
+    return { outline: true, info: true }
+  }
+}
+
 /**
- * The inspector (R5 §4): Outline and Info tabs, no close control - only the top-bar
- * toggle and ⌘I open or close it. Tab and width persist per workspace.
+ * The inspector: Outline and Info as collapsible sections, no close control - only the
+ * top-bar toggle and ⌘I open or close it. Open sections and width persist per workspace.
  */
 export function DocumentInfo(props: Props) {
   const { ctx, entry, content } = props
   const root = ctx.app.root
-  const [tab, setTabState] = useState<InspectorTab>(() => (localStorage.getItem(`inspectorTab:${root}`) === 'info' ? 'info' : 'outline'))
+  const [open, setOpen] = useState<OpenSections>(() => loadSections(root))
   const [width, setWidth] = useState(() => {
     const saved = Number(localStorage.getItem(`inspectorWidth:${root}`))
     return saved >= WIDTH_MIN && saved <= WIDTH_MAX ? saved : 300
   })
-  const setTab = (next: InspectorTab): void => {
-    localStorage.setItem(`inspectorTab:${root}`, next)
-    setTabState(next)
+  const toggle = (id: SectionId): void => {
+    const next = { ...open, [id]: !open[id] }
+    localStorage.setItem(`inspectorSections:${root}`, JSON.stringify(next))
+    setOpen(next)
   }
 
   const startResize = (event: React.MouseEvent): void => {
@@ -82,110 +94,98 @@ export function DocumentInfo(props: Props) {
   // An ignored file shows no Confluence data anywhere - its confluence* keys included.
   const frontmatter = useMemo(
     () => (content === null ? [] : frontmatterEntries(content))
+      .filter(field => !SHOWN_ELSEWHERE.has(field.key))
       .filter(field => !ignored || !field.key.startsWith('confluence') || field.key === 'confluenceIgnore'),
     [content, ignored],
   )
 
+  // Outline takes its natural height, capped so an open Info section always keeps room.
+  const outlineFlex = !open.outline ? 'shrink-0' : open.info ? 'max-h-[60%] min-h-0 shrink' : 'min-h-0 flex-1'
+
   return (
     <aside style={{ width }} className="relative flex shrink-0 flex-col border-l border-line bg-sidebar">
       <div onMouseDown={startResize} className="absolute inset-y-0 -left-0.5 z-10 w-1 cursor-col-resize" />
-      <div className="flex items-center gap-0.5 border-b border-line-subtle px-2.5 pt-2.5">
-        <InspectorTabButton label="Outline" active={tab === 'outline'} onClick={() => setTab('outline')} />
-        <InspectorTabButton label="Info" active={tab === 'info'} onClick={() => setTab('info')} />
+      <div className={`flex flex-col ${outlineFlex}`}>
+        <SectionHeader label="Outline" open={open.outline} onToggle={() => toggle('outline')} />
+        {open.outline && (
+          <div className="flex min-h-0 flex-col gap-0.5 overflow-y-auto px-[14px] pb-3">
+            {props.outline.length === 0
+              ? <span className="px-2 py-1 text-[11.5px] text-ink-label">No sections</span>
+              : props.outline.map(item => (
+                  <button
+                    key={item.id}
+                    onClick={() => props.onJump(item.id)}
+                    className={`shrink-0 rounded-[5px] px-2.5 py-1.5 text-left text-[12.5px] leading-[1.45] ${
+                      item.id === props.activeSection
+                        ? 'bg-selected font-medium text-ink shadow-[inset_2px_0_0_var(--color-select-edge)]'
+                        : 'text-ink-dim hover:bg-row-hover hover:text-ink'
+                    }`}
+                  >
+                    {item.text}
+                  </button>
+                ))}
+          </div>
+        )}
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {tab === 'outline'
-          ? (
+      <div className={`flex flex-col border-t border-line-subtle ${open.info ? 'min-h-0 flex-1' : 'shrink-0'}`}>
+        <SectionHeader label="Info" open={open.info} onToggle={() => toggle('info')} />
+        {open.info && (
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <FrontmatterSection entries={frontmatter} />
+            {!ignored && (
               <>
-                <div className="flex flex-col gap-0.5 px-[14px] py-4">
-                  <Label className="pb-2">On this page</Label>
-                  {props.outline.length === 0
-                    ? <span className="px-2 text-[11.5px] text-ink-label">No sections</span>
-                    : props.outline.map(item => (
-                        <button
-                          key={item.id}
-                          onClick={() => props.onJump(item.id)}
-                          className={`rounded-[5px] px-2.5 py-1.5 text-left text-[12.5px] leading-[1.45] ${
-                            item.id === props.activeSection
-                              ? 'bg-selected font-medium text-ink shadow-[inset_2px_0_0_var(--color-select-edge)]'
-                              : 'text-ink-dim hover:bg-row-hover hover:text-ink'
-                          }`}
-                        >
-                          {item.text}
-                        </button>
-                      ))}
-                </div>
                 <Rule />
-                <FrontmatterSection entries={frontmatter.filter(field => !SYNC_KEYS.has(field.key))} />
-                {!ignored && (
-                  <>
-                    <Rule />
-                    <Section label="Sync">
-                      <ConfluenceRow ctx={ctx} entry={entry} />
-                      <Row label="Space"><Value text={props.space} /></Row>
-                      <Row label="Last sync"><Value text={props.lastSync && stamp(props.lastSync.at)} fallback="not this session" /></Row>
-                      <LastCliCard lastCli={props.lastCli} />
-                      <button onClick={() => setTab('info')} className="inline-flex items-center gap-1 self-start px-2 text-[11.5px] text-link hover:text-link-hover">
-                        All details in Info <ArrowRightIcon size={11} />
-                      </button>
-                    </Section>
-                  </>
-                )}
-              </>
-            )
-          : (
-              <>
-                <FrontmatterSection entries={frontmatter} />
-                {!ignored && (
-                  <>
-                    <Rule />
-                    <Section label="Sync">
-                      <ConfluenceRow ctx={ctx} entry={entry} />
-                      <Row label="Space"><Value text={props.space} /></Row>
-                      <Row label="Local version"><Value text={entry.check?.localVersion} mono /></Row>
-                      <Row label="Remote version"><Value text={entry.check?.remoteVersion} mono /></Row>
-                      <Row label="Last sync"><Value text={props.lastSync && `${props.lastSync.op} · ${stamp(props.lastSync.at)}`} fallback="not this session" /></Row>
-                      {props.labels.length > 0 && (
-                        <Row label="Labels">
-                          <span className="flex flex-wrap gap-1">{props.labels.map(label => <Chip key={label} text={label} />)}</span>
-                        </Row>
-                      )}
-                      <LastCliCard lastCli={props.lastCli} />
-                      <button onClick={props.onOpenLogs} className="self-start px-2 text-[11.5px] text-link hover:text-link-hover">
-                        Open in CLI logs <span className="font-mono text-ink-label">{shortcutLabel('app.logs')}</span>
-                      </button>
-                    </Section>
-                  </>
-                )}
-                {isPinned(ctx) && (
-                  <>
-                    <Rule />
-                    <Section label="App">
-                      <div className="flex items-center gap-2.5 px-2">
-                        <span className="w-[88px] shrink-0 text-[11.5px] text-ink-mute">Pinned</span>
-                        <span className="flex min-w-0 items-center gap-1.5 text-[11.5px] text-ink-body">
-                          <PinIcon size={11} className="shrink-0 text-brand" />
-                          <span className="truncate">{pinPosition(entry.path, ctx.app.pinnedFiles)}</span>
-                        </span>
-                        <div className="flex-1" />
-                        <button onClick={() => command('file.pin').run(ctx)} className="shrink-0 text-[11px] text-link hover:text-link-hover">Unpin</button>
-                      </div>
-                    </Section>
-                  </>
-                )}
+                <Section label="Sync">
+                  <ConfluenceRow ctx={ctx} entry={entry} />
+                  <Row label="Space"><Value text={props.space} /></Row>
+                  <Row label="Local version"><Value text={entry.check?.localVersion} mono /></Row>
+                  <Row label="Remote version"><Value text={entry.check?.remoteVersion} mono /></Row>
+                  <Row label="Last sync"><Value text={props.lastSync && stamp(props.lastSync)} fallback="unknown" /></Row>
+                  <Row label="Last check"><Value text={entry.checkedAt && timeAgo(entry.checkedAt)} fallback="never" /></Row>
+                  {props.labels.length > 0 && (
+                    <Row label="Labels">
+                      <span className="flex flex-wrap gap-1">{props.labels.map(label => <Chip key={label} text={label} />)}</span>
+                    </Row>
+                  )}
+                  <LastCliCard lastCli={props.lastCli} />
+                  <button onClick={props.onOpenLogs} className="self-start px-2 text-[11.5px] text-link hover:text-link-hover">
+                    Open in CLI logs <span className="font-mono text-ink-label">{shortcutLabel('app.logs')}</span>
+                  </button>
+                </Section>
               </>
             )}
+            {isPinned(ctx) && (
+              <>
+                <Rule />
+                <Section label="App">
+                  <div className="flex items-center gap-2.5 px-2">
+                    <span className="w-[88px] shrink-0 text-[11.5px] text-ink-mute">Pinned</span>
+                    <span className="flex min-w-0 items-center gap-1.5 text-[11.5px] text-ink-body">
+                      <PinIcon size={11} className="shrink-0 text-brand" />
+                      <span className="truncate">{pinPosition(entry.path, ctx.app.pinnedFiles)}</span>
+                    </span>
+                    <div className="flex-1" />
+                    <button onClick={() => command('file.pin').run(ctx)} className="shrink-0 text-[11px] text-link hover:text-link-hover">Unpin</button>
+                  </div>
+                </Section>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </aside>
   )
 }
 
-function InspectorTabButton({ label, active, onClick }: { label: string, active: boolean, onClick(): void }) {
+function SectionHeader({ label, open, onToggle }: { label: string, open: boolean, onToggle(): void }) {
+  const Chevron = open ? ChevronDownIcon : ChevronRightIcon
   return (
     <button
-      onClick={onClick}
-      className={`border-b-2 px-3 py-2 text-[12.5px] ${active ? 'border-accent font-medium text-ink' : 'border-transparent text-ink-dim hover:text-ink'}`}
+      onClick={onToggle}
+      aria-expanded={open}
+      className="flex h-[34px] shrink-0 items-center gap-1.5 px-3 text-left text-[11px] font-semibold uppercase tracking-[0.9px] text-ink-dim hover:text-ink"
     >
+      <Chevron size={12} className="shrink-0 text-ink-mute" />
       {label}
     </button>
   )

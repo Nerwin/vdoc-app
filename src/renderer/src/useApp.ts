@@ -62,8 +62,10 @@ interface SavedChecks {
   root: string
   /** Epoch ms of the last full check, when one ran - restored into “last checked”. */
   at: number | null
-  results: CheckFile[]
+  results: SavedCheck[]
 }
+
+type SavedCheck = CheckFile & { checkedAt?: number }
 
 /** A full re-check runs at most once per hour on window focus. */
 const FULL_CHECK_TTL_MS = 60 * 60 * 1000
@@ -176,13 +178,15 @@ export function useApp() {
     return () => window.removeEventListener('unhandledrejection', onRejection)
   }, [fail])
 
-  const applyChecks = useCallback((results: CheckFile[]) => {
+  /** Fresh results are stamped now; restored ones keep their saved stamp. */
+  const applyChecks = useCallback((results: SavedCheck[], fresh = true) => {
+    const now = Date.now()
     setEntries(prev => {
       const next = new Map(prev)
-      for (const result of results) {
+      for (const { checkedAt, ...result } of results) {
         const path = normalize(result.file)
         const entry = next.get(path)
-        next.set(path, { ...entry, path, tracked: entry?.tracked ?? true, check: result })
+        next.set(path, { ...entry, path, tracked: entry?.tracked ?? true, check: result, checkedAt: fresh ? now : checkedAt })
       }
       return next
     })
@@ -204,6 +208,7 @@ export function useApp() {
           hidden: file.hidden,
           mtimeMs: file.mtimeMs,
           check: file.tracked ? previous?.check : undefined,
+          checkedAt: file.tracked ? previous?.checkedAt : undefined,
         })
       }
       return next
@@ -253,7 +258,7 @@ export function useApp() {
           const tracked = new Set(scan.files.filter(file => file.tracked).map(file => file.path))
           const results = saved.results.filter(result => tracked.has(normalize(result.file)))
           if (results.length > 0) {
-            applyChecks(results)
+            applyChecks(results.map(result => ({ ...result, checkedAt: result.checkedAt ?? saved.at ?? undefined })), false)
             if (saved.at) setLastChecked(new Date(saved.at))
           }
         }
@@ -270,7 +275,7 @@ export function useApp() {
   // An empty result set never overwrites a saved snapshot (startup runs before restore).
   useEffect(() => {
     if (root === '') return
-    const results = [...entries.values()].flatMap(entry => (entry.tracked && entry.check ? [entry.check] : []))
+    const results = [...entries.values()].flatMap(entry => (entry.tracked && entry.check ? [{ ...entry.check, checkedAt: entry.checkedAt }] : []))
     if (results.length === 0) return
     localStorage.setItem(CHECKS_KEY, JSON.stringify({ root, at: lastChecked?.getTime() ?? null, results } satisfies SavedChecks))
   }, [entries, lastChecked, root])

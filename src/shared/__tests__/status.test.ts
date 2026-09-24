@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { countStates, displayState, needsAttention, syncGroup } from '../status.ts'
+import { countStates, displayState, lastSyncAt, needsAttention, syncGroup } from '../status.ts'
 
 describe('sync state model', () => {
   it('maps every CLI state to one of the five groups', () => {
@@ -38,5 +38,24 @@ describe('sync state model', () => {
     assert.ok(needsAttention('conflict'))
     assert.ok(!needsAttention('unverified'))
     assert.ok(!needsAttention('in-sync'))
+  })
+})
+
+describe('lastSyncAt', () => {
+  const check = { file: 'a.md', state: 'in-sync' as const, localVersion: 8, remoteVersion: 8 }
+  const v8 = { number: 8, createdAt: '2026-09-21T12:31:00Z', author: 'M. Tremblay' }
+
+  it('uses the publish date of the Confluence version the file is at', () => {
+    assert.equal(lastSyncAt(check, v8, undefined), Date.parse(v8.createdAt))
+  })
+
+  it('ignores a newer remote version the file has not pulled', () => {
+    assert.equal(lastSyncAt({ ...check, state: 'behind', remoteVersion: 9 }, { ...v8, number: 9 }, undefined), undefined)
+  })
+
+  it('prefers a more recent app push or pull', () => {
+    const pulled = Date.parse('2026-09-23T08:00:00Z')
+    assert.equal(lastSyncAt(check, v8, pulled), pulled)
+    assert.equal(lastSyncAt(undefined, null, pulled), pulled)
   })
 })

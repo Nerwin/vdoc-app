@@ -1,4 +1,4 @@
-import type { CheckFile, DisplayState, SyncGroup } from './types.ts'
+import type { CheckFile, DisplayState, SyncGroup, VersionEntry } from './types.ts'
 
 export interface FileEntry {
   path: string
@@ -15,6 +15,8 @@ export interface FileEntry {
   hidden?: boolean
   mtimeMs?: number
   check?: CheckFile
+  /** Epoch ms of the check that produced `check`. */
+  checkedAt?: number
 }
 
 /**
@@ -82,3 +84,13 @@ export function countStates(entries: Iterable<FileEntry>): StateCounts {
 }
 
 export const displayTitle = (entry: FileEntry): string => entry.title ?? entry.path.split('/').at(-1) ?? entry.path
+
+/**
+ * When local and Confluence last matched: the publish date of the Confluence version the
+ * file is at (`latest` is the newest remote version), or an app push/pull if more recent.
+ */
+export function lastSyncAt(check: CheckFile | undefined, latest: VersionEntry | null | undefined, activityAt: number | undefined): number | undefined {
+  const published = check?.localVersion !== undefined && latest?.number === check.localVersion ? Date.parse(latest.createdAt) : Number.NaN
+  const known = [published, activityAt ?? Number.NaN].filter(at => !Number.isNaN(at))
+  return known.length > 0 ? Math.max(...known) : undefined
+}
