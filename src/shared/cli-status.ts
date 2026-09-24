@@ -110,3 +110,16 @@ export function interpretCli(entry: Pick<VdocLogEntry, 'args' | 'exitCode' | 'st
 export function documentOf(args: string[], known: (path: string) => boolean): string | null {
   return args.find(arg => arg.endsWith('.md') && known(arg.replace(/^\.\//, ''))) ?? null
 }
+
+export interface RerunTarget {
+  kind: 'check' | 'diff' | 'lint'
+  path: string
+}
+
+/** Rerun is limited to read-only single-document commands - nothing that writes or skips a preview. */
+export function rerunTarget(args: string[]): RerunTarget | null {
+  const [group, verb, ...rest] = args.filter(arg => arg !== '--json')
+  if (group !== 'cf' || rest.length !== 1 || rest[0].startsWith('-')) return null
+  if (verb === 'check' || verb === 'diff' || verb === 'lint') return { kind: verb, path: rest[0] }
+  return null
+}

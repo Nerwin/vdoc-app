@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { cliStatus, detectFormat, documentOf, interpretCli, worstOutcome } from '../cli-status.ts'
+import { cliStatus, detectFormat, documentOf, interpretCli, rerunTarget, worstOutcome } from '../cli-status.ts'
 
 describe('cliStatus', () => {
   it('reads the status field before the exit code', () => {
@@ -41,5 +41,17 @@ describe('cliStatus', () => {
     assert.equal(interpretCli({ ...entry, exitCode: 0 }, cliStatus({ ...entry, exitCode: 0 })), null)
     assert.equal(documentOf(['cf', 'check', './docs/a.md', 'docs/b.md'], path => path === 'docs/b.md'), 'docs/b.md')
     assert.equal(documentOf(['config', 'path'], () => true), null)
+  })
+})
+
+describe('rerunTarget', () => {
+  it('only allows read-only single-document commands', () => {
+    assert.deepEqual(rerunTarget(['cf', 'diff', 'a.md', '--json']), { kind: 'diff', path: 'a.md' })
+    assert.deepEqual(rerunTarget(['cf', 'check', 'a.md', '--json']), { kind: 'check', path: 'a.md' })
+    assert.deepEqual(rerunTarget(['cf', 'lint', 'a.md', '--json']), { kind: 'lint', path: 'a.md' })
+    assert.equal(rerunTarget(['cf', 'diff', 'a.md', '--record', '--json']), null)
+    assert.equal(rerunTarget(['cf', 'check', 'a.md', 'b.md', '--json']), null)
+    assert.equal(rerunTarget(['cf', 'push', 'a.md', '--dry-run', '--json']), null)
+    assert.equal(rerunTarget(['cf', 'pull', 'a.md', '--json']), null)
   })
 })

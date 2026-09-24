@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 
-import { cliStatus, detectFormat, documentOf, interpretCli, type CliOutcome, type CliStatus } from '../../../shared/cli-status.ts'
+import { cliStatus, detectFormat, documentOf, interpretCli, rerunTarget, type CliOutcome, type CliStatus, type RerunTarget } from '../../../shared/cli-status.ts'
 import type { VdocLogEntry } from '../../../shared/types.ts'
 import { shellCommand, type ShellKind } from '../../../shared/shell-command.ts'
-import { shortcutLabel } from '../commands.ts'
-import { AlertIcon, ArrowRightIcon, ChevronDownIcon, ChevronRightIcon, SearchIcon } from '../icons.tsx'
+import { AlertIcon, ChevronDownIcon, ChevronRightIcon, SearchIcon } from '../icons.tsx'
 import { OUTCOME_META } from '../state-meta.ts'
 import { OutcomeIcon } from './StateGlyph.tsx'
 
@@ -16,6 +15,9 @@ interface Props {
   selection: string | null
   notify(text: string): void
   onOpenDocument(path: string): void
+  /** Problems doesn't exist yet - findings are reviewed in the document's lint. */
+  onReviewProblems(path: string): void
+  onRerun(target: RerunTarget): void
   onClose(): void
 }
 
@@ -32,7 +34,7 @@ const duration = (ms: number): string => (ms >= 1000 ? `${(ms / 1000).toFixed(2)
 const time = (at: number): string => new Date(at).toLocaleTimeString([], { hour12: false })
 
 /** Full overlay of every CLI command this session: semantic status from the JSON, output as real text. */
-export function LogsView({ entries, known, selection, notify, onOpenDocument, onClose }: Props) {
+export function LogsView({ entries, known, selection, notify, onOpenDocument, onReviewProblems, onRerun, onClose }: Props) {
   const [query, setQuery] = useState('')
   const [segment, setSegment] = useState<Segment>('all')
   const [thisDoc, setThisDoc] = useState(false)
@@ -134,45 +136,52 @@ export function LogsView({ entries, known, selection, notify, onOpenDocument, on
         className="absolute inset-6 flex flex-col overflow-hidden rounded-xl border border-line-menu bg-pane shadow-modal"
         onClick={event => event.stopPropagation()}
       >
-        <div className="flex items-center gap-4 px-[22px] pb-3 pt-4">
-          <div className="min-w-0 flex-1">
+        <div className="flex items-start gap-4 border-b border-line-subtle px-[22px] pb-[14px] pt-[18px]">
+          <div className="flex min-w-0 flex-1 flex-col gap-[5px]">
             <h1 className="text-[16px] font-semibold text-ink">CLI activity</h1>
             <p className="text-[12px] text-ink-mute">{summary}</p>
           </div>
           <SecondaryButton onClick={copyAll} disabled={shown.length === 0}>Copy all</SecondaryButton>
           <SecondaryButton onClick={() => setClearedBefore(entries.at(-1)?.id ?? 0)} disabled={rows.length === 0}>Clear</SecondaryButton>
-          <SecondaryButton onClick={onClose}>Close <span className="text-ink-label">esc</span></SecondaryButton>
+          <SecondaryButton onClick={onClose}>Close <span className="ml-1 font-mono text-[10.5px] text-ink-mute">esc</span></SecondaryButton>
         </div>
 
-        <div className="flex items-center gap-3 border-b border-line px-[22px] pb-3">
-          <div className="field-ring flex min-w-0 flex-1 items-center gap-2 rounded-md border border-control bg-sidebar px-2.5 py-[5px]">
-            <SearchIcon size={12} className="shrink-0 text-ink-label" />
+        <div className="flex items-center gap-2.5 border-b border-line-subtle px-[22px] py-3">
+          <div className="field-ring flex min-w-0 flex-1 items-center gap-[9px] rounded-md border border-line bg-sidebar px-[11px] py-[6px]">
+            <SearchIcon size={12} className="shrink-0 text-ink-mute" />
             <input
               value={query}
               onChange={event => setQuery(event.target.value)}
               placeholder="Search commands and output…"
               spellCheck={false}
-              className="min-w-0 flex-1 bg-transparent text-[12.5px] text-ink placeholder-ink-label outline-none"
+              className="min-w-0 flex-1 bg-transparent text-[12.5px] text-ink placeholder-ink-mute outline-none"
             />
           </div>
-          <div className="flex overflow-hidden rounded-md border border-control">
+          <div className="flex items-center gap-[3px] rounded-md border border-line bg-sidebar p-[3px]">
             <SegmentButton active={segment === 'all'} onClick={() => setSegment('all')}>All</SegmentButton>
             <SegmentButton active={segment === 'findings'} onClick={() => setSegment('findings')}>
-              <OutcomeIcon outcome="findings" size={11} /> Findings <Count value={counts.findings + counts.warning} />
+              <OutcomeIcon outcome="findings" size={11} />Findings {counts.findings + counts.warning}
             </SegmentButton>
             <SegmentButton active={segment === 'errors'} onClick={() => setSegment('errors')}>
-              <OutcomeIcon outcome="error" size={11} /> Errors <Count value={counts.error} />
+              <OutcomeIcon outcome="error" size={11} />Errors {counts.error}
             </SegmentButton>
           </div>
-          <label className={`flex items-center gap-1.5 text-[12px] ${selection ? 'text-ink-body' : 'text-ink-label'}`} title={selection ?? 'No document open'}>
-            <input type="checkbox" checked={thisDoc} disabled={!selection} onChange={event => setThisDoc(event.target.checked)} />
+          <button
+            onClick={() => setThisDoc(value => !value)}
+            disabled={!selection}
+            aria-pressed={thisDoc}
+            title={selection ?? 'No document open'}
+            className={`whitespace-nowrap rounded-md border px-3 py-1.5 text-[12px] disabled:opacity-40 ${
+              thisDoc ? 'border-control bg-selected text-ink' : 'border-line bg-raised text-ink-dim hover:bg-hover hover:text-ink'
+            }`}
+          >
             This document only
-          </label>
+          </button>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           {shown.length === 0
-            ? <div className="flex h-full items-center justify-center text-[12px] text-ink-label">{rows.length === 0 ? 'No commands recorded yet' : 'Nothing matches this filter'}</div>
+            ? <div className="flex h-full items-center justify-center text-[12px] text-ink-mute">{rows.length === 0 ? 'No commands recorded yet' : 'Nothing matches this filter'}</div>
             : shown.map((row, index) => (
                 <LogRow
                   key={row.entry.id}
@@ -188,16 +197,18 @@ export function LogsView({ entries, known, selection, notify, onOpenDocument, on
                   }}
                   onCopy={copy}
                   onOpenDocument={onOpenDocument}
+                  onReviewProblems={onReviewProblems}
+                  onRerun={onRerun}
                 />
               ))}
         </div>
 
-        <div className="flex items-center gap-4 border-t border-line bg-chrome px-[22px] py-2 text-[11px] text-ink-mute">
+        <div className="flex items-center gap-[14px] border-t border-line-subtle bg-chrome px-[22px] py-2.5 text-[11px] text-ink-mute">
           <span><Key>↑↓</Key> move</span>
           <span><Key>⏎</Key> expand</span>
-          <span><Key>⌘C</Key> copy selection</span>
+          <span><Key>{window.vdoc.platform === 'darwin' ? '⌘C' : 'Ctrl+C'}</Key> copy selection</span>
           <span className="flex-1" />
-          <span className="italic">a non-zero exit is not automatically an error - the CLI's <span className="font-mono">status</span> field decides the label</span>
+          <span>a non-zero exit is not automatically an error - the CLI's <span className="font-mono text-ink-body">status</span> field decides the label</span>
         </div>
       </div>
     </div>
@@ -205,11 +216,7 @@ export function LogsView({ entries, known, selection, notify, onOpenDocument, on
 }
 
 function Key({ children }: { children: ReactNode }) {
-  return <kbd className="rounded border border-keycap-edge bg-keycap-bg px-[5px] py-px font-mono text-[10.5px] text-keycap-ink">{children}</kbd>
-}
-
-function Count({ value }: { value: number }) {
-  return <span className="font-mono text-[11px] text-ink-label">{value}</span>
+  return <kbd className="font-mono text-ink-body">{children}</kbd>
 }
 
 function SecondaryButton({ children, onClick, disabled }: { children: ReactNode, onClick(): void, disabled?: boolean }) {
@@ -217,7 +224,7 @@ function SecondaryButton({ children, onClick, disabled }: { children: ReactNode,
     <button
       onClick={onClick}
       disabled={disabled}
-      className="whitespace-nowrap rounded-md border border-control bg-raised px-3 py-1.5 text-[12px] text-ink-body hover:bg-hover disabled:opacity-40 disabled:hover:bg-raised"
+      className="flex items-center whitespace-nowrap rounded-md border border-line bg-raised px-3 py-1.5 text-[12px] text-control-ink hover:bg-hover disabled:opacity-40 disabled:hover:bg-raised"
     >
       {children}
     </button>
@@ -228,14 +235,14 @@ function SegmentButton({ active, onClick, children }: { active: boolean, onClick
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-1.5 whitespace-nowrap px-3 py-[5px] text-[12px] ${active ? 'bg-selected text-ink' : 'bg-raised text-ink-dim hover:bg-hover hover:text-ink'}`}
+      className={`flex items-center gap-1.5 whitespace-nowrap rounded px-3 py-1 text-[12px] ${active ? 'bg-hover font-medium text-ink' : 'text-ink-dim hover:text-ink'}`}
     >
       {children}
     </button>
   )
 }
 
-function LogRow({ entry, status, command, document, open, focused, onToggle, onCopy, onOpenDocument }: {
+function LogRow({ entry, status, command, document, open, focused, onToggle, onCopy, onOpenDocument, onReviewProblems, onRerun }: {
   entry: VdocLogEntry
   status: CliStatus
   command: string
@@ -245,14 +252,17 @@ function LogRow({ entry, status, command, document, open, focused, onToggle, onC
   onToggle(): void
   onCopy(text: string, what: string): void
   onOpenDocument(path: string): void
+  onReviewProblems(path: string): void
+  onRerun(target: RerunTarget): void
 }) {
   const meta = OUTCOME_META[status.outcome]
+  const rerun = rerunTarget(entry.args)
   const interpretation = interpretCli(entry, status)
   const output = [entry.stdout, entry.stderr].filter(text => text.trim() !== '').join('\n')
   return (
     <div
       data-log-row
-      className={`border-b border-row-sep ${open ? 'bg-raised-row' : focused ? 'bg-row-hover' : 'hover:bg-row-hover'}`}
+      className={`border-b ${open ? 'border-line-subtle bg-raised-row' : focused ? 'border-row-sep bg-row-hover' : 'border-row-sep hover:bg-row-hover'}`}
       style={open ? { boxShadow: `inset 2px 0 0 ${EDGE[status.outcome]}` } : undefined}
     >
       <div
@@ -265,38 +275,46 @@ function LogRow({ entry, status, command, document, open, focused, onToggle, onC
         }}
         className="grid cursor-default grid-cols-[78px_92px_1fr_84px_26px] items-center gap-[14px] px-[22px] py-[10px]"
       >
-        <span className="font-mono text-[11px] text-ink-label">{time(entry.at)}</span>
+        <span className="font-mono text-[11.5px] text-ink-mute">{time(entry.at)}</span>
         <span className={`flex items-center gap-[7px] text-[11.5px] ${meta.color}`} title={status.summary}>
           <OutcomeIcon outcome={status.outcome} />{meta.label}
         </span>
-        <span className={`selectable min-w-0 truncate font-mono text-[12px] text-ink-body ${open ? 'whitespace-normal break-all' : ''}`}>{command}</span>
-        <span className="text-right font-mono text-[11px] text-ink-label">{duration(entry.durationMs)}</span>
-        <span className="flex justify-center text-ink-label">{open ? <ChevronDownIcon size={12} /> : <ChevronRightIcon size={12} />}</span>
+        <span className={`selectable min-w-0 truncate font-mono text-[12px] ${open ? 'whitespace-normal break-all text-ink' : 'text-ink-body'}`}>{command}</span>
+        <span className="text-right font-mono text-[11.5px] text-ink-mute">{duration(entry.durationMs)}</span>
+        <span className="flex justify-center text-ink-mute">{open ? <ChevronDownIcon size={12} /> : <ChevronRightIcon size={12} />}</span>
       </div>
 
       {open && (
-        <div className="space-y-4 px-[22px] pb-4 pt-1">
-          <div className="flex items-start gap-6">
-            <Meta label="Status"><span className={meta.color}>{status.summary}</span></Meta>
-            <Meta label="Exit code"><span className="font-mono">{entry.exitCode}</span></Meta>
-            <Meta label="Duration"><span className="font-mono">{duration(entry.durationMs)}</span></Meta>
+        <div className="flex flex-col gap-[14px] px-[22px] pb-[18px] pt-1">
+          <div className="flex flex-wrap gap-[26px]">
+            <Meta label="Status"><span className={`selectable ${meta.color}`}>{status.summary}</span></Meta>
+            <Meta label="Exit code"><span className="selectable font-mono">{entry.exitCode}</span></Meta>
+            <Meta label="Duration"><span className="selectable font-mono">{duration(entry.durationMs)}</span></Meta>
             {document && (
               <Meta label="Document">
-                <button onClick={() => onOpenDocument(document)} className="font-mono text-accent hover:underline">{document.split('/').at(-1)}</button>
+                <button onClick={() => onOpenDocument(document)} className="text-link hover:text-link-hover hover:underline">{document.split('/').at(-1)}</button>
               </Meta>
             )}
             <span className="flex-1" />
-            <LinkButton onClick={() => onCopy(command, 'Command')}>Copy command</LinkButton>
-            <LinkButton onClick={() => onCopy(output, 'Output')} disabled={output === ''}>Copy output</LinkButton>
+            <div className="flex items-end gap-[7px]">
+              <SmallButton onClick={() => onCopy(command, 'Command')}>Copy command</SmallButton>
+              <SmallButton onClick={() => onCopy(output, 'Output')} disabled={output === ''}>Copy output</SmallButton>
+              {rerun && <SmallButton onClick={() => onRerun(rerun)}>Rerun</SmallButton>}
+            </div>
           </div>
           <OutputBlock label="stdout" text={entry.stdout} onCopy={onCopy} />
           <OutputBlock label="stderr" text={entry.stderr} onCopy={onCopy} />
           {interpretation && (
-            <div className="flex items-center gap-[9px] rounded-[7px] border border-banner-edge bg-banner-bg px-3 py-[9px]">
+            <div className="flex items-center gap-[11px] rounded-[7px] border border-banner-edge bg-banner-bg px-[13px] py-2.5">
               <AlertIcon size={13} className="shrink-0 text-banner-glyph" />
-              <span className="flex-1 text-[12px] leading-relaxed text-banner-ink">{interpretation}</span>
+              <span className="flex-1 text-[12px] leading-[1.55] text-banner-ink">{interpretation}</span>
               {document && (
-                <button onClick={() => onOpenDocument(document)} className="inline-flex shrink-0 items-center gap-1 text-[12px] text-link hover:text-link-hover hover:underline">Review document<ArrowRightIcon size={12} /></button>
+                <button
+                  onClick={() => onReviewProblems(document)}
+                  className="shrink-0 whitespace-nowrap rounded-[5px] border border-primary-edge bg-primary px-3 py-[5px] text-[11.5px] text-primary-ink hover:bg-primary-hover"
+                >
+                  Review in Problems
+                </button>
               )}
             </div>
           )}
@@ -309,16 +327,26 @@ function LogRow({ entry, status, command, document, open, focused, onToggle, onC
 function Meta({ label, children }: { label: string, children: ReactNode }) {
   return (
     <div className="flex min-w-0 flex-col gap-1">
-      <span className="text-[10.5px] uppercase tracking-[0.09em] text-ink-label">{label}</span>
+      <span className="text-[10.5px] uppercase tracking-[0.9px] text-ink-mute">{label}</span>
       <span className="text-[12px] text-ink-body">{children}</span>
     </div>
   )
 }
 
-function LinkButton({ children, onClick, disabled }: { children: ReactNode, onClick(): void, disabled?: boolean }) {
+function SmallButton({ children, onClick, disabled }: { children: ReactNode, onClick(): void, disabled?: boolean }) {
   return (
-    <button onClick={onClick} disabled={disabled} className="text-[12px] text-accent hover:underline disabled:text-ink-label disabled:no-underline">{children}</button>
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="whitespace-nowrap rounded-[5px] border border-line bg-raised px-[11px] py-[5px] text-[11.5px] text-control-ink hover:bg-hover disabled:opacity-40 disabled:hover:bg-raised"
+    >
+      {children}
+    </button>
   )
+}
+
+function TextButton({ children, onClick, active }: { children: ReactNode, onClick(): void, active?: boolean }) {
+  return <button onClick={onClick} className={`text-[11px] hover:text-ink-body ${active ? 'text-ink-body' : 'text-ink-mute'}`}>{children}</button>
 }
 
 /** Output well: plain text lines, syntax tint by spans only, never truncated - wrap or scroll. */
@@ -327,17 +355,17 @@ function OutputBlock({ label, text, onCopy }: { label: string, text: string, onC
   const empty = text.trim() === ''
   const format = empty ? 'text' : detectFormat(text)
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center gap-3">
-        <span className="text-[10.5px] uppercase tracking-[0.09em] text-ink-label">{label}</span>
+    <div className="flex flex-col gap-[7px]">
+      <div className="flex items-center gap-[9px]">
+        <span className="text-[10.5px] uppercase tracking-[0.9px] text-ink-mute">{label}</span>
+        {!empty && <span className="font-mono text-[10.5px] text-ink-mute">{format}</span>}
+        <span className="flex-1" />
         {empty
           ? <span className="text-[11px] text-ink-mute">empty</span>
           : (
               <>
-                <span className="font-mono text-[10.5px] text-ink-label">{format}</span>
-                <span className="flex-1" />
-                <LinkButton onClick={() => onCopy(text, label)}>Copy</LinkButton>
-                <button onClick={() => setWrap(value => !value)} className={`text-[12px] hover:underline ${wrap ? 'text-ink' : 'text-accent'}`}>Wrap</button>
+                <TextButton onClick={() => onCopy(text, label)}>Copy</TextButton>
+                <TextButton onClick={() => setWrap(value => !value)} active={wrap}>Wrap</TextButton>
               </>
             )}
       </div>

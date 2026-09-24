@@ -409,6 +409,16 @@ export function App() {
             setLogsOpen(false)
             app.setSelection(path)
           }}
+          onReviewProblems={path => {
+            setLogsOpen(false)
+            app.setSelection(path)
+            void app.runLint(path)
+          }}
+          onRerun={({ kind, path }) => {
+            if (kind === 'check') void app.checkOne(path)
+            else if (kind === 'lint') void app.runLint(path)
+            else void app.loadDiff(path, true)
+          }}
           onClose={() => setLogsOpen(false)}
         />
       )}
