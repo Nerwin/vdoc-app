@@ -171,7 +171,7 @@ export function ChangesView(props: Props) {
               )
             : (
                 <span className="text-[12.5px] text-ink-mute">
-                  {props.lastChecked ? `Checked ${timeAgo(props.lastChecked)}` : 'Not checked yet'} · {plural(props.counts.files, 'document')} · {props.counts.tracked} tracked
+                  {props.lastChecked ? `Checked ${timeAgo(props.lastChecked, 'long')}` : 'Not checked yet'} · {plural(props.counts.files, 'document')} · {props.counts.tracked} tracked
                   {scope && (
                     <>
                       {' · '}
@@ -236,7 +236,7 @@ export function ChangesView(props: Props) {
           <span className="text-[18px] text-sync">●</span>
           <span className="text-[20px] font-semibold text-ink">Everything is in sync</span>
           <span className="text-[12.5px] text-ink-mute">
-            {plural(props.counts.files, 'document')}{props.lastChecked ? ` · checked ${timeAgo(props.lastChecked)}` : ''}
+            {plural(props.counts.files, 'document')}{props.lastChecked ? ` · checked ${timeAgo(props.lastChecked, 'long')}` : ''}
           </span>
           <div className="mt-2"><RecheckButton {...props} /></div>
         </div>

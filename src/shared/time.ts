@@ -8,11 +8,13 @@ export function humanTtl(ms: number): string {
   return `${Math.max(1, Math.floor(ms / 60_000))}m`
 }
 
-/** Relative past time - `just now`, `5m ago`, `3h ago`, `2d ago`. */
-export function timeAgo(at: number | string | Date): string {
+const UNITS = { short: ['min', 'h', 'd'], long: ['minute', 'hour', 'day'] } as const
+
+/** Relative past time - `just now`, `5 min ago`, `3 h ago`, `2 d ago`; `long` spells the unit out for prose. */
+export function timeAgo(at: number | string | Date, style: keyof typeof UNITS = 'short'): string {
   const minutes = Math.floor((Date.now() - new Date(at).getTime()) / 60_000)
   if (minutes < 1) return 'just now'
-  if (minutes < 60) return `${minutes}m ago`
-  if (minutes < 24 * 60) return `${Math.floor(minutes / 60)}h ago`
-  return `${Math.floor(minutes / (24 * 60))}d ago`
+  const [value, unit] = minutes < 60 ? [minutes, 0] : minutes < 24 * 60 ? [Math.floor(minutes / 60), 1] : [Math.floor(minutes / (24 * 60)), 2]
+  const word = UNITS[style][unit]
+  return style === 'long' ? `${value} ${word}${value === 1 ? '' : 's'} ago` : `${value} ${word} ago`
 }

@@ -252,6 +252,7 @@ export function DetailPane(props: Props) {
 
   const openDiffTab = (): void => (diffReady ? onView('diff') : props.onDiff(path))
   const openSource = (): void => onView(props.sourceLayout)
+  const sourceActive = view === 'content' || view === 'split'
 
   const notes: Array<{ text: string, error: boolean, help?: boolean }> = []
   if (meta.hint && (state === 'conflict' || state === 'not-found' || state === 'no-version')) {
@@ -385,26 +386,18 @@ export function DetailPane(props: Props) {
           <div className="flex items-center gap-1 border-b border-line-subtle">
             <Tab label="Preview" active={view === 'preview'} disabled={content === null} onClick={() => onView('preview')} />
             <div className="relative flex items-center">
-              <Tab
-                label="Source"
-                active={view === 'content' || view === 'split'}
+              <Tab label="Source" active={sourceActive} disabled={content === null} onClick={openSource} className="pr-1.5" />
+              <button
+                aria-label="Source layout"
+                aria-haspopup="menu"
+                aria-expanded={layoutOpen}
+                title="Layout: Editor / Editor + Preview"
                 disabled={content === null}
-                onClick={openSource}
-                trailing={(
-                  <span
-                    role="button"
-                    aria-label="Source layout"
-                    title="Layout: Editor / Editor + Preview"
-                    onClick={event => {
-                      event.stopPropagation()
-                      setLayoutOpen(open => !open)
-                    }}
-                    className="flex text-ink-label hover:text-ink"
-                  >
-                    <ChevronDownIcon size={12} />
-                  </span>
-                )}
-              />
+                onClick={() => setLayoutOpen(open => !open)}
+                className={`flex self-stretch items-center border-b-2 pl-0.5 pr-[13px] text-ink-mute enabled:hover:text-ink disabled:text-ink-disabled ${sourceActive ? 'border-accent' : 'border-transparent'}`}
+              >
+                <ChevronDownIcon size={12} />
+              </button>
               {layoutOpen && (
                 <ActionMenu
                   ctx={ctx}
@@ -604,12 +597,12 @@ function BacklinksButton({ links, onPick }: { links: string[], onPick(path: stri
   )
 }
 
-function Tab({ label, active, disabled, title, trailing, onClick }: {
+function Tab({ label, active, disabled, title, className = '', onClick }: {
   label: string
   active: boolean
   disabled?: boolean
   title?: string
-  trailing?: React.ReactNode
+  className?: string
   onClick(): void
 }) {
   return (
@@ -617,12 +610,11 @@ function Tab({ label, active, disabled, title, trailing, onClick }: {
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 px-[13px] py-[9px] text-[12.5px] disabled:cursor-not-allowed ${
+      className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 px-[13px] py-[9px] text-[12.5px] disabled:cursor-not-allowed ${className} ${
         active ? 'border-accent font-medium text-ink' : 'border-transparent text-ink-dim enabled:hover:text-ink disabled:text-ink-disabled'
       }`}
     >
       {label}
-      {trailing}
     </button>
   )
 }
