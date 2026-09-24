@@ -103,6 +103,7 @@ function recordRun(args: string[], run: VdocRun, startedAt: number): void {
     at: startedAt,
     args: redactVdocArgs(args),
     exitCode: run.exitCode,
+    ...(run.termination ? { termination: run.termination } : {}),
     durationMs: Date.now() - startedAt,
     stdout: hideOutput ? '(hidden - output may contain sensitive data)' : run.stdout.slice(0, OUTPUT_CLIP),
     stderr: hideOutput ? '(hidden - output may contain sensitive data)' : run.stderr.slice(-OUTPUT_CLIP),

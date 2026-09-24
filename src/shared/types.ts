@@ -215,6 +215,8 @@ export interface VdocLogEntry {
   /** argv after the binary - credential values are replaced with •••. */
   args: string[]
   exitCode: number
+  /** Set when the app stopped the process itself - never a CLI result. */
+  termination?: 'cancelled' | 'timeout'
   durationMs: number
   /** First 8KB of stdout; hidden entirely for commands that print credentials. */
   stdout: string
