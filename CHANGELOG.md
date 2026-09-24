@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.20.0](https://github.com/Nerwin/vdoc-app/compare/v1.19.0...v1.20.0) (2026-09-24)
+
+### Features
+
+* **changes:** R5 Changes home ([b678754](https://github.com/Nerwin/vdoc-app/commit/b6787548c8e3b11cee739a8c85b2ce41b507400c))
+* **conflict:** R5 conflict review ([26895b1](https://github.com/Nerwin/vdoc-app/commit/26895b17ae38144d55674e15110d634fffd771af))
+* **document:** R5 header, contextual actions, tabs and preview ([fd90365](https://github.com/Nerwin/vdoc-app/commit/fd9036528c0fc9785ac578689e766c72f77a81e9))
+* **document:** R5 inspector with Outline and Info tabs ([e9c92ef](https://github.com/Nerwin/vdoc-app/commit/e9c92ef883cc3da2c6437aecf77c03465a733ce4))
+* **logs:** R5 CLI activity overlay ([04eaafd](https://github.com/Nerwin/vdoc-app/commit/04eaafd813a8a3d1ae33da5b02cf1878a4a0d42b))
+* **main:** record app-side cancel and timeout on logged CLI runs ([c44ea74](https://github.com/Nerwin/vdoc-app/commit/c44ea744074bd2f663976401f897b77e565767ce))
+* **pins:** store pinned files per workspace in app settings ([a54cba1](https://github.com/Nerwin/vdoc-app/commit/a54cba1c0518db34f0acb7ff7e0356706464a84d))
+* **shared:** R4 sync groups, CLI result status and line diff helpers ([973cd71](https://github.com/Nerwin/vdoc-app/commit/973cd7105edc3fafda215ca5eb150fe70db41d49))
+* **shell:** R5 top bar, panel toggles, status bar and shortcuts ([cc54a7d](https://github.com/Nerwin/vdoc-app/commit/cc54a7d503e1872988f26bf28eb2ca7958466061))
+* **sidebar:** R5 tree rows, markers and collapsible legend ([4ce1271](https://github.com/Nerwin/vdoc-app/commit/4ce12710a9f145da5f2a37b04e22431811adf387))
+* **ui:** Changes home screen, conflict review and R4 state vocabulary ([6c8ef2f](https://github.com/Nerwin/vdoc-app/commit/6c8ef2fc58ffeb2fef413f3ee729d299e63c6cda))
+* **ui:** Lucide icon set replaces text-symbol icons ([41f2ead](https://github.com/Nerwin/vdoc-app/commit/41f2ead497aefac0f1784b3c079d0b7eb3b19145))
+* **ui:** R5 settings modal and command palette ([ab845f4](https://github.com/Nerwin/vdoc-app/commit/ab845f42c973cb762cc81dd0044d9e315e53fe66))
+
+### Bug Fixes
+
+* **inspector:** real last sync time and collapsible Outline / Info sections ([e5a6d5c](https://github.com/Nerwin/vdoc-app/commit/e5a6d5c743949bbf655b73b1adf9fb92f7853f1d))
+* **ui:** R5 follow-ups ([fc166f1](https://github.com/Nerwin/vdoc-app/commit/fc166f1496f776083eb850ff3553697d6248e577))
 ## [1.19.0](https://github.com/Nerwin/vdoc-app/compare/v1.18.0...v1.19.0) (2026-08-27)
 
 ### Features
