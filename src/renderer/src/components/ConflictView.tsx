@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { diffLines, hunksOf, mergeSegments, type Hunk, type HunkChoice } from '../../../shared/line-diff.ts'
+import { displayAuthor } from '../../../shared/confluence.ts'
 import { displayTitle, type FileEntry } from '../../../shared/status.ts'
 import { timeAgo } from '../../../shared/time.ts'
 import type { DiffResult, VersionEntry } from '../../../shared/types.ts'
@@ -30,6 +31,8 @@ export function ConflictView({ entry, diff, author, busy, onBack, onError, onMer
 
   useEffect(() => setChoices(new Map()), [diff])
 
+  const localVersion = diff?.localVersion ?? entry.check?.localVersion ?? '-'
+  const remoteVersion = diff?.remoteVersion ?? entry.check?.remoteVersion ?? '-'
   const resolved = hunks.filter(hunk => choices.has(hunk.index)).length
   const left = hunks.length - resolved
   const complete = hunks.length > 0 && left === 0
@@ -82,48 +85,41 @@ export function ConflictView({ entry, diff, author, busy, onBack, onError, onMer
 
   return (
     <div className="flex h-full min-w-0 flex-col bg-pane">
-      <div className="flex flex-col gap-[14px] px-[30px] pt-[18px]">
-        <button onClick={onBack} className="flex items-center gap-0.5 self-start text-[12px] text-ink-mute hover:text-ink"><BackIcon size={13} />Changes</button>
-        <div className="flex items-start gap-5">
-          <div className="flex min-w-0 flex-1 flex-col gap-[7px]">
-            <h1 className="truncate text-[20px] font-semibold tracking-[-0.2px] text-ink">{displayTitle(entry)}</h1>
-            <div className="flex flex-wrap items-center gap-[11px] text-[12.5px]">
-              <StateGlyph group="conflict" word />
-              <span className="text-sep">·</span>
-              <span className="text-ink-dim">Local v{diff?.localVersion ?? entry.check?.localVersion ?? '-'} · Confluence v{diff?.remoteVersion ?? entry.check?.remoteVersion ?? '-'}</span>
-              <span className="text-sep">·</span>
-              <span className="text-ink-label">{hunks.length} hunk{hunks.length === 1 ? '' : 's'} · {resolved} resolved</span>
-            </div>
-            <span className="truncate font-mono text-[11px] text-ink-label">{entry.path}</span>
+      <div className="flex items-center gap-4 border-b border-line-subtle px-[22px] py-4">
+        <button onClick={onBack} className="flex shrink-0 items-center gap-0.5 text-[12px] text-ink-mute hover:text-ink"><BackIcon size={13} />Changes</button>
+        <div className="flex min-w-0 flex-1 flex-col gap-[5px]">
+          <h1 title={entry.path} className="truncate text-[16px] font-semibold text-ink">{displayTitle(entry)}</h1>
+          <div className="flex flex-wrap items-center gap-[9px] text-[12px]">
+            <StateGlyph group="conflict" word />
+            <span className="text-sep">·</span>
+            <span className="text-ink-dim">Local v{localVersion} · Confluence v{remoteVersion}</span>
+            <span className="text-sep">·</span>
+            <span className="text-ink-mute">{hunks.length} hunk{hunks.length === 1 ? '' : 's'} · {resolved} resolved</span>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <Secondary onClick={() => decideAll('mine')} disabled={hunks.length === 0}>Keep all mine</Secondary>
-            <Secondary onClick={() => decideAll('theirs')} disabled={hunks.length === 0}>Keep all theirs</Secondary>
-            <button
-              onClick={merge}
-              disabled={!complete || busy}
-              title={complete ? `Write the merged document and push - ${IS_MAC ? '⌘⏎' : 'Ctrl+⏎'}` : `Resolve the remaining ${left} hunk${left === 1 ? '' : 's'} first`}
-              className="whitespace-nowrap rounded-md border border-primary-edge bg-primary px-[15px] py-[6px] text-[12px] font-medium text-primary-ink hover:bg-primary-hover disabled:border-control disabled:bg-raised disabled:text-ink-mute"
-            >
-              Merge & push{left > 0 && ` · ${left} left`}
-            </button>
-          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Secondary onClick={() => decideAll('mine')} disabled={hunks.length === 0}>Keep all mine</Secondary>
+          <Secondary onClick={() => decideAll('theirs')} disabled={hunks.length === 0}>Keep all theirs</Secondary>
+          <div className="h-[18px] w-px bg-line" />
+          <button
+            onClick={merge}
+            disabled={!complete || busy}
+            title={complete ? `Write the merged document and push - ${IS_MAC ? '⌘⏎' : 'Ctrl+⏎'}` : `Resolve the remaining ${left} hunk${left === 1 ? '' : 's'} first`}
+            className="whitespace-nowrap rounded-md border border-primary-edge bg-primary px-[15px] py-[6px] text-[12px] font-medium text-primary-ink hover:bg-primary-hover disabled:border-line disabled:bg-line-subtle disabled:text-ink-mute"
+          >
+            Merge & push{left > 0 && ` - ${left} left`}
+          </button>
         </div>
       </div>
 
-      <div className="mt-[14px] flex border-b border-t border-line-subtle text-[10.5px] uppercase tracking-[0.09em] text-ink-label">
-        <span className="flex-1 px-[30px] py-2">
-          Local <span className="font-mono normal-case tracking-normal text-ink-mute">- v{diff?.localVersion ?? '-'}</span>
-        </span>
-        <span className="flex-1 border-l border-line-subtle px-4 py-2">
-          Confluence <span className="font-mono normal-case tracking-normal text-ink-mute">- v{diff?.remoteVersion ?? '-'}</span>
-          {author && <span className="normal-case tracking-normal text-ink-mute"> · updated {timeAgo(author.createdAt)} by {author.author}</span>}
-        </span>
+      <div className="grid grid-cols-2 border-b border-line-subtle">
+        <ColumnHead label="Local" detail={`v${localVersion}${entry.mtimeMs === undefined ? '' : ` · edited ${timeAgo(entry.mtimeMs)}`}`} className="border-r border-line-subtle" />
+        <ColumnHead label="Confluence" detail={`v${remoteVersion}${author ? ` · updated ${timeAgo(author.createdAt)} by ${displayAuthor(author.author)}` : ''}`} />
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {!diff && <p className="px-[30px] py-8 text-[12px] text-ink-label">Loading the diff…</p>}
-        {diff && hunks.length === 0 && <p className="px-[30px] py-8 text-[12px] text-ink-mute">No line differences between the two versions - Recheck the document.</p>}
+        {!diff && <p className="px-[22px] py-8 text-[12px] text-ink-mute">Loading the diff…</p>}
+        {diff && hunks.length === 0 && <p className="px-[22px] py-8 text-[12px] text-ink-mute">No line differences between the two versions - Recheck the document.</p>}
         {hunks.map(hunk => (
           <HunkBand
             key={hunk.index}
@@ -137,7 +133,7 @@ export function ConflictView({ entry, diff, author, busy, onBack, onError, onMer
         ))}
       </div>
 
-      <div className="flex items-center gap-4 border-t border-line bg-chrome px-[30px] py-2 text-[11px] text-ink-mute">
+      <div className="flex items-center gap-[14px] border-t border-line-subtle bg-chrome px-[22px] py-2.5 text-[11px] text-ink-mute">
         <span>↑↓ / J K move</span>
         <span>← keep mine</span>
         <span>→ keep theirs</span>
@@ -150,9 +146,18 @@ export function ConflictView({ entry, diff, author, busy, onBack, onError, onMer
 
 function Secondary({ children, onClick, disabled }: { children: React.ReactNode, onClick(): void, disabled?: boolean }) {
   return (
-    <button onClick={onClick} disabled={disabled} className="whitespace-nowrap rounded-md border border-control bg-raised px-3 py-[6px] text-[12px] text-ink-body hover:bg-hover disabled:opacity-40">
+    <button onClick={onClick} disabled={disabled} className="whitespace-nowrap rounded-md border border-line bg-raised px-3 py-[6px] text-[12px] text-ink-dim hover:bg-hover hover:text-ink disabled:opacity-40">
       {children}
     </button>
+  )
+}
+
+function ColumnHead({ label, detail, className = '' }: { label: string, detail: string, className?: string }) {
+  return (
+    <div className={`flex min-w-0 items-center gap-[9px] px-[22px] py-[9px] ${className}`}>
+      <span className="text-[11px] uppercase tracking-[0.9px] text-ink-mute">{label}</span>
+      <span className="truncate text-[11.5px] text-ink-mute">{detail}</span>
+    </div>
   )
 }
 
@@ -166,18 +171,18 @@ function HunkBand({ hunk, choice, focused, onFocus, onDecide, onUndo }: {
 }) {
   const range = hunk.localEnd >= hunk.localStart ? `lines ${hunk.localStart}–${hunk.localEnd}` : `after line ${hunk.localStart - 1}`
   return (
-    <section data-hunk={hunk.index} onClick={onFocus} className={`border-b border-line-subtle ${focused ? 'bg-raised-row/40' : ''}`}>
+    <section data-hunk={hunk.index} onClick={onFocus} className="border-b border-line-subtle">
       <div
-        className="flex items-center gap-3 bg-raised-row px-[30px] py-2"
-        style={{ boxShadow: choice ? undefined : 'inset 2px 0 0 var(--color-conflict)' }}
+        className="flex items-center gap-3 bg-raised-row px-[22px] py-[9px]"
+        style={{ boxShadow: focused && !choice ? 'inset 2px 0 0 var(--color-conflict)' : undefined }}
       >
-        <span className="font-mono text-[11px] text-ink-body">Hunk {hunk.index + 1} · {range}</span>
+        <span className={`font-mono text-[11px] ${choice ? 'text-ink-mute' : 'text-ink-body'}`}>Hunk {hunk.index + 1} · {range}</span>
         {choice
           ? (
               <>
-                <span className="flex items-center gap-1 text-[11.5px] text-sync-text"><CheckIcon size={12} />{CHOICE_LABEL[choice]}</span>
+                <span className="flex items-center gap-1.5 text-[11.5px] text-sync-text"><CheckIcon size={12} />{CHOICE_LABEL[choice]}</span>
                 <span className="flex-1" />
-                <button onClick={onUndo} className="text-[11.5px] text-accent hover:underline">Change</button>
+                <button onClick={onUndo} className="text-[11.5px] text-ink-mute hover:text-ink-body">Change</button>
               </>
             )
           : (
@@ -191,10 +196,9 @@ function HunkBand({ hunk, choice, focused, onFocus, onDecide, onUndo }: {
             )}
       </div>
       {!choice && (
-        <div className="flex">
-          <Side lines={hunk.local} before={hunk.before} after={hunk.after} tone="bg-diff-add" className="pl-[30px] pr-4" />
-          <div className="w-px shrink-0 bg-line-subtle" />
-          <Side lines={hunk.remote} before={hunk.before} after={hunk.after} tone="bg-diff-remove" className="px-4" />
+        <div className="grid grid-cols-2">
+          <Side lines={hunk.local} before={hunk.before} after={hunk.after} tone="bg-diff-add" className="border-r border-line-subtle" />
+          <Side lines={hunk.remote} before={hunk.before} after={hunk.after} tone="bg-diff-remove" />
         </div>
       )}
     </section>
@@ -208,16 +212,16 @@ function Choice({ children, quiet, onClick }: { children: React.ReactNode, quiet
         event.stopPropagation()
         onClick()
       }}
-      className={`whitespace-nowrap rounded-md border px-2.5 py-[3px] text-[11.5px] ${quiet ? 'border-transparent text-ink-mute hover:bg-hover hover:text-ink' : 'border-control bg-raised text-ink-body hover:bg-hover'}`}
+      className={`whitespace-nowrap rounded-[5px] border border-line bg-raised px-3 py-1 text-[11.5px] hover:bg-hover ${quiet ? 'text-ink-dim hover:text-ink' : 'text-control-ink'}`}
     >
       {children}
     </button>
   )
 }
 
-function Side({ lines, before, after, tone, className }: { lines: string[], before: string[], after: string[], tone: string, className: string }) {
+function Side({ lines, before, after, tone, className = '' }: { lines: string[], before: string[], after: string[], tone: string, className?: string }) {
   return (
-    <pre className={`selectable min-w-0 flex-1 overflow-x-auto py-2 font-mono text-[12px] leading-[1.7] ${className}`}>
+    <pre className={`selectable flex min-w-0 flex-col gap-1 overflow-x-auto px-[22px] py-3 font-mono text-[11.5px] leading-[1.75] ${className}`}>
       {before.map((line, index) => <div key={`b${index}`} className="text-ink-mute">{line || ' '}</div>)}
       {lines.map((line, index) => <div key={index} className={`rounded-[3px] px-1 text-ink ${tone}`}>{line || ' '}</div>)}
       {after.map((line, index) => <div key={`a${index}`} className="text-ink-mute">{line || ' '}</div>)}

@@ -12,3 +12,6 @@ export function parseConfluenceSpaces(value: unknown): ConfluenceSpace[] {
       : []
   })
 }
+
+/** Raw Atlassian account ids (not mapped in the metadata file) are noise - soften them. */
+export const displayAuthor = (author: string): string => (/^\w+:[\w-]{20,}$/.test(author) ? 'unmapped user' : author)

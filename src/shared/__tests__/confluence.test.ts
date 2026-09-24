@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { parseConfluenceSpaces } from '../confluence.ts'
+import { displayAuthor, parseConfluenceSpaces } from '../confluence.ts'
 
 test('parseConfluenceSpaces keeps the displayed fields in CLI order', () => {
   assert.deepEqual(parseConfluenceSpaces([
@@ -20,4 +20,9 @@ test('parseConfluenceSpaces ignores malformed CLI entries', () => {
     { id: '123', key: 'DOC' },
   ]), [])
   assert.deepEqual(parseConfluenceSpaces(undefined), [])
+})
+
+test('displayAuthor softens raw account ids and keeps mapped names', () => {
+  assert.equal(displayAuthor('M. Tremblay'), 'M. Tremblay')
+  assert.equal(displayAuthor('557058:0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d'), 'unmapped user')
 })

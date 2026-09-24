@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { ChangesScope, DisplayState, SyncGroup, VersionEntry } from '../../../shared/types.ts'
 import { CHANGE_GROUPS, displayState, displayTitle, syncGroup, type FileEntry } from '../../../shared/status.ts'
+import { displayAuthor } from '../../../shared/confluence.ts'
 import { timeAgo } from '../../../shared/time.ts'
 import { command, forPath, shortcutLabel, type CommandContext } from '../commands.ts'
 import { ArrowRightIcon, CheckIcon, CloseIcon, MoreIcon } from '../icons.tsx'
@@ -315,9 +316,6 @@ function byRecency(authors: Map<string, VersionEntry | null>) {
   }
   return (a: Row, b: Row): number => at(b) - at(a) || a.entry.path.localeCompare(b.entry.path)
 }
-
-/** Raw Atlassian account ids (not mapped in the metadata file) are noise - soften them. */
-const displayAuthor = (author: string): string => (/^\w+:[\w-]{20,}$/.test(author) ? 'unmapped user' : author)
 
 function RecheckButton(props: Props) {
   return (
