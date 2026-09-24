@@ -135,7 +135,7 @@ const STEPS: Step[] = [
   },
   {
     title: 'Check · Pull · Push · Verify',
-    target: 'topbar',
+    target: 'changes-actions',
     body: ctx => (
       <>
         <p>

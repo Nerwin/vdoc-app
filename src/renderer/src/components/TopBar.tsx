@@ -19,7 +19,7 @@ interface Props {
 /** One top bar for every view (R5 §2): fixed 150px clusters keep the search centred. */
 export function TopBar(props: Props) {
   return (
-    <header data-tour="topbar" className="drag-region flex h-[46px] shrink-0 items-center gap-3.5 border-b border-line bg-chrome px-[13px]">
+    <header className="drag-region flex h-[46px] shrink-0 items-center gap-3.5 border-b border-line bg-chrome px-[13px]">
       {IS_MAC && <div className="w-[58px] shrink-0" />}
       <span className="ml-1.5 inline-flex h-[28px] shrink-0 items-center gap-[7px] rounded-[5px] border border-wordmark-edge bg-wordmark-plate px-2.5 font-mono text-[11px] font-bold tracking-[1.5px]">
         <span className="text-wordmark-ink">VOSKER</span>

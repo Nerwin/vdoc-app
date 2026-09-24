@@ -351,6 +351,8 @@ export function App() {
                     busy={app.busyOp !== null}
                     scope={app.changesScope}
                     bulkResult={app.bulkResult}
+                    findings={app.lossyPushPaths}
+                    keyboard={!dialogOpen}
                     loadAuthors={app.loadAuthors}
                     onReview={openDiff}
                     onResolve={openResolve}
