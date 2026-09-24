@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 import { FileTree } from './components/FileTree.tsx'
 import { DetailPane, type SourceLayout } from './components/DetailPane.tsx'
@@ -78,7 +78,8 @@ export function App() {
   }), [app.reportError])
 
   const theme = useResolvedTheme(app.settings?.theme ?? 'system')
-  useEffect(() => {
+  // Layout effect: set before child effects read the tokens (Monaco themes).
+  useLayoutEffect(() => {
     document.documentElement.dataset.theme = theme
   }, [theme])
 
@@ -219,7 +220,7 @@ export function App() {
     .map(entry => entry.path)
 
   return (
-    <div className="flex h-screen flex-col bg-bg font-sans text-[12.5px] text-ink-body">
+    <div className="flex h-screen flex-col bg-pane font-sans text-[12.5px] text-ink-body">
       <TopBar
         theme={theme}
         remoteCount={app.counts.remote}

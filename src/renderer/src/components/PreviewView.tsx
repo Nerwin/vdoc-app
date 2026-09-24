@@ -185,7 +185,7 @@ export function PreviewView({ content, theme, findSeq, onOpenLink }: Props) {
           {contentEl}
           {toc.length >= 2 && (
             <nav aria-label="On this page" className="sticky top-6 hidden max-h-[75vh] w-[200px] shrink-0 self-start overflow-y-auto @min-[960px]:block">
-              <p className="mb-3 font-mono text-[10.5px] uppercase tracking-[0.12em] text-ink-ghost">On this page</p>
+              <p className="mb-3 font-mono text-[10.5px] uppercase tracking-[0.12em] text-ink-label">On this page</p>
               {toc.map(item => (
                 <button
                   key={item.id}
@@ -300,9 +300,9 @@ function FindBar({ containerRef, scrollRef, html, seq, onClose }: {
         onKeyDown={onKeyDown}
         placeholder="Find in document…"
         spellCheck={false}
-        className="w-44 border-none bg-transparent font-mono text-[12.5px] text-ink placeholder-ink-faint outline-none focus:shadow-none"
+        className="w-44 border-none bg-transparent font-mono text-[12.5px] text-ink placeholder-ink-label outline-none focus:shadow-none"
       />
-      <span className="min-w-[44px] text-right font-mono text-[11px] text-ink-faint">
+      <span className="min-w-[44px] text-right font-mono text-[11px] text-ink-label">
         {query === '' ? '' : `${ranges.length === 0 ? 0 : active + 1}/${ranges.length}`}
       </span>
       <FindButton title="Previous match (⇧⏎)" onClick={() => step(-1)}>‹</FindButton>
@@ -317,7 +317,7 @@ function FindButton({ title, onClick, children }: { title: string, onClick(): vo
     <button
       title={title}
       onClick={onClick}
-      className="flex h-6 w-6 items-center justify-center rounded-[5px] text-[12.5px] text-ink-ghost hover:bg-hover hover:text-ink"
+      className="flex h-6 w-6 items-center justify-center rounded-[5px] text-[12.5px] text-ink-label hover:bg-hover hover:text-ink"
     >
       {children}
     </button>

@@ -4,8 +4,8 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 
 /**
- * The light palette is only correct while every text token still clears 4.5:1 on the
- * surface it sits on. A future tweak that dims a token trips this before it ships.
+ * Every text token must clear 4.5:1 on each surface it sits on, in both themes.
+ * A future tweak that dims a token trips this before it ships.
  */
 
 const CSS = readFileSync(join(import.meta.dirname, '../../renderer/src/styles.css'), 'utf8')
@@ -14,7 +14,7 @@ function tokens(selector: string): Record<string, string> {
   const block = CSS.slice(CSS.indexOf(selector) + selector.length)
   const body = block.slice(0, block.indexOf('}'))
   return Object.fromEntries(
-    [...body.matchAll(/(--color-[\w-]+):\s*(#[0-9a-f]{6})/g)].map(match => [match[1], match[2]]),
+    [...body.matchAll(/--color-([\w-]+):\s*(#[0-9a-f]{6})/g)].map(match => [match[1], match[2]]),
   )
 }
 
@@ -31,61 +31,60 @@ function contrast(a: string, b: string): number {
   return (high + 0.05) / (low + 0.05)
 }
 
-const light = tokens(':root[data-theme="light"] {')
+const dark = tokens('@theme static {')
+const light = { ...dark, ...tokens(':root[data-theme="light"] {') }
 
-/** Text roles, and the lightest surface each one is allowed to sit on. */
-const TEXT_ON_SURFACE: Array<[string, string]> = [
-  ['--color-ink', '--color-pane'],
-  ['--color-ink-body', '--color-pane'],
-  ['--color-ink-mid', '--color-pane'],
-  ['--color-ink-dim', '--color-pane'],
-  ['--color-ink-mute', '--color-pane'],
-  ['--color-ink-label', '--color-pane'],
-  ['--color-ink-faint', '--color-pane'],
-  ['--color-sync-text', '--color-pane'],
-  ['--color-behind', '--color-pane'],
-  ['--color-conflict', '--color-pane'],
-  ['--color-accent', '--color-pane'],
-  ['--color-warn-text', '--color-pane'],
-  ['--color-attention', '--color-chrome'],
-  ['--color-pill-ink', '--color-pill-bg'],
-  ['--color-banner-ink', '--color-banner-bg'],
-  ['--color-selected-ink', '--color-selected'],
-  ['--color-keycap-ink', '--color-keycap-bg'],
-  ['--color-match', '--color-selected'],
+const SURFACES = ['well', 'pane', 'content', 'sidebar', 'raised-row', 'chrome', 'overlay']
+const TEXTS = ['ink', 'ink-body', 'control-ink', 'ink-dim', 'ink-mute', 'ink-label', 'link', 'accent', 'sync-text', 'behind', 'conflict', 'warn-text']
+
+/**
+ * Text on its own fill: buttons at rest, badges, strips, keycaps, selection.
+ * R5 ships two transient states below 4.5 (dark): white on primary hover (4.05) and
+ * tertiary/muted on control-hover and selected fills - deliberately not asserted.
+ */
+const PAIRS: Array<[string, string]> = [
+  ['primary-ink', 'primary'],
+  ['danger-ink', 'danger'],
+  ['danger-ink', 'danger-hover'],
+  ['control-ink', 'raised'],
+  ['control-ink', 'hover'],
+  ['ink', 'row-hover'],
+  ['ink-body', 'row-hover'],
+  ['ink-dim', 'row-hover'],
+  ['selected-ink', 'selected'],
+  ['match', 'selected'],
+  ['badge-done-ink', 'badge-done-bg'],
+  ['badge-active-ink', 'badge-active-bg'],
+  ['badge-todo-ink', 'badge-todo-bg'],
+  ['banner-ink', 'banner-bg'],
+  ['ok-ink', 'ok-bg'],
+  ['info-ink', 'info-bg'],
+  ['bad-ink', 'bad-bg'],
+  ['keycap-ink', 'keycap-bg'],
+  ['wordmark-ink', 'wordmark-plate'],
+  ['wordmark-accent', 'wordmark-plate'],
 ]
 
-test('every light text token clears 4.5:1 on its surface', () => {
-  for (const [text, surface] of TEXT_ON_SURFACE) {
-    const ink = light[text]
-    const bg = light[surface]
-    assert.ok(ink && bg, `missing token: ${text} / ${surface}`)
-    const ratio = contrast(ink, bg)
-    assert.ok(ratio >= 4.5, `${text} (${ink}) on ${surface} (${bg}) is ${ratio.toFixed(2)}:1`)
-  }
-})
+for (const [name, theme] of [['dark', dark], ['light', light]] as const) {
+  test(`every ${name} text token clears 4.5:1 on every surface`, () => {
+    for (const text of TEXTS) {
+      for (const surface of SURFACES) {
+        const ratio = contrast(theme[text], theme[surface])
+        assert.ok(ratio >= 4.5, `${text} (${theme[text]}) on ${surface} (${theme[surface]}) is ${ratio.toFixed(2)}:1`)
+      }
+    }
+  })
 
-test('the disabled token stays above the 3:1 non-text floor', () => {
-  // Disabled palette rows are deliberately below 4.5 - but never below the UI-element floor.
-  assert.ok(contrast(light['--color-ink-ghost'], light['--color-pane']) >= 3)
-})
+  test(`every ${name} filled pair clears 4.5:1`, () => {
+    for (const [text, surface] of PAIRS) {
+      assert.ok(theme[text] && theme[surface], `missing token: ${text} / ${surface}`)
+      const ratio = contrast(theme[text], theme[surface])
+      assert.ok(ratio >= 4.5, `${text} (${theme[text]}) on ${surface} (${theme[surface]}) is ${ratio.toFixed(2)}:1`)
+    }
+  })
 
-const dark = tokens('@theme {')
-
-test('the dark column ships the lifted blue-grey surfaces', () => {
-  assert.equal(dark['--color-pane'], '#1e2126')
-  assert.equal(dark['--color-sidebar'], '#1a1d22')
-  assert.equal(dark['--color-chrome'], '#22262c')
-  assert.equal(dark['--color-well'], '#15181c')
-  assert.equal(dark['--color-accent'], '#69b0f5')
-})
-
-test('every dark text token clears 4.5:1 on its surface', () => {
-  for (const [text, surface] of TEXT_ON_SURFACE) {
-    const ratio = contrast(dark[text], dark[surface])
-    assert.ok(ratio >= 4.5, `${text} (${dark[text]}) on ${surface} (${dark[surface]}) is ${ratio.toFixed(2)}:1`)
-  }
-  for (const token of ['--color-ink-faint', '--color-ink-ghost', '--color-glyph']) {
-    assert.equal(dark[token], dark['--color-ink-label'], `${token} must sit on the text floor`)
-  }
-})
+  test(`${name} disabled ink and brand stay above the 3:1 non-text floor`, () => {
+    assert.ok(contrast(theme['ink-disabled'], theme.pane) >= 3)
+    for (const surface of ['pane', 'sidebar', 'selected']) assert.ok(contrast(theme.brand, theme[surface]) >= 3)
+  })
+}

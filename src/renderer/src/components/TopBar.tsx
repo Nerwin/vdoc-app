@@ -35,7 +35,7 @@ export function TopBar(props: Props) {
         >
           <span className="text-[11px] text-ink-label">⌕</span>
           <span className="flex-1 truncate text-[12.5px] text-ink-label">Search documents or run a command</span>
-          <span className="rounded-[3px] border border-line bg-log-sep px-[5px] py-px font-mono text-[10.5px] text-ink-mute">{shortcutLabel('file.goto')}</span>
+          <span className="rounded-[3px] border border-line bg-row-hover px-[5px] py-px font-mono text-[10.5px] text-ink-mute">{shortcutLabel('file.goto')}</span>
         </button>
       </div>
 

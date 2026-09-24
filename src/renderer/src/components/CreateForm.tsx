@@ -31,7 +31,7 @@ export function CreateForm({ path, defaultSpace, busy, onSubmit, onClose }: Prop
           (<code className="font-mono">confluencePageId</code>, space, version).
         </p>
         <label className="block">
-          <span className="mb-1 block text-[11px] text-ink-faint">Space key</span>
+          <span className="mb-1 block text-[11px] text-ink-label">Space key</span>
           <input
             value={space}
             onChange={event => setSpace(event.target.value.toUpperCase())}
@@ -41,7 +41,7 @@ export function CreateForm({ path, defaultSpace, busy, onSubmit, onClose }: Prop
           />
         </label>
         <label className="block">
-          <span className="mb-1 block text-[11px] text-ink-faint">Parent page ID (optional - created at the space root when empty)</span>
+          <span className="mb-1 block text-[11px] text-ink-label">Parent page ID (optional - created at the space root when empty)</span>
           <input
             value={parent}
             onChange={event => setParent(event.target.value)}

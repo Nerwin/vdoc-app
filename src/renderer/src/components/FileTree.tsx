@@ -124,7 +124,7 @@ export function FileTree(props: Props) {
           <ModeButton active={mode === 'changes'} title={`Changes - ${shortcutLabel('view.changes')}`} onClick={() => props.onSetMode('changes')}>
             {props.counts.attention > 0 && <span className="text-[11px] text-warn">⚠</span>}
             <span>Changes</span>
-            {props.counts.attention > 0 && <span className="font-mono text-[11px] text-ink-mid">{props.counts.attention}</span>}
+            {props.counts.attention > 0 && <span className="font-mono text-[11px] text-ink-body">{props.counts.attention}</span>}
           </ModeButton>
           <ModeButton active={mode === 'all'} title={`All documents - ${shortcutLabel('view.all')}`} onClick={() => props.onSetMode('all')}>All</ModeButton>
         </div>
@@ -238,7 +238,7 @@ function MenuItem({ label, onClick, danger }: { label: string, onClick(): void, 
   return (
     <button
       onClick={onClick}
-      className={`block w-full px-3 py-1.5 text-left text-[12.5px] ${danger ? 'text-conflict hover:bg-danger-bg' : 'text-ink-body hover:bg-row-hover'}`}
+      className={`block w-full px-3 py-1.5 text-left text-[12.5px] ${danger ? 'text-conflict hover:bg-danger' : 'text-ink-body hover:bg-row-hover'}`}
     >
       {label}
     </button>
@@ -289,7 +289,7 @@ function Row({ node, entries, selected, pinned, collapsed, subLabel, onClick, on
           <path d="M1.5 3c0-.83.67-1.5 1.5-1.5h3.2c.4 0 .78.16 1.06.44L8.4 3h4.6c.83 0 1.5.67 1.5 1.5v7c0 .83-.67 1.5-1.5 1.5H3c-.83 0-1.5-.67-1.5-1.5V3Z" />
         </svg>
         <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
-          <span className={`truncate text-[12.5px] ${node.depth === 0 ? 'font-medium text-ink' : 'text-ink-mid'}`}>
+          <span className={`truncate text-[12.5px] ${node.depth === 0 ? 'font-medium text-ink' : 'text-ink-body'}`}>
             {node.name}{pinned && <span className="ml-1.5 text-[9px] text-accent" title="Pinned on top">✦</span>}
           </span>
           {sub && <span className={`text-[11px] ${sub.includes('attention') ? 'text-warn' : 'text-ink-label'}`}>{sub}</span>}

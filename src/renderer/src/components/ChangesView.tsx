@@ -149,7 +149,7 @@ export function ChangesView(props: Props) {
       {props.counts.unchecked > 0 && !scanning && (
         <div className="mx-[30px] mb-5 flex items-center gap-3 rounded-[7px] border border-line bg-chrome px-[14px] py-[10px]">
           <span className="text-[12px] text-ink-label">○</span>
-          <span className="whitespace-nowrap text-[12.5px] text-ink-mid">{plural(props.counts.unchecked, 'document')} {props.counts.unchecked === 1 ? 'is' : 'are'} not checked</span>
+          <span className="whitespace-nowrap text-[12.5px] text-ink-body">{plural(props.counts.unchecked, 'document')} {props.counts.unchecked === 1 ? 'is' : 'are'} not checked</span>
           <span className="min-w-0 truncate text-[11.5px] text-ink-label">- content is compared against Confluence and recorded as a baseline</span>
           <span className="flex-1" />
           <button
@@ -228,7 +228,7 @@ export function ChangesView(props: Props) {
                   {rows.length > ROW_LIMIT && !expanded.has(group) && (
                     <button
                       onClick={() => setExpanded(prev => new Set(prev).add(group))}
-                      className="self-start px-3 py-2.5 text-[11.5px] text-ink-label hover:text-ink-mid"
+                      className="self-start px-3 py-2.5 text-[11.5px] text-ink-label hover:text-ink-body"
                     >
                       Show {rows.length - ROW_LIMIT} more
                     </button>
@@ -245,7 +245,7 @@ export function ChangesView(props: Props) {
 
 function BulkLink({ children, disabled, onClick }: { children: React.ReactNode, disabled: boolean, onClick(): void }) {
   return (
-    <button onClick={onClick} disabled={disabled} className="text-[11.5px] text-accent hover:text-[var(--color-match)] hover:underline disabled:text-ink-label disabled:no-underline">
+    <button onClick={onClick} disabled={disabled} className="text-[11.5px] text-link hover:text-link-hover hover:underline disabled:text-ink-label disabled:no-underline">
       {children}
     </button>
   )
@@ -282,7 +282,7 @@ function ChangeRow({ row, group, author, menuOpen, ctx, onReview, onMenu }: {
   const remoteContext = author === undefined ? '…' : author === null ? '' : `updated ${timeAgo(author.createdAt)} by ${displayAuthor(author.author)}`
   const top = group === 'conflict'
     ? { text: conflict ? 'both sides changed' : STATE_META[state].label.toLowerCase(), tone: 'text-conflict' }
-    : { text: versions, tone: 'text-ink-mid' }
+    : { text: versions, tone: 'text-ink-body' }
   const localContext = state === 'local-edits' ? 'edited since the last sync' : state === 'ahead' ? 'local version ahead' : 'never published'
   const bottom = group === 'conflict' ? versions : group === 'remote' ? remoteContext : localContext
 

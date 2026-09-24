@@ -250,7 +250,7 @@ function LogRow({ entry, status, command, document, open, focused, onToggle, onC
   return (
     <div
       data-log-row
-      className={`border-b border-log-sep ${open ? 'bg-raised-row' : focused ? 'bg-row-hover' : 'hover:bg-row-hover'}`}
+      className={`border-b border-row-sep ${open ? 'bg-raised-row' : focused ? 'bg-row-hover' : 'hover:bg-row-hover'}`}
       style={open ? { boxShadow: `inset 2px 0 0 ${EDGE[status.outcome]}` } : undefined}
     >
       <div
@@ -267,7 +267,7 @@ function LogRow({ entry, status, command, document, open, focused, onToggle, onC
         <span className={`flex items-center gap-[7px] text-[11.5px] ${meta.color}`} title={status.summary}>
           <span className="font-mono text-[10.5px]">{meta.glyph}</span>{meta.label}
         </span>
-        <span className={`selectable min-w-0 truncate font-mono text-[12px] text-ink-mid ${open ? 'whitespace-normal break-all' : ''}`}>{command}</span>
+        <span className={`selectable min-w-0 truncate font-mono text-[12px] text-ink-body ${open ? 'whitespace-normal break-all' : ''}`}>{command}</span>
         <span className="text-right font-mono text-[11px] text-ink-label">{duration(entry.durationMs)}</span>
         <span className="text-center text-[11px] text-ink-label">{open ? '▾' : '▸'}</span>
       </div>
@@ -341,7 +341,7 @@ function OutputBlock({ label, text, onCopy }: { label: string, text: string, onC
       </div>
       {!empty && (
         <pre
-          className={`selectable max-h-[420px] overflow-auto rounded-[7px] border border-line-subtle bg-well px-[15px] py-[13px] font-mono text-[11.5px] leading-[1.7] text-ink-mid ${wrap ? 'whitespace-pre-wrap break-all' : 'whitespace-pre'}`}
+          className={`selectable max-h-[420px] overflow-auto rounded-[7px] border border-line-subtle bg-well px-[15px] py-[13px] font-mono text-[11.5px] leading-[1.7] text-ink-body ${wrap ? 'whitespace-pre-wrap break-all' : 'whitespace-pre'}`}
         >
           {format === 'json' ? tintJson(text) : text}
         </pre>

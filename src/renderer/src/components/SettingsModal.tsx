@@ -155,7 +155,7 @@ function Folders({ settings, spaceMapping, busy, onAddFolder, onPickDocsRoot, on
           <span />
         </div>
         {settings.contentDirs.map((dir) => (
-          <div key={dir} className="grid grid-cols-[1fr_132px_30px] items-center border-t border-divider">
+          <div key={dir} className="grid grid-cols-[1fr_132px_30px] items-center border-t border-row-sep">
             <span className="truncate px-2.5 py-[7px] font-mono text-[12.5px] text-ink">{dir}</span>
             {spaceMapping[dir] ? (
               <button
@@ -171,14 +171,14 @@ function Folders({ settings, spaceMapping, busy, onAddFolder, onPickDocsRoot, on
             <button
               onClick={() => onRemoveFolder(dir)}
               title={`Remove ${dir} from the tree`}
-              className="flex h-6 w-6 items-center justify-center rounded text-[12px] text-ink-mute hover:bg-danger-bg hover:text-conflict"
+              className="flex h-6 w-6 items-center justify-center rounded text-[12px] text-ink-mute hover:bg-danger hover:text-conflict"
             >
               ✕
             </button>
           </div>
         ))}
         {settings.contentDirs.length === 0 && (
-          <p className="border-t border-divider px-2.5 py-[7px] text-[12px] text-ink-mute">No folders - the tree is empty.</p>
+          <p className="border-t border-row-sep px-2.5 py-[7px] text-[12px] text-ink-mute">No folders - the tree is empty.</p>
         )}
       </div>
 
@@ -279,7 +279,7 @@ function AccessibleSpaces({ auth }: { auth: AuthStatus | null }) {
         </thead>
         <tbody>
           {auth.spaces.map(space => (
-            <tr key={space.id} className="border-t border-divider text-[12px]">
+            <tr key={space.id} className="border-t border-row-sep text-[12px]">
               <td className="truncate px-2.5 py-[7px] font-mono text-ink-dim" title={space.id}>{space.id}</td>
               <td className="truncate px-2.5 py-[7px] font-mono text-ink" title={space.key}>{space.key}</td>
               <td className="truncate px-2.5 py-[7px] text-ink" title={space.name}>{space.name}</td>
@@ -418,7 +418,7 @@ function Cli({ settings, busy, onUpdate, onReloadVersion }: Props) {
           <span className="text-conflict">cannot run {settings.resolvedBin} - check the path (and that bun is installed)</span>
         )}
         {settings.cliRequirement && (
-          <span className="text-ink-faint">· minimum v{settings.cliRequirement.minimumVersion}</span>
+          <span className="text-ink-label">· minimum v{settings.cliRequirement.minimumVersion}</span>
         )}
         <button
           onClick={() => {

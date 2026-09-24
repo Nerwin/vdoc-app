@@ -37,13 +37,13 @@ function TryButton({ id, label, ctx }: { id: string, label: string, ctx: Command
   return (
     <span className="flex items-center gap-2 pt-1">
       <ModalButton label={label} disabled={reason !== undefined} onClick={() => cmd.run(ctx)} />
-      {reason && <span className="text-[11px] text-ink-faint">{reason}</span>}
+      {reason && <span className="text-[11px] text-ink-label">{reason}</span>}
     </span>
   )
 }
 
 function CheckRow({ ok, label, detail }: { ok: boolean | null, label: string, detail: string }) {
-  const tone = ok === null ? 'text-ink-faint' : ok ? 'text-sync' : 'text-warn'
+  const tone = ok === null ? 'text-ink-label' : ok ? 'text-sync' : 'text-warn'
   return (
     <div className="flex items-baseline gap-2">
       <span className={`w-3 shrink-0 text-center ${tone}`}>{ok === null ? '…' : ok ? '✓' : '✗'}</span>
@@ -224,14 +224,14 @@ export function Tour({ ctx, onClose }: { ctx: CommandContext, onClose(): void })
     <div className="pointer-events-auto w-[460px] max-w-[90vw] rounded-xl border border-line-menu bg-overlay shadow-modal">
       <div className="flex items-center gap-3 border-b border-line-subtle px-4 py-3">
         <h2 className="min-w-0 flex-1 truncate text-[13px] font-semibold text-ink">{step.title}</h2>
-        <span className="shrink-0 text-[11px] text-ink-faint">{index + 1} / {STEPS.length}</span>
+        <span className="shrink-0 text-[11px] text-ink-label">{index + 1} / {STEPS.length}</span>
         <button onClick={onClose} title="Close the tour" className="shrink-0 text-ink-mute hover:text-ink">✕</button>
       </div>
       <div className="max-h-[60vh] space-y-2 overflow-y-auto px-4 py-3 text-[12px] leading-relaxed text-ink-dim">
         {step.body(ctx)}
       </div>
       <div className="flex items-center gap-2 rounded-b-xl border-t border-line-subtle bg-chrome px-4 py-3">
-        <span className="flex-1 text-[11px] text-ink-faint">
+        <span className="flex-1 text-[11px] text-ink-label">
           {index > 0 && 'The app stays usable - try things as you go.'}
         </span>
         {index > 0

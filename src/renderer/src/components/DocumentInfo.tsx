@@ -31,7 +31,7 @@ export function DocumentInfo({ ctx, entry, labels, lastSync, lastCli, onOpenLogs
       <div className="flex items-center gap-2">
         <span className="text-[11px] uppercase tracking-[0.09em] text-ink-label">Document info</span>
         <span className="flex-1" />
-        <button onClick={onClose} title={`Hide panel - ${shortcutLabel('view.info')}`} className="text-[12px] text-ink-label hover:text-ink-mid">✕</button>
+        <button onClick={onClose} title={`Hide panel - ${shortcutLabel('view.info')}`} className="text-[12px] text-ink-label hover:text-ink-body">✕</button>
       </div>
 
       <dl className="flex flex-col gap-[11px] text-[11.5px]">
@@ -43,7 +43,7 @@ export function DocumentInfo({ ctx, entry, labels, lastSync, lastCli, onOpenLogs
         <Row label="Local version"><Mono value={check?.localVersion} /></Row>
         <Row label="Remote version"><Mono value={check?.remoteVersion} /></Row>
         <Row label="Last sync">
-          {lastSync ? <span className="text-ink-mid">{lastSync.op} · {stamp(lastSync.at)}</span> : <span className="text-ink-label">not this session</span>}
+          {lastSync ? <span className="text-ink-body">{lastSync.op} · {stamp(lastSync.at)}</span> : <span className="text-ink-label">not this session</span>}
         </Row>
         {labels.length > 0 && (
           <Row label="Labels">
@@ -65,7 +65,7 @@ export function DocumentInfo({ ctx, entry, labels, lastSync, lastCli, onOpenLogs
               <div className="flex items-center gap-[9px] rounded-md border border-line-subtle bg-raised-row px-2.5 py-[9px]">
                 <span className={`font-mono text-[11px] ${OUTCOME_META[status.outcome].color}`}>{OUTCOME_META[status.outcome].glyph}</span>
                 <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
-                  <span className="truncate font-mono text-[11px] text-ink-mid">{shellCommand(['vdoc', ...lastCli.args], window.vdoc.platform === 'win32' ? 'powershell' : 'posix')}</span>
+                  <span className="truncate font-mono text-[11px] text-ink-body">{shellCommand(['vdoc', ...lastCli.args], window.vdoc.platform === 'win32' ? 'powershell' : 'posix')}</span>
                   <span className="truncate text-[10.5px] text-ink-label">
                     {status.summary.replace(/^\w+ - /, '')} · {(lastCli.durationMs / 1000).toFixed(2)} s · {new Date(lastCli.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
@@ -90,7 +90,7 @@ export function DocumentInfo({ ctx, entry, labels, lastSync, lastCli, onOpenLogs
               disabled={reason !== undefined}
               title={reason}
               onClick={() => cmd.run(ctx)}
-              className="rounded px-2 py-[6px] text-left text-[12px] text-ink-mid hover:bg-row-hover hover:text-ink disabled:text-ink-label disabled:hover:bg-transparent"
+              className="rounded px-2 py-[6px] text-left text-[12px] text-ink-body hover:bg-row-hover hover:text-ink disabled:text-ink-label disabled:hover:bg-transparent"
             >
               {cmd.label}
             </button>
@@ -105,7 +105,7 @@ function Row({ label, children }: { label: string, children: React.ReactNode }) 
   return (
     <div className="flex items-baseline gap-2.5">
       <dt className="w-[92px] shrink-0 text-ink-label">{label}</dt>
-      <dd className="min-w-0 flex-1 text-ink-mid">{children}</dd>
+      <dd className="min-w-0 flex-1 text-ink-body">{children}</dd>
     </div>
   )
 }

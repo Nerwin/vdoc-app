@@ -64,7 +64,7 @@ export function GetForm({ folders, presetDir, busy, findExisting, onOpenExisting
           The file is named after the page title.
         </p>
         <label className="block">
-          <span className="mb-1 block text-[11px] text-ink-faint">Create in folder</span>
+          <span className="mb-1 block text-[11px] text-ink-label">Create in folder</span>
           {presetDir
             ? <span className="block font-mono text-[12px] text-ink">{presetDir}</span>
             : (
@@ -78,7 +78,7 @@ export function GetForm({ folders, presetDir, busy, findExisting, onOpenExisting
               )}
         </label>
         <label className="block">
-          <span className="mb-1 block text-[11px] text-ink-faint">Page URL or ID</span>
+          <span className="mb-1 block text-[11px] text-ink-label">Page URL or ID</span>
           <input
             value={input}
             onChange={event => {
@@ -100,7 +100,7 @@ export function GetForm({ folders, presetDir, busy, findExisting, onOpenExisting
           <span className="text-[12px] text-ink-body">Include all nested pages</span>
         </label>
         {recursive && (
-          <p className="text-[11px] text-ink-faint">
+          <p className="text-[11px] text-ink-label">
             Every sub-page is written into the folder as its own file; already-tracked pages are skipped.
           </p>
         )}

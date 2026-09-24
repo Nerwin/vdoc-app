@@ -2,6 +2,8 @@ import { captureException, init as sentryInit } from '@sentry/electron/renderer'
 import { Component, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 
+import '@fontsource-variable/inter'
+import '@fontsource-variable/jetbrains-mono'
 import './styles.css'
 import './highlight.css'
 import { App } from './App.tsx'
@@ -28,14 +30,14 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
   render(): ReactNode {
     if (!this.state.error) return this.props.children
     return (
-      <div style={{ padding: 32, fontFamily: 'system-ui', maxWidth: 640 }}>
-        <h1 style={{ fontSize: 15, fontWeight: 600, color: '#e5484d', marginBottom: 8 }}>V-DOC hit an unexpected error</h1>
-        <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12, lineHeight: 1.5, color: '#888', marginBottom: 16 }}>
+      <div className="h-full max-w-[640px] bg-pane p-8 font-sans">
+        <h1 className="mb-2 text-[15px] font-semibold text-conflict">V-DOC hit an unexpected error</h1>
+        <pre className="mb-4 whitespace-pre-wrap text-[12px] leading-normal text-ink-dim">
           {this.state.error.message}
         </pre>
         <button
           onClick={() => window.location.reload()}
-          style={{ fontSize: 12, padding: '6px 14px', borderRadius: 6, border: '1px solid #555', background: 'transparent', color: '#888', cursor: 'pointer' }}
+          className="cursor-pointer rounded-md border border-control px-3.5 py-1.5 text-[12px] text-ink-dim"
         >
           Reload
         </button>

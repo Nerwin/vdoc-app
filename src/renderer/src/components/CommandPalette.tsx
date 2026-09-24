@@ -188,14 +188,14 @@ export function CommandPalette({ ctx, entries, mode, recents, onPick, onRun, onC
             }}
             placeholder={commandMode ? 'Type a command…' : mode === 'search' ? 'Search in documents…' : mode === 'recent' ? 'Recent documents…' : 'Search documents, or > for a command'}
             spellCheck={false}
-            className="min-w-0 flex-1 border-none bg-transparent font-mono text-[13px] text-ink placeholder-ink-faint outline-none focus:shadow-none"
+            className="min-w-0 flex-1 border-none bg-transparent font-mono text-[13px] text-ink placeholder-ink-label outline-none focus:shadow-none"
           />
-          <span className="shrink-0 font-mono text-[11px] text-ink-faint">{counter}</span>
+          <span className="shrink-0 font-mono text-[11px] text-ink-label">{counter}</span>
         </div>
 
         <ul ref={listRef} className="max-h-[60vh] overflow-y-auto py-1">
           {rows.length === 0 && (
-            <li className="px-[14px] py-3 font-mono text-[12px] text-ink-faint">
+            <li className="px-[14px] py-3 font-mono text-[12px] text-ink-label">
               {commandMode
                 ? 'No matching command'
                 : mode === 'search' && search.trim().length < 2
@@ -259,12 +259,12 @@ function CommandRow({ row, ctx, selected, onClick, position }: {
         selected ? 'bg-selected shadow-[inset_2px_0_0_var(--color-select-edge)]' : 'hover:bg-row-hover'
       }`}
     >
-      <span className={`text-center text-[12px] ${row.disabled ? 'text-ink-ghost' : TINT[command.tint ?? ''] ?? 'text-ink-mute'}`}>
+      <span className={`text-center text-[12px] ${row.disabled ? 'text-ink-disabled' : TINT[command.tint ?? ''] ?? 'text-ink-mute'}`}>
         {command.icon}
       </span>
-      <span className={`min-w-0 truncate text-[13px] ${row.disabled ? 'text-ink-ghost' : 'text-ink'}`}>
+      <span className={`min-w-0 truncate text-[13px] ${row.disabled ? 'text-ink-disabled' : 'text-ink'}`}>
         <Highlight text={label} indices={row.indices ?? []} />
-        {suffix && <span className={row.disabled ? 'text-ink-ghost' : 'text-ink-dim'}> - {suffix}</span>}
+        {suffix && <span className={row.disabled ? 'text-ink-disabled' : 'text-ink-dim'}> - {suffix}</span>}
       </span>
       <span className="flex shrink-0 items-center gap-[3px]">
         {caps.length === 0
@@ -304,9 +304,9 @@ function FileRow({ path, snippet, entries, selected, onClick, position }: {
       <span className="min-w-0">
         <span className="block truncate">
           <span className="text-ink">{path.slice(slash + 1)}</span>
-          <span className="text-ink-faint">  {path.slice(0, slash + 1)}</span>
+          <span className="text-ink-label">  {path.slice(0, slash + 1)}</span>
         </span>
-        {snippet && <span className="block truncate text-[11px] text-ink-faint">{snippet}</span>}
+        {snippet && <span className="block truncate text-[11px] text-ink-label">{snippet}</span>}
       </span>
     </button>
   )

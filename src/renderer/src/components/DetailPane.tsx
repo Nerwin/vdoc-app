@@ -290,7 +290,7 @@ export function DetailPane(props: Props) {
               <button
                 onClick={() => setMenuOpen(open => !open)}
                 title="More actions"
-                className="flex h-[30px] w-[30px] items-center justify-center rounded-md border border-control bg-raised text-[14px] text-ink-mid hover:bg-hover hover:text-ink"
+                className="flex h-[30px] w-[30px] items-center justify-center rounded-md border border-control bg-raised text-[14px] text-ink-body hover:bg-hover hover:text-ink"
               >
                 ⋯
               </button>
@@ -346,7 +346,7 @@ export function DetailPane(props: Props) {
           <button
             onClick={() => props.onLint(path)}
             disabled={busy}
-            className="px-[11px] py-[9px] text-[11.5px] text-ink-label hover:text-ink-mid disabled:opacity-40"
+            className="px-[11px] py-[9px] text-[11.5px] text-ink-label hover:text-ink-body disabled:opacity-40"
           >
             Lint
           </button>
@@ -481,7 +481,7 @@ function BacklinksButton({ links, onPick }: { links: string[], onPick(path: stri
       <button
         onClick={() => setOpen(current => !current)}
         title={`${links.length} document(s) link to this one`}
-        className={`px-[11px] py-[9px] text-[11.5px] hover:text-ink-mid ${open ? 'text-ink' : 'text-ink-label'}`}
+        className={`px-[11px] py-[9px] text-[11.5px] hover:text-ink-body ${open ? 'text-ink' : 'text-ink-label'}`}
       >
         {links.length} linked from
       </button>

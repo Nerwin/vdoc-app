@@ -170,7 +170,7 @@ function HunkBand({ hunk, choice, focused, onFocus, onDecide, onUndo }: {
         className="flex items-center gap-3 bg-raised-row px-[30px] py-2"
         style={{ boxShadow: choice ? undefined : 'inset 2px 0 0 var(--color-conflict)' }}
       >
-        <span className="font-mono text-[11px] text-ink-mid">Hunk {hunk.index + 1} · {range}</span>
+        <span className="font-mono text-[11px] text-ink-body">Hunk {hunk.index + 1} · {range}</span>
         {choice
           ? (
               <>

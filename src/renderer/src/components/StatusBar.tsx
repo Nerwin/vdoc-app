@@ -89,7 +89,7 @@ function BarButton({ title, muted, onClick, children }: { title: string, muted?:
     <button
       onClick={onClick}
       title={title}
-      className={`flex items-center gap-[7px] whitespace-nowrap rounded px-[7px] py-[3px] hover:bg-hover ${muted ? 'text-ink-dim' : 'text-ink-mid'}`}
+      className={`flex items-center gap-[7px] whitespace-nowrap rounded px-[7px] py-[3px] hover:bg-hover ${muted ? 'text-ink-dim' : 'text-ink-body'}`}
     >
       {children}
     </button>
@@ -157,7 +157,7 @@ function UpdateControl(props: { version: string, status: AppUpdateStatus | null,
         : 'Check for updates'
 
   return (
-    <button onClick={props.onCheck} title={title} className="flex items-center gap-1.5 whitespace-nowrap rounded px-[7px] py-[3px] font-mono text-[11px] text-ink-label hover:bg-hover hover:text-ink-mid">
+    <button onClick={props.onCheck} title={title} className="flex items-center gap-1.5 whitespace-nowrap rounded px-[7px] py-[3px] font-mono text-[11px] text-ink-label hover:bg-hover hover:text-ink-body">
       v{props.version}
       {status?.phase === 'checking' && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />}
     </button>
@@ -204,7 +204,7 @@ function ConnectionButton({ auth, site, onRefresh }: { auth: AuthStatus | null, 
       <button
         onClick={() => setOpen(value => !value)}
         title="Confluence - account, token and site"
-        className={`flex items-center gap-[7px] whitespace-nowrap rounded px-[7px] py-[3px] hover:bg-hover ${label.tone === 'text-sync' ? 'text-ink-mid' : label.tone}`}
+        className={`flex items-center gap-[7px] whitespace-nowrap rounded px-[7px] py-[3px] hover:bg-hover ${label.tone === 'text-sync' ? 'text-ink-body' : label.tone}`}
       >
         <span className={label.tone}>{label.glyph}</span>{label.text}
       </button>
@@ -240,7 +240,7 @@ function PopoverRow({ label, children }: { label: string, children: React.ReactN
   return (
     <div className="flex items-baseline gap-2">
       <dt className="w-[64px] shrink-0 text-ink-label">{label}</dt>
-      <dd className="min-w-0 flex-1 break-words text-ink-mid">{children}</dd>
+      <dd className="min-w-0 flex-1 break-words text-ink-body">{children}</dd>
     </div>
   )
 }
