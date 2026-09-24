@@ -3,7 +3,8 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { displayState, syncGroup, type FileEntry } from '../../../shared/status.ts'
 import { fuzzyMatch, fuzzyRank, type FuzzyMatch } from '../../../shared/fuzzy.ts'
 import type { SearchHit } from '../../../shared/search.ts'
-import { COMMANDS, fullLabel, keycaps, type Command, type CommandContext } from '../commands.ts'
+import { COMMANDS, IGNORED_REASON, fullLabel, keycaps, type Command, type CommandContext } from '../commands.ts'
+import { Keycaps } from './Keycaps.tsx'
 import { StateGlyph } from './StateGlyph.tsx'
 
 interface Props {
@@ -66,6 +67,7 @@ export function CommandPalette({ ctx, entries, mode, recents, onPick, onRun, onC
   const [query, setQuery] = useState(mode === 'command' ? '> ' : '')
   const [index, setIndex] = useState(0)
   const listRef = useRef<HTMLUListElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   // The whole corpus re-ranks on every keystroke - defer it so typing never stutters.
   const deferred = useDeferredValue(query)
   const commandMode = deferred.startsWith('>')
@@ -105,7 +107,9 @@ export function CommandPalette({ ctx, entries, mode, recents, onPick, onRun, onC
       const ranked = mode === 'recent' && search === '' ? pool.slice(0, FILE_LIMIT) : fuzzyRank(search, pool, FILE_LIMIT)
       return ranked.map(path => ({ key: path, group: 'FILES', path }))
     }
+    // R5 §6: a Confluence-ignored document drops out of the Sync group instead of listing it disabled.
     const ranked = COMMANDS
+      .filter(command => !(command.group === 'Sync' && command.reason?.(ctx) === IGNORED_REASON))
       .map(command => ({ command, match: fuzzyMatch(search, fullLabel(command)) }))
       .filter((item): item is { command: Command, match: FuzzyMatch } => item.match !== null)
       .sort((a, b) => a.match.score - b.match.score)
@@ -174,10 +178,18 @@ export function CommandPalette({ ctx, entries, mode, recents, onPick, onRun, onC
         aria-modal
         className="mx-auto mt-24 w-[660px] max-w-[92vw] overflow-hidden rounded-xl border border-line-menu bg-overlay shadow-palette"
         onClick={event => event.stopPropagation()}
+        onKeyDown={event => {
+          // Focus trap: the input owns the keyboard, the list moves by arrows.
+          if (event.key === 'Tab') {
+            event.preventDefault()
+            inputRef.current?.focus()
+          }
+        }}
       >
         <div className="flex items-center gap-2 border-b border-line-subtle bg-sidebar px-[14px] py-3">
           {commandMode && <span className="text-[13px] font-bold text-accent">&gt;</span>}
           <input
+            ref={inputRef}
             autoFocus
             value={commandMode ? query.replace(/^>\s*/, '') : query}
             onChange={event => setQuery(commandMode ? `> ${event.target.value}` : event.target.value)}
@@ -188,14 +200,14 @@ export function CommandPalette({ ctx, entries, mode, recents, onPick, onRun, onC
             }}
             placeholder={commandMode ? 'Type a command…' : mode === 'search' ? 'Search in documents…' : mode === 'recent' ? 'Recent documents…' : 'Search documents, or > for a command'}
             spellCheck={false}
-            className="min-w-0 flex-1 border-none bg-transparent font-mono text-[13px] text-ink placeholder-ink-label outline-none focus:shadow-none"
+            className="min-w-0 flex-1 border-none bg-transparent text-[13px] text-ink placeholder-ink-label outline-none focus:shadow-none"
           />
-          <span className="shrink-0 font-mono text-[11px] text-ink-label">{counter}</span>
+          <span className="shrink-0 text-[11px] text-ink-label">{counter}</span>
         </div>
 
         <ul ref={listRef} className="max-h-[60vh] overflow-y-auto py-1">
           {rows.length === 0 && (
-            <li className="px-[14px] py-3 font-mono text-[12px] text-ink-label">
+            <li className="px-[14px] py-3 text-[12px] text-ink-label">
               {commandMode
                 ? 'No matching command'
                 : mode === 'search' && search.trim().length < 2
@@ -220,7 +232,7 @@ export function CommandPalette({ ctx, entries, mode, recents, onPick, onRun, onC
           })}
         </ul>
 
-        <div className="flex items-center gap-4 border-t border-line-subtle bg-chrome px-[14px] py-2 font-mono text-[11px] text-ink-mute">
+        <div className="flex items-center gap-4 border-t border-line-subtle bg-chrome px-[14px] py-2 text-[11px] text-ink-mute">
           <span>↑↓ navigate</span>
           <span>⏎ {commandMode ? 'run' : 'open'}</span>
           <span>{commandMode ? '⌫ clear > for file search' : '> for commands'}</span>
@@ -269,14 +281,7 @@ function CommandRow({ row, ctx, selected, onClick, position }: {
       <span className="flex shrink-0 items-center gap-[3px]">
         {caps.length === 0
           ? <span className="text-[11px] text-ink-mute">-</span>
-          : caps.map((cap, index) => (
-              <kbd
-                key={index}
-                className="min-w-[18px] rounded border border-keycap-edge bg-keycap-bg px-[5px] py-px text-center text-[11px] font-normal text-keycap-ink"
-              >
-                {cap}
-              </kbd>
-            ))}
+          : <Keycaps caps={caps} />}
       </span>
     </button>
   )

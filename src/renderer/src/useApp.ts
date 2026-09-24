@@ -769,6 +769,14 @@ export function useApp() {
       .catch(fail)
   }, [api, fail])
 
+  const testConnection = useCallback(() => runOp('test connection', async () => {
+    const status = await api.authStatus()
+    setAuth(status)
+    setMessage(status.ok
+      ? { kind: 'info', text: `Connected as ${status.displayName ?? 'unknown'}` }
+      : { kind: 'error', text: status.error ?? 'Confluence authentication failed' })
+  }), [api, runOp])
+
   const saveToken = useCallback((token: string) => runOp('save token', async () => {
     const status = await api.setToken(token)
     setAuth(status)
@@ -895,6 +903,7 @@ export function useApp() {
     submitCreate,
     runLint,
     saveToken,
+    testConnection,
     openConfluence: (path: string) => api.confluenceUrl(path).then(url => api.openExternal(url)).catch(fail),
     confluenceUrl: (path: string) => api.confluenceUrl(path).catch(error => {
       fail(error)

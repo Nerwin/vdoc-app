@@ -14,6 +14,7 @@ interface Props {
   onUpdate(patch: Partial<Settings>): void;
   onSetAssetsDir(dir: string | null): void;
   onSetSite(site: string | null): void;
+  onTestConnection(): void;
   onReloadVersion(): void;
   onSaveApiKey(apiToken: string): void;
   onSetAuthMethod(method: "api-token" | "session-token"): void;
@@ -29,7 +30,7 @@ interface Props {
   onClose(): void;
 }
 
-const SECTIONS = ["Appearance", "Folders & spaces", "Confluence", "vdoc CLI", "Config file"] as const;
+const SECTIONS = ["Appearance", "Folders & spaces", "Confluence auth", "vdoc CLI", "Config file"] as const;
 type Section = (typeof SECTIONS)[number];
 
 export function SettingsModal(props: Props) {
@@ -83,13 +84,20 @@ export function SettingsModal(props: Props) {
           <div className="min-w-0 flex-1 overflow-y-auto px-5 py-[18px] [&>*+*]:mt-7 [&>*+*]:border-t [&>*+*]:border-line-subtle [&>*+*]:pt-7">
             {section === "Appearance" && <Appearance {...props} />}
             {section === "Folders & spaces" && <Folders {...props} />}
-            {section === "Confluence" && <Confluence {...props} />}
+            {section === "Confluence auth" && <Confluence {...props} />}
             {section === "vdoc CLI" && <Cli {...props} />}
             {section === "Config file" && <Config {...props} />}
           </div>
         </div>
 
-        <footer className="flex shrink-0 items-center justify-end gap-2 border-t border-line-subtle bg-chrome px-[18px] py-3">
+        <footer className="flex shrink-0 items-center gap-2 border-t border-line-subtle bg-chrome px-[18px] py-3">
+          {props.settings.configPath && (
+            <span className="flex min-w-0 items-center gap-2 text-[11.5px]">
+              <span className="truncate font-mono text-ink-label" title={props.settings.configPath}>{props.settings.configPath}</span>
+              <button onClick={props.onRevealConfig} className="shrink-0 text-link hover:text-link-hover">Show in folder</button>
+            </span>
+          )}
+          <span className="flex-1" />
           <ModalButton label="Cancel" onClick={props.onClose} />
           <ModalButton label="Done" primary onClick={props.onClose} />
         </footer>
@@ -141,7 +149,7 @@ function Folders({ settings, spaceMapping, busy, onAddFolder, onPickDocsRoot, on
       <Field label="DOCS REPOSITORY">
         <div className="flex items-center gap-2">
           <span
-            className="flex-1 truncate rounded-md border border-control bg-pane px-2.5 py-[7px] font-mono text-[12.5px] text-ink-dim"
+            className="flex-1 truncate rounded-md border border-control bg-well px-2.5 py-[7px] font-mono text-[12.5px] text-ink-dim"
             title={settings.resolvedRoot}
           >
             {settings.resolvedRoot}
@@ -150,7 +158,7 @@ function Folders({ settings, spaceMapping, busy, onAddFolder, onPickDocsRoot, on
         </div>
       </Field>
       <div className="overflow-hidden rounded-md border border-control">
-        <div className="grid grid-cols-[1fr_132px_30px] bg-sidebar text-[10.5px] tracking-[1px] text-ink-mute">
+        <div className="grid grid-cols-[1fr_132px_30px] bg-sidebar text-[10.5px] tracking-[1px] text-ink-label">
           <span className="px-2.5 py-[7px]">FOLDER</span>
           <span className="py-[7px]">SPACE</span>
           <span />
@@ -231,21 +239,22 @@ function Folders({ settings, spaceMapping, busy, onAddFolder, onPickDocsRoot, on
 }
 
 function Confluence(props: Props) {
-  const { settings, busy, onSetSite } = props;
+  const { settings, busy, onSetSite, onTestConnection } = props;
   const [site, setSite] = useState(settings.site ?? "");
   const siteDirty = (site.trim() || null) !== settings.site;
 
   return (
-    <Section title="Confluence" description="Global Confluence configuration shared with the CLI - the site and credentials live in the config file.">
+    <Section title="Confluence auth" description="Global Confluence configuration shared with the CLI - the site and credentials live in the config file.">
       <Field label="SITE">
         <div className="flex items-center gap-2">
           <TextInput value={site} onChange={setSite} placeholder="your-org.atlassian.net" />
           <ModalButton label="Apply" disabled={!siteDirty || busy} onClick={() => onSetSite(site.trim() || null)} />
+          <ModalButton label="Test" disabled={siteDirty || !settings.site || busy} onClick={onTestConnection} />
         </div>
       </Field>
 
       <div className="border-t border-line-subtle pt-4">
-        <span className="mb-1 block text-[11px] tracking-[1px] text-ink-mute">AUTHENTICATION</span>
+        <span className="mb-1 block text-[11px] tracking-[1px] text-ink-label">AUTHENTICATION</span>
         <p className="mb-3 max-w-[460px] text-[11.5px] leading-[1.55] text-ink-dim">
           A session cookie expires every couple of weeks; an API key does not.
         </p>
@@ -253,7 +262,7 @@ function Confluence(props: Props) {
       </div>
 
       <div className="border-t border-line-subtle pt-4">
-        <span className="mb-1 block text-[11px] tracking-[1px] text-ink-mute">ACCESSIBLE SPACES</span>
+        <span className="mb-1 block text-[11px] tracking-[1px] text-ink-label">ACCESSIBLE SPACES</span>
         <p className="mb-3 max-w-[460px] text-[11.5px] leading-[1.55] text-ink-dim">
           Spaces returned by vdoc cf whoami for the current credentials.
         </p>
@@ -271,7 +280,7 @@ function AccessibleSpaces({ auth }: { auth: AuthStatus | null }) {
   return (
     <div className="overflow-hidden rounded-md border border-control">
       <table className="w-full table-fixed text-left">
-        <thead className="bg-sidebar text-[10.5px] tracking-[1px] text-ink-mute">
+        <thead className="bg-sidebar text-[10.5px] tracking-[1px] text-ink-label">
           <tr>
             <th className="w-[124px] px-2.5 py-[7px] font-normal">ID</th>
             <th className="w-[104px] px-2.5 py-[7px] font-normal">KEY</th>
@@ -468,7 +477,7 @@ function Config({ settings, onRevealConfig, onEditConfig }: Props) {
       <Field label="PATH">
         <div className="flex items-center gap-2">
           <span
-            className="flex-1 truncate rounded-md border border-control bg-pane px-2.5 py-[7px] font-mono text-[12.5px] text-ink-dim"
+            className="flex-1 truncate rounded-md border border-control bg-well px-2.5 py-[7px] font-mono text-[12.5px] text-ink-dim"
             title={settings.configPath ?? undefined}
           >
             {settings.configPath ?? "not resolved - is the CLI runnable?"}
@@ -496,7 +505,7 @@ function Section({ title, description, children }: { title: string; description:
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-[11px] tracking-[1px] text-ink-mute">{label}</span>
+      <span className="mb-1 block text-[11px] tracking-[1px] text-ink-label">{label}</span>
       {children}
     </label>
   );
@@ -510,7 +519,7 @@ function TextInput({ value, onChange, placeholder, type }: { value: string; onCh
       onChange={(event) => onChange(event.target.value)}
       placeholder={placeholder}
       spellCheck={false}
-      className="min-w-0 flex-1 rounded-md border border-control bg-pane px-2.5 py-[7px] font-mono text-[12.5px] text-ink placeholder-ink-mute outline-none"
+      className="min-w-0 flex-1 rounded-md border border-control bg-well px-2.5 py-[7px] font-mono text-[12.5px] text-ink placeholder-ink-mute outline-none"
     />
   );
 }

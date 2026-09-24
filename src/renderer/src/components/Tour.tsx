@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import type { SyncGroup } from '../../../shared/types.ts'
 import { command, keycaps, type CommandContext } from '../commands.ts'
 import { CheckIcon, CloseIcon } from '../icons.tsx'
+import { Keycaps } from './Keycaps.tsx'
 import { ModalButton } from './Modal.tsx'
 import { StateGlyph } from './StateGlyph.tsx'
 
@@ -12,20 +13,7 @@ import { StateGlyph } from './StateGlyph.tsx'
  * Auto-opens on first launch; relaunch via the palette (App: Welcome tour).
  */
 
-function Keys({ id }: { id: string }) {
-  return (
-    <span className="mx-0.5 inline-flex items-center gap-[3px] align-middle">
-      {keycaps(command(id).keys).map((cap, index) => (
-        <kbd
-          key={index}
-          className="min-w-[18px] rounded border border-keycap-edge bg-keycap-bg px-[5px] py-px text-center text-[11px] font-normal text-keycap-ink"
-        >
-          {cap}
-        </kbd>
-      ))}
-    </span>
-  )
-}
+const Keys = ({ id }: { id: string }) => <Keycaps caps={keycaps(command(id).keys)} className="mx-0.5 align-middle" />
 
 function Chip({ group }: { group: SyncGroup }) {
   return <StateGlyph group={group} word className="mr-2 text-[11.5px]" />

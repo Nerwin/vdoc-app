@@ -495,6 +495,7 @@ export function App() {
           onUpdate={app.updateSettings}
           onSetAssetsDir={app.setAssetsDir}
           onSetSite={app.setSite}
+          onTestConnection={() => void app.testConnection()}
           onReloadVersion={app.reloadVersion}
           onSaveApiKey={token => void app.saveApiKey(token)}
           onSetAuthMethod={method => void app.setAuthMethod(method)}

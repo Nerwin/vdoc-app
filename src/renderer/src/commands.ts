@@ -83,8 +83,9 @@ export interface Command {
 
 const noFile = (ctx: CommandContext): string | undefined => (ctx.selection ? undefined : 'no document selected')
 
-const notIgnored = (ctx: CommandContext): string | undefined =>
-  (ctx.entry?.ignored ? 'document is excluded from Confluence sync' : undefined)
+export const IGNORED_REASON = 'document is excluded from Confluence sync'
+
+const notIgnored = (ctx: CommandContext): string | undefined => (ctx.entry?.ignored ? IGNORED_REASON : undefined)
 
 /** Linked = a confluencePageId in the frontmatter; whether it was checked yet is a separate question. */
 const linked = (ctx: CommandContext): string | undefined =>

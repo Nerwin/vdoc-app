@@ -1,6 +1,8 @@
 import type { DisplayState } from '../../../shared/types.ts'
 import { syncGroup } from '../../../shared/status.ts'
 import { STATE_META } from '../state-meta.ts'
+import { command, keycaps } from '../commands.ts'
+import { Keycaps } from './Keycaps.tsx'
 import { Modal, ModalButton } from './Modal.tsx'
 import { StateGlyph } from './StateGlyph.tsx'
 
@@ -34,6 +36,9 @@ const CONCEPTS: Array<{ term: string, text: string }> = [
 /** States with a hint, in lifecycle order - the confusing one (not checked) up front. */
 const STATE_ORDER: DisplayState[] = ['unverified', 'behind', 'ahead', 'local-edits', 'conflict', 'no-version', 'not-found', 'untracked', 'ignored']
 
+/** R5 §10 - labels and keycaps come from the registry. */
+const SHORTCUTS = ['file.goto', 'view.changes', 'file.back', 'file.forward', 'view.sidebar', 'view.info', 'view.focus', 'doc.primary', 'sync.check', 'sync.checkAll', 'sync.pullAll', 'view.diff', 'app.logs', 'file.editor', 'file.finder', 'file.pin', 'app.settings']
+
 export function HelpModal({ onClose }: { onClose(): void }) {
   return (
     <Modal title="Sync concepts" onClose={onClose} actions={<ModalButton label="Close" onClick={onClose} />}>
@@ -54,6 +59,22 @@ export function HelpModal({ onClose }: { onClose(): void }) {
                 <span className="leading-relaxed">{STATE_META[state].hint}</span>
               </div>
             ))}
+          </div>
+        </div>
+
+        <div className="pt-1">
+          <div className="border-t border-line-subtle pb-2 pt-3 text-[10.5px] tracking-[0.12em] text-ink-label">KEYBOARD</div>
+          <div className="space-y-1.5">
+            {SHORTCUTS.map(id => (
+              <div key={id} className="flex items-center justify-between gap-3">
+                <span className="truncate">{command(id).label}</span>
+                <Keycaps caps={keycaps(command(id).keys)} />
+              </div>
+            ))}
+            <div className="flex items-center justify-between gap-3">
+              <span className="truncate">Close overlay / go back</span>
+              <Keycaps caps={keycaps({ key: 'Escape' })} />
+            </div>
           </div>
         </div>
       </div>
