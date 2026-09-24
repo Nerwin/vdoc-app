@@ -1,5 +1,5 @@
 import { execFile, execFileSync } from 'node:child_process'
-import { closeSync, existsSync, openSync, readdirSync, readFileSync, readSync } from 'node:fs'
+import { closeSync, existsSync, fstatSync, openSync, readdirSync, readFileSync, readSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
 import { BrowserWindow } from 'electron'
@@ -249,6 +249,7 @@ interface FileMeta {
   ignored?: boolean
   hidden?: boolean
   pinned?: boolean
+  mtimeMs?: number
 }
 
 /** Relative paths of all Markdown files in the content dirs, tracked = has confluencePageId frontmatter. */
@@ -319,16 +320,19 @@ function fileMeta(absPath: string): FileMeta {
     const file = openSync(absPath, 'r')
     const buffer = Buffer.allocUnsafe(8192)
     let head: string
+    let mtimeMs: number
     try {
       const bytes = readSync(file, buffer, 0, buffer.length, 0)
       head = buffer.toString('utf8', 0, bytes)
+      mtimeMs = fstatSync(file).mtimeMs
     } finally {
       closeSync(file)
     }
     const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(head)
-    if (!frontmatter) return { tracked: false }
+    if (!frontmatter) return { tracked: false, mtimeMs }
     const { title, confluencePageId, confluenceIgnore, vdocHide, vdocPin } = parseFrontmatter(head)
     return {
+      mtimeMs,
       tracked: /^confluencePageId\s*:/m.test(frontmatter[1]),
       title,
       pageId: confluencePageId,

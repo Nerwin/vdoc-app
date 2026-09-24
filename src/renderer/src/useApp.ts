@@ -200,6 +200,7 @@ export function useApp() {
           ignored: file.ignored,
           hidden: file.hidden,
           pinned: file.pinned,
+          mtimeMs: file.mtimeMs,
           check: file.tracked ? previous?.check : undefined,
         })
       }

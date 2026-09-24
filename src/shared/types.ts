@@ -197,6 +197,8 @@ export interface ScanFile {
   hidden?: boolean
   /** Frontmatter `vdocPin: true` - the file is pinned on top of its siblings, after folders. */
   pinned?: boolean
+  /** Last modification time on disk - local data, feeds "edited 3d ago". */
+  mtimeMs?: number
 }
 
 interface ScanResult {

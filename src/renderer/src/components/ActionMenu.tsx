@@ -1,17 +1,17 @@
 import { useEffect, useRef } from 'react'
 
-import { command, keycaps, IS_MAC, type CommandContext } from '../commands.ts'
+import { command, keycaps, IS_MAC, type CommandContext, type MenuItem } from '../commands.ts'
 
 interface Props {
   ctx: CommandContext
-  /** Registry ids, in order - a label, keycaps and availability come from the registry. */
-  ids: string[]
+  /** Registry ids, in order - keycaps and availability come from the registry, the label too unless overridden. */
+  items: MenuItem[]
   align?: 'left' | 'right'
   onClose(): void
 }
 
 /** The `⋯` menu: registry commands aimed at one document. Esc closes, ↑↓ move, click outside closes. */
-export function ActionMenu({ ctx, ids, align = 'right', onClose }: Props) {
+export function ActionMenu({ ctx, items, align = 'right', onClose }: Props) {
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -47,8 +47,10 @@ export function ActionMenu({ ctx, ids, align = 'right', onClose }: Props) {
       className={`absolute top-full z-30 mt-1 w-[248px] rounded-lg border border-line-menu bg-overlay p-1.5 shadow-menu ${align === 'right' ? 'right-0' : 'left-0'}`}
       onClick={event => event.stopPropagation()}
     >
-      {ids.map(id => {
+      {items.map(item => {
+        const id = typeof item === 'string' ? item : item.id
         const cmd = command(id)
+        const label = typeof item === 'string' ? cmd.label : item.label
         const reason = cmd.reason?.(ctx)
         const suffix = cmd.suffix?.(ctx)
         const caps = keycaps(cmd.keys).join(IS_MAC ? '' : '+')
@@ -56,7 +58,7 @@ export function ActionMenu({ ctx, ids, align = 'right', onClose }: Props) {
           <button
             key={id}
             disabled={reason !== undefined}
-            title={reason ? `${cmd.label} - ${reason}` : suffix ? `${cmd.label} - ${suffix}` : cmd.label}
+            title={reason ? `${label} - ${reason}` : suffix ? `${label} - ${suffix}` : label}
             onClick={() => {
               onClose()
               cmd.run(ctx)
@@ -65,7 +67,7 @@ export function ActionMenu({ ctx, ids, align = 'right', onClose }: Props) {
               cmd.tint === 'danger' ? 'text-conflict disabled:text-ink-label' : 'text-ink-body disabled:text-ink-label'
             }`}
           >
-            <span className="truncate">{cmd.label}</span>
+            <span className="truncate">{label}</span>
             {reason
               ? <span className="shrink-0 text-[10.5px] text-ink-label">{reason}</span>
               : caps && <span className="shrink-0 font-mono text-[11px] text-ink-label">{caps}</span>}

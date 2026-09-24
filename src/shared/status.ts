@@ -15,6 +15,7 @@ export interface FileEntry {
   hidden?: boolean
   /** Frontmatter `vdocPin: true` - pinned on top of its siblings, after folders. */
   pinned?: boolean
+  mtimeMs?: number
   check?: CheckFile
 }
 

@@ -150,7 +150,7 @@ export function primaryAction(state: DisplayState | null): PrimaryAction | null 
       ? { label: 'Verify document', commandId: 'sync.baseline', tone: 'primary' }
       : { label: 'Check document', commandId: 'sync.check', tone: 'primary' }
     case 'unlinked': return { label: 'Create page', commandId: 'sync.create', tone: 'primary' }
-    case 'ignored': return null
+    case 'ignored': return { label: 'Open in editor', commandId: 'file.editor', tone: 'secondary' }
   }
 }
 
@@ -161,18 +161,23 @@ function visiblePrimary(ctx: CommandContext): PrimaryAction | null {
   return remote > 0 ? { label: `Pull ${remote} remote update${remote === 1 ? '' : 's'}`, commandId: 'sync.pullAll', tone: 'primary' } : null
 }
 
-/** What `⋯` offers per state - everything that is not the primary. */
-export function secondaryActions(state: DisplayState | null): string[] {
-  const common = ['file.editor', 'file.finder', 'file.copyUrl', 'file.browser', 'file.copyPath', 'file.ignore']
-  if (!state) return common
-  switch (syncGroup(state)) {
-    case 'synced': return ['sync.push', 'sync.pull', 'sync.lossyPush', ...common]
-    case 'local': return ['sync.forcePull', 'sync.lossyPush', 'view.diff', ...common]
-    case 'remote': return ['sync.pull', 'sync.forcePush', 'sync.lossyPush', ...common]
-    case 'conflict': return ['sync.forcePush', 'sync.forcePull', 'sync.lossyPush', 'view.diff', ...common]
-    case 'unchecked': return ['sync.baseline', 'sync.push', 'sync.pull', 'view.diff', ...common]
+/** A menu row: a registry id, optionally relabelled for the surface it sits in. */
+export type MenuItem = string | { id: string, label: string }
+
+/** What `⋯` offers per state (R5 §5) - everything that is not the primary. */
+export function secondaryActions(ctx: CommandContext): MenuItem[] {
+  const pin = { id: 'file.pin', label: ctx.entry?.pinned ? 'Unpin from top' : 'Pin on top' }
+  const ignore = { id: 'file.ignore', label: ctx.entry?.ignored ? 'Include in Confluence' : 'Ignore in Confluence' }
+  const common: MenuItem[] = ['file.editor', 'file.finder', 'file.copyUrl', 'file.copyPath', pin, ignore]
+  if (!ctx.state) return common
+  switch (syncGroup(ctx.state)) {
+    case 'synced': return [{ id: 'sync.push', label: 'Push anyway' }, { id: 'sync.pull', label: 'Pull anyway' }, 'sync.lossyPush', ...common]
+    case 'local': return [{ id: 'sync.forcePull', label: 'Discard local changes' }, { id: 'view.diff', label: 'Open diff' }, 'sync.lossyPush', ...common]
+    case 'remote': return [{ id: 'sync.pull', label: 'Pull without reviewing' }, { id: 'file.browser', label: 'Open in Confluence' }, 'sync.forcePush', 'sync.lossyPush', ...common]
+    case 'conflict': return [{ id: 'sync.forcePush', label: 'Keep all mine' }, { id: 'sync.forcePull', label: 'Keep all theirs' }, { id: 'view.diff', label: 'Open diff' }, 'sync.lossyPush', ...common]
+    case 'unchecked': return ['sync.baseline', { id: 'sync.push', label: 'Push' }, 'sync.pull', { id: 'view.diff', label: 'Open diff' }, ...common]
     case 'unlinked': return ['sync.link', 'file.init', ...common]
-    case 'ignored': return common
+    case 'ignored': return ['file.finder', 'file.copyPath', pin, ignore]
   }
 }
 

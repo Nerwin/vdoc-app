@@ -328,7 +328,7 @@ function ChangeRow({ row, group, author, menuOpen, ctx, onReview, onMenu }: {
         {menuOpen && (
           <ActionMenu
             ctx={forPath(ctx, entry.path)}
-            ids={[...(group === 'remote' || group === 'local' || group === 'conflict' ? ROW_MENU[group] : []), ...ROW_MENU_COMMON]}
+            items={[...(group === 'remote' || group === 'local' || group === 'conflict' ? ROW_MENU[group] : []), ...ROW_MENU_COMMON]}
             onClose={() => onMenu(false)}
           />
         )}

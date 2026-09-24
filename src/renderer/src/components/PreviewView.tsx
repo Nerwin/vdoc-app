@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Marked } from 'marked'
 
-import { escapeHtml, previewMetaLine } from '../../../shared/preview-html.ts'
+import { escapeHtml, previewBody } from '../../../shared/preview-html.ts'
 import { BackIcon, CloseIcon, ForwardIcon } from '../icons.tsx'
 
 /** Fence language → Monaco language id, for the common shorthands. */
@@ -31,10 +31,16 @@ const marked = new Marked({
       const attr = /^[\w+-]+$/.test(language) ? ` data-lang="${language}"` : ''
       return `<pre class="code-block"${attr}><code>${escapeHtml(text)}</code></pre>`
     },
+    // A callout strip: the Lucide info icon, no left accent border.
+    blockquote({ tokens }) {
+      // GitHub alert markers (`> [!NOTE]`) are syntax, not content.
+      const body = this.parser.parse(tokens).replace(/^<p>\[!\w+\]\s*/, '<p>')
+      return `<blockquote class="callout">${INFO_SVG}<div>${body}</div></blockquote>`
+    },
   },
 })
 
-const stripFrontmatter = (content: string): string => content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '')
+const INFO_SVG = '<svg class="callout-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>'
 
 interface TocItem {
   id: string
@@ -76,14 +82,12 @@ export function PreviewView({ content, theme, findSeq, onOpenLink }: Props) {
     onOpenLink?.(href)
   }, [onOpenLink])
 
-  const meta = useMemo(() => previewMetaLine(content), [content])
-
   // React 19 re-applies dangerouslySetInnerHTML whenever this element re-renders,
   // rebuilding every node under it - which wipes the heading ids and collapses the
   // find-bar's highlight ranges. Memoizing the element skips that subtree in
   // reconciliation, so the DOM only rebuilds when the html itself changes.
   const contentEl = useMemo(() => (
-    <div ref={containerRef} onClick={handleClick} className="preview min-w-0 max-w-[680px] flex-1" dangerouslySetInnerHTML={{ __html: html }} />
+    <div ref={containerRef} onClick={handleClick} className="preview min-w-0 max-w-[720px] flex-1" dangerouslySetInnerHTML={{ __html: html }} />
   ), [html, handleClick])
 
   // Mermaid diagrams and colorized code are rendered into the html string itself, not
@@ -91,9 +95,7 @@ export function PreviewView({ content, theme, findSeq, onOpenLink }: Props) {
   // re-renders, which would silently wipe any DOM patched in behind its back. The plain
   // body shows immediately; the enriched html replaces it.
   useEffect(() => {
-    let body = marked.parse(stripFrontmatter(content), { async: false })
-    // The meta line sits under the H1; a doc without one gets it at the top.
-    if (meta) body = body.includes('</h1>') ? body.replace('</h1>', `</h1>${meta}`) : meta + body
+    const body = marked.parse(previewBody(content), { async: false })
     setHtml(body)
     const needsMermaid = body.includes('class="mermaid-source"')
     const needsColor = body.includes('data-lang="')
@@ -137,7 +139,7 @@ export function PreviewView({ content, theme, findSeq, onOpenLink }: Props) {
     return () => {
       live = false
     }
-  }, [content, meta, theme])
+  }, [content, theme])
 
   // The "On this page" rail: ids are assigned to the rendered h2/h3 nodes.
   useEffect(() => {
@@ -182,7 +184,7 @@ export function PreviewView({ content, theme, findSeq, onOpenLink }: Props) {
         />
       )}
       <div ref={scrollRef} onScroll={onScroll} className="h-full overflow-y-auto scroll-smooth motion-reduce:scroll-auto">
-        <div className="mx-auto flex max-w-[1080px] justify-center gap-14 px-10 pb-16 pt-12">
+        <div className="flex gap-14 px-10 py-[34px]">
           {contentEl}
           {toc.length >= 2 && (
             <nav aria-label="On this page" className="sticky top-6 hidden max-h-[75vh] w-[200px] shrink-0 self-start overflow-y-auto @min-[960px]:block">

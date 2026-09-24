@@ -100,9 +100,13 @@ export function App() {
   useEffect(() => {
     setSourceLayoutState(localStorage.getItem(layoutKey) === 'split' ? 'split' : 'content')
   }, [layoutKey])
-  const setSourceLayout = (layout: SourceLayout): void => {
-    localStorage.setItem(layoutKey, layout)
-    setSourceLayoutState(layout)
+  /** Every way into Source (tab menu, palette) goes through here, so the layout choice persists. */
+  const showView = (next: ViewMode): void => {
+    if (next === 'content' || next === 'split') {
+      localStorage.setItem(layoutKey, next)
+      setSourceLayoutState(next)
+    }
+    setView(next)
   }
 
   const [sidebarOpen, setSidebarOpen] = useWorkspaceFlag('sidebarOpen', app.root)
@@ -161,7 +165,7 @@ export function App() {
     openLogs: () => setLogsOpen(open => !open),
     openHelp: () => setHelpOpen(true),
     openTour: () => setTourOpen(true),
-    setView,
+    setView: showView,
     setSidebarMode: mode => {
       setSidebarMode(mode)
       setSidebarOpen(true)
@@ -317,7 +321,6 @@ export function App() {
                     reloadKey={reloadKey}
                     findSeq={findSeq}
                     onView={setView}
-                    onSourceLayout={setSourceLayout}
                     onOpenLogs={() => setLogsOpen(true)}
                     onError={app.reportError}
                     onRegisterFlush={registerEditorFlush}

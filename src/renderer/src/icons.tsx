@@ -17,6 +17,7 @@ export {
   Search as SearchIcon,
   Settings as SettingsIcon,
   ArrowRight as ArrowRightIcon,
+  Ban as BanIcon,
   Check as CheckIcon,
   RotateCw as ReloadIcon,
   TriangleAlert as AlertIcon,

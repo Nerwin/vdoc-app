@@ -1,12 +1,14 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { DiffResult, VdocLogEntry } from '../../../shared/types.ts'
+import { parseFrontmatter } from '../../../shared/frontmatter.ts'
+import { diffLines, hunksOf } from '../../../shared/line-diff.ts'
 import { resolveRelative } from '../../../shared/links.ts'
 import { GuardedSaveQueue } from '../../../shared/save-queue.ts'
 import { displayState, displayTitle, syncGroup, type FileEntry } from '../../../shared/status.ts'
 import { timeAgo } from '../../../shared/time.ts'
 import { command, primaryAction, secondaryActions, shortcutLabel, type CommandContext, type ViewMode } from '../commands.ts'
-import { AlertIcon, ChevronDownIcon, MoreIcon } from '../icons.tsx'
+import { AlertIcon, BanIcon, ChevronDownIcon, ExternalIcon, MoreIcon, PinIcon } from '../icons.tsx'
 import { STATE_META } from '../state-meta.ts'
 import type { SyncEvent } from '../useApp.ts'
 import { ActionMenu } from './ActionMenu.tsx'
@@ -41,7 +43,6 @@ interface Props {
   /** Bumped by ⌘F - opens (or refocuses) the preview's find bar. */
   findSeq: number
   onView(view: ViewMode): void
-  onSourceLayout(layout: SourceLayout): void
   onOpenLogs(): void
   onError(error: unknown): void
   onRegisterFlush(flush: (() => Promise<boolean>) | null): void
@@ -56,7 +57,7 @@ interface Props {
 
 const TONE = {
   primary: 'border-primary-edge bg-primary text-primary-ink hover:bg-primary-hover',
-  secondary: 'border-control bg-raised text-ink-body hover:bg-hover',
+  secondary: 'border-control bg-raised text-control-ink hover:bg-hover',
   danger: 'border-danger-edge bg-danger text-danger-ink hover:bg-danger-hover',
 }
 
@@ -217,6 +218,14 @@ export function DetailPane(props: Props) {
   const ignored = state === 'ignored'
   const loadingDiff = props.diffLoading === path
   const showDiff = view === 'diff' && diffReady && props.diff
+  const synced = group === 'synced'
+  const pageId = ignored ? undefined : check?.pageId ?? entry.pageId
+  const space = useMemo(() => (content === null ? undefined : parseFrontmatter(content).confluenceSpace), [content])
+    ?? ctx.app.spaceMapping[path.split('/')[0]]
+  const hunkCount = useMemo(
+    () => (state === 'conflict' && diffReady && props.diff ? hunksOf(diffLines(props.diff.result.local, props.diff.result.remote)).length : null),
+    [state, diffReady, props.diff],
+  )
   const primary = primaryAction(state)
   const primaryCommand = primary ? command(primary.commandId) : null
   const primaryReason = primaryCommand?.reason?.(ctx)
@@ -225,8 +234,8 @@ export function DetailPane(props: Props) {
   const openSource = (): void => onView(props.sourceLayout)
 
   const notes: Array<{ text: string, error: boolean, help?: boolean }> = []
-  if (meta.hint && (state === 'conflict' || state === 'not-found' || state === 'no-version' || ignored)) {
-    notes.push({ text: meta.hint, error: state === 'conflict' || state === 'not-found', help: !ignored })
+  if (meta.hint && (state === 'conflict' || state === 'not-found' || state === 'no-version')) {
+    notes.push({ text: meta.hint, error: state === 'conflict' || state === 'not-found', help: true })
   }
   if (check?.titleMismatch) {
     notes.push({ text: 'Frontmatter title differs from the body H1 - pushes use the frontmatter title.', error: false })
@@ -243,22 +252,44 @@ export function DetailPane(props: Props) {
           <div className="flex min-w-0 flex-1 flex-col gap-[7px]">
             <h1 className="truncate text-[20px] font-semibold tracking-[-0.2px] text-ink" title={displayTitle(entry)}>{displayTitle(entry)}</h1>
             <div className="flex flex-wrap items-center gap-[11px] text-[12.5px]">
-              <StateGlyph group={group} word={meta.label} />
-              {check && (check.localVersion !== undefined || check.remoteVersion !== undefined) && (
-                <>
-                  <Sep />
-                  <span title={versionsTitle} className="text-ink-dim">
-                    {group === 'remote' ? `Confluence v${check.remoteVersion ?? '-'} · Local v${check.localVersion ?? '-'}` : `Local v${check.localVersion ?? '-'} · Confluence v${check.remoteVersion ?? '-'}`}
-                  </span>
-                </>
-              )}
-              {check && props.lastChecked && (
-                <>
-                  <Sep />
-                  <span className="text-ink-label">checked {timeAgo(props.lastChecked)}</span>
-                </>
-              )}
-              {state === 'unchecked' && <><Sep /><span className="text-ink-label">no baseline recorded</span></>}
+              {ignored
+                ? (
+                    <>
+                      <span className="inline-flex items-center gap-[7px] text-ink-dim"><BanIcon size={12} className="shrink-0 text-ink-mute" />Not synced with Confluence</span>
+                      {entry.pinned && <><Sep /><span className="inline-flex items-center gap-[7px] text-ink-dim"><PinIcon size={11} className="shrink-0 text-brand" />Pinned</span></>}
+                      {entry.mtimeMs !== undefined && <><Sep /><span className="text-ink-mute">edited {timeAgo(entry.mtimeMs)}</span></>}
+                    </>
+                  )
+                : (
+                    <>
+                      <StateGlyph group={group} word={meta.label} />
+                      {state === 'conflict'
+                        ? <><Sep /><span className="text-ink-dim">both sides changed{hunkCount ? ` · ${hunkCount} hunk${hunkCount === 1 ? '' : 's'}` : ''}</span></>
+                        : group === 'unchecked'
+                          ? <><Sep /><span className="text-ink-dim">no baseline recorded</span></>
+                          : check && (check.localVersion !== undefined || check.remoteVersion !== undefined) && (
+                            <>
+                              <Sep />
+                              <span title={versionsTitle} className="text-ink-dim">
+                                {group === 'remote' ? `Confluence v${check.remoteVersion ?? '-'} · Local v${check.localVersion ?? '-'}` : `Local v${check.localVersion ?? '-'} · Confluence v${check.remoteVersion ?? '-'}`}
+                              </span>
+                            </>
+                          )}
+                      {pageId && (
+                        <>
+                          <Sep />
+                          <button
+                            onClick={() => command('file.browser').run(ctx)}
+                            title={`Open in Confluence - ${space ? `${space} / ` : ''}${pageId}`}
+                            className="inline-flex items-center gap-[5px] text-link hover:text-link-hover"
+                          >
+                            page <span className="font-mono text-[12px]">{pageId}</span><ExternalIcon size={11} className="shrink-0" />
+                          </button>
+                        </>
+                      )}
+                      {check && props.lastChecked && <><Sep /><span className="text-ink-mute">checked {timeAgo(props.lastChecked)}</span></>}
+                    </>
+                  )}
               {saveState !== 'saved' && (
                 <>
                   <Sep />
@@ -290,14 +321,30 @@ export function DetailPane(props: Props) {
               <button
                 onClick={() => setMenuOpen(open => !open)}
                 title="More actions"
-                className="flex h-[30px] w-[30px] items-center justify-center rounded-md border border-control bg-raised text-control-ink hover:bg-hover hover:text-ink"
+                className="flex h-[30px] w-[30px] items-center justify-center rounded-md border border-control bg-raised text-ink-body hover:bg-hover hover:text-ink"
               >
                 <MoreIcon size={15} />
               </button>
-              {menuOpen && <ActionMenu ctx={ctx} ids={secondaryActions(state)} onClose={() => setMenuOpen(false)} />}
+              {menuOpen && <ActionMenu ctx={ctx} items={secondaryActions(ctx)} onClose={() => setMenuOpen(false)} />}
             </div>
           </div>
         </div>
+
+        {ignored && (
+          <div className="flex items-center gap-3 rounded-[7px] border border-callout-edge bg-callout px-[14px] py-[10px]">
+            <BanIcon size={13} className="shrink-0 text-ink-mute" />
+            <span className="flex-1 text-[12.5px] leading-[1.5] text-ink-body">
+              <span className="font-mono text-ink">confluenceIgnore: true</span> in the frontmatter - the CLI skips this file for checks, diffs and sync.
+            </span>
+            <button
+              onClick={() => command('file.ignore').run(ctx)}
+              disabled={command('file.ignore').reason?.(ctx) !== undefined}
+              className="shrink-0 whitespace-nowrap rounded-md border border-control bg-raised px-3 py-[5px] text-[12px] text-ink-body hover:bg-hover disabled:opacity-40"
+            >
+              Include in Confluence
+            </button>
+          </div>
+        )}
 
         {notes.map(note => (
           <div
@@ -317,36 +364,53 @@ export function DetailPane(props: Props) {
         <div className="flex items-center gap-1 border-b border-line-subtle">
           <Tab label="Preview" active={view === 'preview'} disabled={content === null} onClick={() => onView('preview')} />
           <div className="relative flex items-center">
-            <Tab label="Source" active={view === 'content' || view === 'split'} disabled={content === null} onClick={openSource} />
-            <button
-              onClick={() => setLayoutOpen(open => !open)}
-              title="Layout: Editor / Editor + Preview"
-              className="-ml-2 pr-2 text-ink-mute hover:text-ink"
-            >
-              <ChevronDownIcon size={12} />
-            </button>
+            <Tab
+              label="Source"
+              active={view === 'content' || view === 'split'}
+              disabled={content === null}
+              onClick={openSource}
+              trailing={(
+                <span
+                  role="button"
+                  aria-label="Source layout"
+                  title="Layout: Editor / Editor + Preview"
+                  onClick={event => {
+                    event.stopPropagation()
+                    setLayoutOpen(open => !open)
+                  }}
+                  className="flex text-ink-label hover:text-ink"
+                >
+                  <ChevronDownIcon size={12} />
+                </span>
+              )}
+            />
             {layoutOpen && (
               <ActionMenu
                 ctx={ctx}
-                ids={['view.content', 'view.split']}
+                items={[{ id: 'view.content', label: 'Editor' }, { id: 'view.split', label: 'Editor + Preview' }]}
                 align="left"
                 onClose={() => setLayoutOpen(false)}
               />
             )}
           </div>
-          <Tab
-            label={loadingDiff ? 'Diff…' : 'Diff'}
-            active={Boolean(showDiff)}
-            disabled={!entry.tracked || ignored || loadingDiff}
-            onClick={openDiffTab}
-          />
-          <Tab label="Comments" active={view === 'comments'} disabled={!entry.tracked || ignored} onClick={() => onView('comments')} />
+          {!ignored && (
+            <>
+              <Tab
+                label={loadingDiff ? 'Diff…' : 'Diff'}
+                active={Boolean(showDiff)}
+                disabled={!entry.tracked || loadingDiff || synced}
+                title={synced ? 'No differences to show' : undefined}
+                onClick={openDiffTab}
+              />
+              <Tab label="Comments" active={view === 'comments'} disabled={!entry.tracked} onClick={() => onView('comments')} />
+            </>
+          )}
           <div className="flex-1" />
           {backlinks.length > 0 && <BacklinksButton links={backlinks} onPick={onSelect} />}
           <button
             onClick={() => props.onLint(path)}
             disabled={busy}
-            className="px-[11px] py-[9px] text-[11.5px] text-ink-label hover:text-ink-body disabled:opacity-40"
+            className="px-[11px] py-[9px] text-[11.5px] text-ink-mute hover:text-ink-body disabled:opacity-40"
           >
             Lint
           </button>
@@ -480,7 +544,7 @@ function BacklinksButton({ links, onPick }: { links: string[], onPick(path: stri
       <button
         onClick={() => setOpen(current => !current)}
         title={`${links.length} document(s) link to this one`}
-        className={`px-[11px] py-[9px] text-[11.5px] hover:text-ink-body ${open ? 'text-ink' : 'text-ink-label'}`}
+        className={`px-[11px] py-[9px] text-[11.5px] hover:text-ink-body ${open ? 'text-ink' : 'text-ink-mute'}`}
       >
         {links.length} linked from
       </button>
@@ -505,16 +569,25 @@ function BacklinksButton({ links, onPick }: { links: string[], onPick(path: stri
   )
 }
 
-function Tab({ label, active, disabled, onClick }: { label: string, active: boolean, disabled?: boolean, onClick(): void }) {
+function Tab({ label, active, disabled, title, trailing, onClick }: {
+  label: string
+  active: boolean
+  disabled?: boolean
+  title?: string
+  trailing?: React.ReactNode
+  onClick(): void
+}) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`whitespace-nowrap border-b-2 px-[13px] py-[9px] text-[12.5px] disabled:cursor-not-allowed disabled:opacity-40 ${
-        active ? 'border-accent font-medium text-ink' : 'border-transparent text-ink-dim hover:text-ink'
+      title={title}
+      className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 px-[13px] py-[9px] text-[12.5px] disabled:cursor-not-allowed ${
+        active ? 'border-accent font-medium text-ink' : 'border-transparent text-ink-dim enabled:hover:text-ink disabled:text-ink-disabled'
       }`}
     >
       {label}
+      {trailing}
     </button>
   )
 }
