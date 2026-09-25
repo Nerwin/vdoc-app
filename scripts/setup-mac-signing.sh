@@ -47,5 +47,8 @@ base64 -i "$OUT" | gh secret set MAC_CSC_LINK --repo "$REPO"
 printf '%s' "$PASSWORD" | gh secret set MAC_CSC_KEY_PASSWORD --repo "$REPO"
 
 echo "Secrets set. Commit $CERT (public cert, no secret) so CI can trust it."
-echo "Back up $OUT and its password (currently only in MAC_CSC_KEY_PASSWORD):"
+echo
+echo "Store both values in your vault now - GitHub never shows them again, and"
 echo "re-creating the certificate later forces every user through one manual reinstall."
+echo "  MAC_CSC_KEY_PASSWORD: $PASSWORD"
+echo "  MAC_CSC_LINK: base64 of $OUT (regenerate with: base64 -i $OUT)"
