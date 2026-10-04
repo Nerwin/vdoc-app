@@ -96,6 +96,9 @@ export function vdocLogs(): VdocLogEntry[] {
   return logEntries
 }
 
+/** A standalone copy - a V8 slice would keep the whole CLI output (up to maxBuffer) alive in the log. */
+const detach = (text: string): string => Buffer.from(text, 'utf8').toString('utf8')
+
 /** Sensitive values never reach the renderer's command log. */
 function recordRun(args: string[], run: VdocRun, startedAt: number): void {
   const hideOutput = hidesVdocOutput(args)
@@ -106,8 +109,8 @@ function recordRun(args: string[], run: VdocRun, startedAt: number): void {
     exitCode: run.exitCode,
     ...(run.termination ? { termination: run.termination } : {}),
     durationMs: Date.now() - startedAt,
-    stdout: hideOutput ? '(hidden - output may contain sensitive data)' : run.stdout.slice(0, OUTPUT_CLIP),
-    stderr: hideOutput ? '(hidden - output may contain sensitive data)' : run.stderr.slice(-OUTPUT_CLIP),
+    stdout: hideOutput ? '(hidden - output may contain sensitive data)' : detach(run.stdout.slice(0, OUTPUT_CLIP)),
+    stderr: hideOutput ? '(hidden - output may contain sensitive data)' : detach(run.stderr.slice(-OUTPUT_CLIP)),
   }
   logEntries.push(entry)
   if (logEntries.length > LOG_MAX) logEntries.shift()
