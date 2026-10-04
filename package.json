@@ -52,7 +52,7 @@
     "@vitejs/plugin-react": "^5.2.0",
     "commit-and-tag-version": "^13.1.2",
     "electron": "^44.0.0",
-    "electron-builder": "^26.15.3",
+    "electron-builder": "^26.17.0",
     "electron-vite": "^5.0.0",
     "knip": "^6.32.2",
     "lucide-react": "^1.47.0",
