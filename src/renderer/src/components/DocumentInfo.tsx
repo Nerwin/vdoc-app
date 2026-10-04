@@ -5,7 +5,7 @@ import { frontmatterEntries, type FrontmatterEntry } from '../../../shared/front
 import type { FileEntry } from '../../../shared/status.ts'
 import type { VdocLogEntry } from '../../../shared/types.ts'
 import { shellCommand } from '../../../shared/shell-command.ts'
-import { command, isPinned, shortcutLabel, type CommandContext } from '../commands.ts'
+import { command, isPinned, type CommandContext } from '../commands.ts'
 import { timeAgo } from '../../../shared/time.ts'
 import { ChevronDownIcon, ChevronRightIcon, ExternalIcon, PinIcon } from '../icons.tsx'
 import type { OutlineItem } from './PreviewView.tsx'
@@ -35,7 +35,6 @@ interface Props {
   outline: OutlineItem[]
   activeSection: string | null
   onJump(id: string): void
-  onOpenLogs(): void
 }
 
 const parentOf = (path: string): string => path.slice(0, path.lastIndexOf('/') + 1)
@@ -148,9 +147,6 @@ export function DocumentInfo(props: Props) {
                     </Row>
                   )}
                   <LastCliCard lastCli={props.lastCli} />
-                  <button onClick={props.onOpenLogs} className="self-start px-2 text-[11.5px] text-link hover:text-link-hover">
-                    Open in CLI logs <span className="font-mono text-ink-label">{shortcutLabel('app.logs')}</span>
-                  </button>
                 </Section>
               </>
             )}

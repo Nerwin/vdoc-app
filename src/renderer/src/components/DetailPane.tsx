@@ -41,7 +41,6 @@ interface Props {
   /** Bumped by ⌘F - opens (or refocuses) the preview's find bar. */
   findSeq: number
   onView(view: ViewMode): void
-  onOpenLogs(): void
   onError(error: unknown): void
   onRegisterFlush(flush: (() => Promise<boolean>) | null): void
   /** Open the sync-concepts help modal (the state strips link to it). */
@@ -212,12 +211,17 @@ export function DetailPane(props: Props) {
     if (resolved?.endsWith('.md')) onSelect(resolved)
   }, [onError, onSelect, path])
 
-  // A loaded diff for this file (via the Diff tab or ⏎ in the tree) takes the stage.
+  // A loaded diff for this file (via the Diff tab or ⏎ in the tree) takes the stage, and hands it
+  // back to Preview once cleared by a pull or push.
   const diffReady = props.diff?.path === path
+  const hadDiff = useRef(false)
   const { onView } = props
   useEffect(() => {
+    if (diffReady === hadDiff.current) return
+    hadDiff.current = diffReady
     if (diffReady) onView('diff')
-  }, [diffReady, onView])
+    else if (view === 'diff') onView('preview')
+  }, [diffReady, onView, view])
 
   const state = displayState(entry)
   const group = syncGroup(state)
@@ -530,7 +534,6 @@ export function DetailPane(props: Props) {
           outline={outline}
           activeSection={activeSection}
           onJump={jumpToSection}
-          onOpenLogs={props.onOpenLogs}
         />
       )}
     </div>

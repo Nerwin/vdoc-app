@@ -37,7 +37,7 @@ const CONCEPTS: Array<{ term: string, text: string }> = [
 const STATE_ORDER: DisplayState[] = ['unverified', 'behind', 'ahead', 'local-edits', 'conflict', 'no-version', 'not-found', 'untracked', 'ignored']
 
 /** R5 §10 - labels and keycaps come from the registry. */
-const SHORTCUTS = ['file.goto', 'view.changes', 'file.back', 'file.forward', 'view.sidebar', 'view.info', 'view.focus', 'doc.primary', 'sync.check', 'sync.checkAll', 'sync.pullAll', 'view.diff', 'app.logs', 'file.editor', 'file.finder', 'file.pin', 'app.settings']
+const SHORTCUTS = ['file.goto', 'view.changes', 'file.back', 'file.forward', 'view.sidebar', 'view.info', 'view.focus', 'doc.primary', 'sync.check', 'sync.checkAll', 'sync.pullAll', 'view.diff', 'app.logs', 'file.editor', 'file.finder', 'app.settings']
 
 export function HelpModal({ onClose }: { onClose(): void }) {
   return (

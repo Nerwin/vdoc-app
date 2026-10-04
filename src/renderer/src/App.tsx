@@ -297,7 +297,6 @@ export function App() {
                     reloadKey={reloadKey}
                     findSeq={findSeq}
                     onView={setView}
-                    onOpenLogs={() => setLogsOpen(true)}
                     onError={app.reportError}
                     onRegisterFlush={registerEditorFlush}
                     onHelp={() => setHelpOpen(true)}
