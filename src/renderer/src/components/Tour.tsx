@@ -134,8 +134,8 @@ const STEPS: Step[] = [
           local-edit detection possible.
         </p>
         <p>
-          Documents with local changes are never overwritten silently, conflicts are resolved hunk by
-          hunk, and anything destructive (force push, force pull) needs an explicit red confirmation.
+          Documents with local changes are never overwritten silently, conflicts are resolved change by
+          change in the diff, and anything destructive (force push, force pull) needs an explicit red confirmation.
         </p>
         <TryButton id="sync.checkAll" label="Check the workspace now" ctx={ctx} />
       </>

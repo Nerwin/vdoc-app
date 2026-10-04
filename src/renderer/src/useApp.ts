@@ -5,6 +5,7 @@ import { LOG_MAX, type AppUpdateStatus, type AuthStatus, type ChangesScope, type
 import { setFrontmatterFlag } from '../../shared/frontmatter.ts'
 import { initMessage } from '../../shared/init.ts'
 import { isLossyPushError } from '../../shared/lossy-push.ts'
+import { reviewOutcome, spliceMerged } from '../../shared/review.ts'
 import { countStates, displayState, needsAttention, type FileEntry } from '../../shared/status.ts'
 import { updateCheckMessage } from '../../shared/update.ts'
 import { verifyBatch } from '../../shared/verification.ts'
@@ -98,6 +99,8 @@ export function useApp() {
   const [busyOp, setBusyOp] = useState<string | null>(null)
   const [diff, setDiff] = useState<{ path: string, result: DiffResult } | null>(null)
   const [diffLoading, setDiffLoading] = useState<string | null>(null)
+  /** The Confluence side of `result` as edited in review - stale once the diff reloads. */
+  const [review, setReview] = useState<{ result: DiffResult, text: string } | null>(null)
   const [pushPreview, setPushPreview] = useState<PushPreview | null>(null)
   const [lossyPushPaths, setLossyPushPaths] = useState<Set<string>>(() => new Set())
   const [pullConfirm, setPullConfirm] = useState<PullConfirm | null>(null)
@@ -461,16 +464,25 @@ export function useApp() {
   }, [api, previewNext, pushPreview, pushQueue, recheck, recordActivity, runOp])
 
   /**
-   * Conflict review outcome: the merged text replaces the local body (guarded against
-   * outside edits), then the push previews as a force push - Confluence moved, so the
-   * red confirm still stands.
+   * Applies the reviewed diff: untouched = pull, fully reverted = force push, a mix is written
+   * through the guarded write and previewed as a force push - Confluence moved, so the red confirm stands.
    */
-  const mergeAndPush = useCallback((path: string, expected: string, merged: string) => runOp('merge', async () => {
-    await api.writeFile({ path, expected, next: merged, revision: Date.now() })
-    setDiff(current => (current?.path === path ? null : current))
-    const { result, token } = await api.previewPush(path, true, false)
-    setPushPreview({ path, result, force: true, allowLossy: false, token })
-  }), [api, runOp])
+  const applyReview = useCallback((path: string) => {
+    if (diff?.path !== path) return
+    const { local, remote } = diff.result
+    const text = review?.result === diff.result ? review.text : remote
+    switch (reviewOutcome(text, local, remote)) {
+      case 'theirs': return requestPull(path)
+      case 'mine': return void requestPush(path, true)
+      case 'merged': return void runOp('merge', async () => {
+        const disk = await api.readFile(path)
+        await api.writeFile({ path, expected: disk, next: spliceMerged(disk, local, text), revision: Date.now() })
+        setDiff(current => (current?.path === path ? null : current))
+        const { result, token } = await api.previewPush(path, true, false)
+        setPushPreview({ path, result, force: true, allowLossy: false, token })
+      })
+    }
+  }, [api, diff, requestPull, requestPush, review, runOp])
 
   const checkOne = useCallback((path: string) => runOp('check', async () => {
     const results = await api.checkFiles([path])
@@ -876,7 +888,9 @@ export function useApp() {
     markVerified,
     verifyAllUnverified,
     checkUnchecked,
-    mergeAndPush,
+    review,
+    setReview,
+    applyReview,
     saveApiKey,
     setAuthMethod,
     clearCredential,

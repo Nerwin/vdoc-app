@@ -25,7 +25,6 @@ interface Props {
   keyboard: boolean
   loadAuthors(requests: Array<{ path: string, remoteVersion: number }>): void
   onReview(path: string): void
-  onResolve(path: string): void
   onPullAll(paths: string[]): void
   onPushAll(paths: string[]): void
   onCheckAll(): void
@@ -114,7 +113,7 @@ export function ChangesView(props: Props) {
     const rows = ordered.get(group) ?? []
     return expanded.has(group) ? rows : rows.slice(0, ROW_LIMIT)
   })
-  const open = (row: Row): void => (row.state === 'conflict' ? props.onResolve(row.entry.path) : props.onReview(row.entry.path))
+  const open = (row: Row): void => props.onReview(row.entry.path)
   const navRef = useRef({ navigable, focused, open })
   navRef.current = { navigable, focused, open }
 

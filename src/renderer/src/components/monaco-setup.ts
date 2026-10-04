@@ -5,6 +5,9 @@ import EditorWorker from 'monaco-editor/editor/editor.worker.js?worker'
   getWorker: () => new EditorWorker(),
 }
 
+// ⌘⏎ is the app's primary action (commands.ts), not "insert line below".
+monaco.editor.addKeybindingRule({ keybinding: monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, command: '-editor.action.insertLineAfter' })
+
 const token = (name: string): string =>
   getComputedStyle(document.documentElement).getPropertyValue(`--color-${name}`).trim()
 

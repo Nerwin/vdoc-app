@@ -2,12 +2,11 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 
 import type { DiffResult, VdocLogEntry } from '../../../shared/types.ts'
 import { parseFrontmatter } from '../../../shared/frontmatter.ts'
-import { diffLines, hunksOf } from '../../../shared/line-diff.ts'
 import { resolveRelative } from '../../../shared/links.ts'
 import { GuardedSaveQueue } from '../../../shared/save-queue.ts'
 import { displayState, displayTitle, syncGroup, type FileEntry } from '../../../shared/status.ts'
 import { timeAgo } from '../../../shared/time.ts'
-import { command, isPinned, primaryAction, secondaryActions, shortcutLabel, type CommandContext, type ViewMode } from '../commands.ts'
+import { command, isPinned, isReviewable, primaryAction, secondaryActions, shortcutLabel, type CommandContext, type ViewMode } from '../commands.ts'
 import { AlertIcon, BanIcon, ChevronDownIcon, ExternalIcon, MoreIcon, PinIcon } from '../icons.tsx'
 import { STATE_META } from '../state-meta.ts'
 import { ActionMenu } from './ActionMenu.tsx'
@@ -66,6 +65,8 @@ export function DetailPane(props: Props) {
   const [readFailed, setReadFailed] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [layoutOpen, setLayoutOpen] = useState(false)
+  const diffLayoutKey = `diffLayout:${ctx.app.root}`
+  const [diffInline, setDiffInline] = useState(() => localStorage.getItem(diffLayoutKey) === 'inline')
   const [editorLoaded, setEditorLoaded] = useState(false)
   const [saveState, setSaveState] = useState<'saved' | 'unsaved' | 'saving' | 'blocked'>('saved')
 
@@ -230,11 +231,7 @@ export function DetailPane(props: Props) {
   const pageId = ignored ? undefined : check?.pageId ?? entry.pageId
   const space = useMemo(() => (content === null ? undefined : parseFrontmatter(content).confluenceSpace), [content])
     ?? ctx.app.spaceMapping[path.split('/')[0]]
-  const hunkCount = useMemo(
-    () => (state === 'conflict' && diffReady && props.diff ? hunksOf(diffLines(props.diff.result.local, props.diff.result.remote)).length : null),
-    [state, diffReady, props.diff],
-  )
-  const primary = primaryAction(state)
+  const primary = primaryAction(ctx)
   const primaryCommand = primary ? command(primary.commandId) : null
   const primaryReason = primaryCommand?.reason?.(ctx)
 
@@ -248,6 +245,18 @@ export function DetailPane(props: Props) {
     onView('preview')
     setTimeout(() => jumpRef.current?.(id), 0)
   }
+
+  const setDiffLayout = (inline: boolean): void => {
+    localStorage.setItem(diffLayoutKey, inline ? 'inline' : 'split')
+    setDiffInline(inline)
+  }
+  // The side the sync would overwrite is the original: local under review, Confluence otherwise.
+  const reviewing = isReviewable(state)
+  const diffSides = props.diff && [
+    { label: 'Local', version: props.diff.result.localVersion ?? '-' },
+    { label: 'Confluence', version: props.diff.result.remoteVersion },
+  ]
+  const [diffBefore, diffAfter] = diffSides && !reviewing ? [diffSides[1], diffSides[0]] : diffSides ?? []
 
   const openDiffTab = (): void => (diffReady ? onView('diff') : props.onDiff(path))
   const openSource = (): void => onView(props.sourceLayout)
@@ -285,7 +294,7 @@ export function DetailPane(props: Props) {
                       <>
                         <StateGlyph group={group} word={meta.label} />
                         {state === 'conflict'
-                          ? <><Sep /><span className="text-ink-dim">both sides changed{hunkCount ? ` · ${hunkCount} hunk${hunkCount === 1 ? '' : 's'}` : ''}</span></>
+                          ? <><Sep /><span className="text-ink-dim">both sides changed</span></>
                           : group === 'unchecked'
                             ? <><Sep /><span className="text-ink-dim">no baseline recorded</span></>
                             : check && (check.localVersion !== undefined || check.remoteVersion !== undefined) && (
@@ -454,12 +463,27 @@ export function DetailPane(props: Props) {
                     : (
                         <div className="flex h-full flex-col">
                           <div className="flex border-b border-line text-[11px] uppercase tracking-[0.08em] text-ink-label">
-                            <span className="flex-1 px-4 py-1.5">Local <span className="font-mono normal-case tracking-normal">v{props.diff.result.localVersion ?? '-'}</span></span>
-                            <span className="flex-1 border-l border-line px-4 py-1.5">Confluence <span className="font-mono normal-case tracking-normal">v{props.diff.result.remoteVersion}</span></span>
+                            {diffInline
+                              ? <span className="px-4 py-1.5"><DiffSide {...diffBefore!} /> → <DiffSide {...diffAfter!} /></span>
+                              : <span className="flex-1 px-4 py-1.5"><DiffSide {...diffBefore!} /></span>}
+                            <span className={`flex flex-1 items-center gap-1 pr-2 ${diffInline ? '' : 'border-l border-line pl-4'}`}>
+                              {!diffInline && <DiffSide {...diffAfter!} />}
+                              {reviewing && <span className="ml-2 normal-case tracking-normal text-ink-mute">revert a change to keep yours</span>}
+                              <span className="ml-auto flex gap-0.5 normal-case tracking-normal">
+                                <DiffLayoutButton label="Side by side" active={!diffInline} onClick={() => setDiffLayout(false)} />
+                                <DiffLayoutButton label="Inline" active={diffInline} onClick={() => setDiffLayout(true)} />
+                              </span>
+                            </span>
                           </div>
                           <div className="min-h-0 flex-1">
                             <Suspense fallback={<CenterNote text="Loading diff…" />}>
-                              <DiffView remote={props.diff.result.remote} local={props.diff.result.local} theme={props.theme} />
+                              <DiffView
+                                diff={props.diff.result}
+                                localFirst={reviewing}
+                                inline={diffInline}
+                                onEdit={reviewing ? text => ctx.app.setReview({ result: props.diff!.result, text }) : undefined}
+                                theme={props.theme}
+                              />
                             </Suspense>
                           </div>
                         </div>
@@ -612,6 +636,21 @@ function Tab({ label, active, disabled, title, className = '', onClick }: {
       className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 px-[13px] py-[9px] text-[12.5px] disabled:cursor-not-allowed ${className} ${
         active ? 'border-accent font-medium text-ink' : 'border-transparent text-ink-dim enabled:hover:text-ink disabled:text-ink-disabled'
       }`}
+    >
+      {label}
+    </button>
+  )
+}
+
+function DiffSide({ label, version }: { label: string, version: string | number }) {
+  return <>{label} <span className="font-mono normal-case tracking-normal">v{version}</span></>
+}
+
+function DiffLayoutButton({ label, active, onClick }: { label: string, active: boolean, onClick(): void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded px-2 py-0.5 text-[11px] ${active ? 'bg-hover text-ink' : 'text-ink-dim hover:text-ink'}`}
     >
       {label}
     </button>

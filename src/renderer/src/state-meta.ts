@@ -34,7 +34,7 @@ export const STATE_META: Record<DisplayState, StateMeta> = {
   'behind': { label: 'Remote changes', hint: 'Confluence moved ahead - pull to refresh the local file' },
   'ahead': { label: 'Local changes', hint: 'Local version is ahead of Confluence - push to publish' },
   'local-edits': { label: 'Local changes', hint: 'The local body changed since the last sync - push to publish' },
-  'conflict': { label: 'Conflict', hint: 'Both sides changed since the baseline. Resolve hunk by hunk - never auto-merged' },
+  'conflict': { label: 'Conflict', hint: 'Both sides changed since the baseline. Resolve change by change in the diff - never auto-merged' },
   'no-version': { label: 'Never published', hint: 'Tracked but never published by vdoc - push to publish it' },
   'not-found': { label: 'Page not found', hint: 'The Confluence page is gone or not accessible' },
   'untracked': { label: 'No page linked', hint: 'No confluencePageId - link it to an existing page or create one' },

@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowDownToLine, ArrowUp, ArrowUpToLine, Ban, Check, ChevronLeft, ChevronRight, CircleArrowUp, CircleHelp, Columns3, Clock, Command as CommandKey, Copy, CornerDownLeft, Download, ExternalLink, FilePlus, FileText, FolderOpen, House, KeyRound, Link, ListTree, PanelLeft, PanelRight, Pin, Plus, Power, RefreshCw, RotateCw, Search, Settings, Sparkles, SquarePen, SunMoon, Terminal, TriangleAlert, X, type LucideIcon } from 'lucide-react'
 import type { ChangesScope, DisplayState } from '../../shared/types.ts'
+import { reviewOutcome } from '../../shared/review.ts'
 import { displayState, syncGroup, type FileEntry } from '../../shared/status.ts'
 import type { AppStore } from './useApp.ts'
 
@@ -53,8 +54,6 @@ export interface CommandContext {
   openChanges(scope?: ChangesScope): void
   /** Select the document and open its diff. */
   openDiff(path: string): void
-  /** Select the document and open the per-hunk conflict review. */
-  openResolve(path: string): void
   /** Open (or refocus) the in-document find bar over the preview. */
   openFind(): void
   toggleSidebar(): void
@@ -137,15 +136,36 @@ export interface PrimaryAction {
   tone: 'primary' | 'secondary' | 'danger'
 }
 
-/** One primary per document, derived from its state. Synced is the only calm (secondary) one. */
-export function primaryAction(state: DisplayState | null): PrimaryAction | null {
+/** Both sides can win - the diff's Confluence side is then the editable merge result. */
+export const isReviewable = (state: DisplayState | null): boolean => state === 'conflict' || (state !== null && syncGroup(state) === 'remote')
+
+const inReview = (ctx: CommandContext): boolean =>
+  ctx.view === 'diff' && isReviewable(ctx.state) && ctx.app.diff?.path === ctx.selection
+
+/** The diff under review, as far as the reverted changes go. */
+function reviewPrimary(ctx: CommandContext): PrimaryAction {
+  const { local, remote } = ctx.app.diff!.result
+  const text = ctx.app.review?.result === ctx.app.diff!.result ? ctx.app.review.text : remote
+  switch (reviewOutcome(text, local, remote)) {
+    case 'theirs': return ctx.state === 'conflict'
+      ? { label: 'Accept Confluence version', commandId: 'sync.applyReview', tone: 'danger' }
+      : { label: 'Pull changes', commandId: 'sync.applyReview', tone: 'primary' }
+    case 'mine': return { label: 'Keep mine - overwrite Confluence', commandId: 'sync.applyReview', tone: 'danger' }
+    case 'merged': return { label: 'Save merge and push', commandId: 'sync.applyReview', tone: 'danger' }
+  }
+}
+
+/** One primary per document, derived from its state - in review, from the reverted changes. Synced is the only calm (secondary) one. */
+export function primaryAction(ctx: CommandContext): PrimaryAction | null {
+  const { state } = ctx
   if (!state) return null
+  if (inReview(ctx)) return reviewPrimary(ctx)
   switch (syncGroup(state)) {
     case 'synced': return { label: 'Recheck', commandId: 'sync.check', tone: 'secondary' }
     case 'local': return { label: 'Push to Confluence', commandId: 'sync.push', tone: 'primary' }
     case 'remote': return { label: 'Review changes', commandId: 'view.diff', tone: 'primary' }
     case 'conflict': return state === 'conflict'
-      ? { label: 'Resolve conflict', commandId: 'sync.resolve', tone: 'danger' }
+      ? { label: 'Resolve conflict', commandId: 'view.diff', tone: 'danger' }
       : { label: 'Recheck', commandId: 'sync.check', tone: 'secondary' }
     case 'unchecked': return state === 'unverified'
       ? { label: 'Verify document', commandId: 'sync.baseline', tone: 'primary' }
@@ -157,7 +177,7 @@ export function primaryAction(state: DisplayState | null): PrimaryAction | null 
 
 /** What ⌘⏎ runs: the document's primary, or on Changes the bulk pull when anything is remote. */
 function visiblePrimary(ctx: CommandContext): PrimaryAction | null {
-  if (ctx.selection) return primaryAction(ctx.state)
+  if (ctx.selection) return primaryAction(ctx)
   const remote = ctx.app.counts.remote
   return remote > 0 ? { label: `Pull ${remote} remote update${remote === 1 ? '' : 's'}`, commandId: 'sync.pullAll', tone: 'primary' } : null
 }
@@ -176,7 +196,10 @@ export function secondaryActions(ctx: CommandContext): MenuItem[][] {
   switch (syncGroup(ctx.state)) {
     case 'synced': return [[{ id: 'sync.push', label: 'Push anyway' }, { id: 'sync.pull', label: 'Pull anyway' }, ...lossy], common]
     case 'local': return [[{ id: 'sync.forcePull', label: 'Discard local changes' }, ...lossy], [diff, ...common]]
-    case 'remote': return [[{ id: 'sync.pull', label: 'Pull without reviewing' }, 'sync.forcePush', ...lossy], ['file.browser', ...common]]
+    case 'remote': return [
+      [{ id: 'sync.pull', label: ctx.view === 'diff' ? 'Accept all changes' : 'Pull without reviewing' }, { id: 'sync.forcePush', label: 'Keep mine - overwrite Confluence' }, ...lossy],
+      ['file.browser', ...common],
+    ]
     case 'conflict': return [[{ id: 'sync.forcePush', label: 'Keep all mine' }, { id: 'sync.forcePull', label: 'Keep all theirs' }, ...lossy], [diff, ...common]]
     case 'unchecked': return [['sync.baseline', { id: 'sync.push', label: 'Push' }, 'sync.pull'], [diff, ...common]]
     case 'unlinked': return [['sync.link', 'file.init'], common]
@@ -322,13 +345,14 @@ export const COMMANDS: Command[] = [
     run: ctx => void ctx.app.requestPush(ctx.selection!, ['remote', 'conflict'].includes(syncGroup(ctx.state!)), true),
   },
   {
-    id: 'sync.resolve',
+    id: 'sync.applyReview',
     group: 'Sync',
-    label: 'Resolve conflict',
+    label: 'Apply the reviewed diff',
     icon: TriangleAlert,
     tint: 'danger',
-    reason: all(linked, ctx => (ctx.state === 'conflict' ? undefined : 'document is not in conflict'), online),
-    run: ctx => ctx.openResolve(ctx.selection!),
+    reason: all(linked, ctx => (inReview(ctx) ? undefined : 'open the diff of a document with remote changes'), idle, online),
+    suffix: ctx => (inReview(ctx) ? reviewPrimary(ctx).label : undefined),
+    run: ctx => ctx.app.applyReview(ctx.selection!),
   },
   {
     id: 'sync.create',

@@ -3,7 +3,6 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { FileTree } from './components/FileTree.tsx'
 import { DetailPane, type SourceLayout } from './components/DetailPane.tsx'
 import { ChangesView } from './components/ChangesView.tsx'
-import { ConflictView } from './components/ConflictView.tsx'
 import { StatusBar } from './components/StatusBar.tsx'
 import { TopBar } from './components/TopBar.tsx'
 import { TokenPanel } from './components/TokenPanel.tsx'
@@ -62,8 +61,6 @@ export function App() {
   const [tourOpen, setTourOpen] = useState(() => localStorage.getItem('tourSeen') === null)
   const [view, setView] = useState<ViewMode>('preview')
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>('all')
-  /** The document under per-hunk conflict review, when any. */
-  const [resolving, setResolving] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
   /** Bumped by ⌘F - opens (or refocuses) the preview's find bar. */
   const [findSeq, setFindSeq] = useState(0)
@@ -115,7 +112,7 @@ export function App() {
   const [legendOpen, setLegendOpen] = useWorkspaceFlag('legendOpen', app.root)
 
   const selected = app.selection ? app.entries.get(app.selection) ?? null : null
-  const inspectorAvailable = selected !== null && resolving !== selected.path && !logsOpen
+  const inspectorAvailable = selected !== null && !logsOpen
   const connected = app.auth?.ok === true
   const cliOutdated = Boolean(
     app.settings?.version
@@ -136,23 +133,13 @@ export function App() {
     if (selected && remoteVersion !== undefined && connected) loadAuthors([{ path: selected.path, remoteVersion }])
   }, [connected, loadAuthors, remoteVersion, selected])
 
-  // A new selection starts on Preview - reading is the common case - and leaves any conflict review.
-  useEffect(() => {
-    setView('preview')
-    setResolving(current => (current === app.selection ? current : null))
-  }, [app.selection])
+  // A new selection starts on Preview - reading is the common case.
+  useEffect(() => setView('preview'), [app.selection])
 
   const openDiff = (path: string): void => {
     app.setSelection(path)
-    setResolving(null)
     if (app.diff?.path === path) setView('diff')
     else void app.loadDiff(path, true)
-  }
-
-  const openResolve = (path: string): void => {
-    app.setSelection(path)
-    setResolving(path)
-    if (app.diff?.path !== path) void app.loadDiff(path, true)
   }
 
   const ctx: CommandContext = {
@@ -178,12 +165,8 @@ export function App() {
       setSidebarMode(mode)
       setSidebarOpen(true)
     },
-    openChanges: scope => {
-      setResolving(null)
-      app.openChanges(scope)
-    },
+    openChanges: scope => app.openChanges(scope),
     openDiff,
-    openResolve,
     openFind: () => setFindSeq(seq => seq + 1),
     toggleSidebar: () => setSidebarOpen(open => !open),
     toggleInfo: () => setInfoOpen(open => !open),
@@ -296,22 +279,7 @@ export function App() {
           </aside>
         )}
         <main data-tour="main" className="@container min-w-0 flex-1 bg-content">
-          {selected && resolving === selected.path
-            ? (
-                <ConflictView
-                  entry={selected}
-                  diff={app.diff?.path === selected.path ? app.diff.result : null}
-                  author={latestVersion}
-                  busy={app.busyOp !== null}
-                  onBack={() => ctx.openChanges()}
-                  onError={app.reportError}
-                  onMergeAndPush={(expected, merged) => {
-                    setResolving(null)
-                    void app.mergeAndPush(selected.path, expected, merged)
-                  }}
-                />
-              )
-            : selected
+          {selected
               ? (
                   <DetailPane
                     ctx={ctx}
@@ -357,7 +325,6 @@ export function App() {
                     keyboard={!dialogOpen}
                     loadAuthors={app.loadAuthors}
                     onReview={openDiff}
-                    onResolve={openResolve}
                     onPullAll={app.pullAll}
                     onPushAll={app.pushAll}
                     onCheckAll={() => void app.checkAll()}

@@ -21,7 +21,7 @@ const CONCEPTS: Array<{ term: string, text: string }> = [
   },
   {
     term: 'Conflict',
-    text: 'Both sides changed since the baseline. Resolve keeps or discards each hunk (mine, theirs, or both), writes the merged document, and pushes it as one force push after the usual preview and red confirmation. Nothing is ever auto-merged.',
+    text: 'Both sides changed since the baseline. Resolve opens the diff with Confluence\'s version on the right: revert a change to keep yours, or edit it. Untouched, it replaces your file; otherwise the result is written and pushed as one force push after the usual preview and red confirmation. Nothing is ever auto-merged.',
   },
   {
     term: 'Pull',
