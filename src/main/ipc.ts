@@ -22,6 +22,13 @@ import { checkForUpdates, getUpdateStatus, restartAndInstallUpdate } from './upd
 import { watchDocs } from './watcher.ts'
 
 const CHECK_BATCH = 24
+
+/** One CLI run per batch, in order - keeps argv far below Windows' 32,767-character command line. */
+async function inBatches<T>(paths: string[], run: (batch: string[]) => Promise<T[]>): Promise<T[]> {
+  const results: T[] = []
+  for (let i = 0; i < paths.length; i += CHECK_BATCH) results.push(...await run(paths.slice(i, i + CHECK_BATCH)))
+  return results
+}
 const PUSH_PREVIEW_TTL_MS = 5 * 60 * 1000
 
 interface PendingPush {
@@ -219,9 +226,7 @@ export function registerIpc(
 
   handle('check-files', async (_event, input: unknown) => {
     const paths = docsPaths(input)
-    if (paths.length === 0) return []
-    const { files } = await runVdocJson<{ files: CheckFile[] }>(['cf', 'check', ...paths])
-    return files
+    return inBatches(paths, async batch => (await runVdocJson<{ files: CheckFile[] }>(['cf', 'check', ...batch])).files)
   })
 
   handle('read-file', (_event, input: unknown) => readFileSync(resolveExistingPathInsideRoot(docsRoot(), input), 'utf8'))
@@ -280,10 +285,7 @@ export function registerIpc(
   handle('pull', async (_event, pathsInput: unknown, forceInput?: unknown) => {
     const paths = docsPaths(pathsInput)
     const force = forceInput === undefined ? false : booleanValue(forceInput, 'force flag')
-    const args = ['cf', 'pull', ...paths]
-    if (force) args.push('--force')
-    const { files } = await runVdocJson<{ files: PullFile[] }>(args)
-    return files
+    return inBatches(paths, async batch => (await runVdocJson<{ files: PullFile[] }>(['cf', 'pull', ...batch, ...(force ? ['--force'] : [])])).files)
   })
 
   handle('push-preview', async (_event, pathInput: unknown, forceInput?: unknown, allowLossyInput?: unknown) => {
