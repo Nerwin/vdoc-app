@@ -222,12 +222,12 @@ function vdocFailureMessage(args: string[], stderr: string, stdout: string): str
   return `vdoc ${command} failed${detail ? `:\n${detail}` : ''}`
 }
 
-/** Relative paths of files with uncommitted git changes under the content dirs. */
-export function gitDirtyFiles(): Set<string> {
+/** Relative paths of files with uncommitted git changes under the content dirs, or among `paths`. */
+export function gitDirtyFiles(paths: string[] = getContentDirs()): Set<string> {
   try {
     const output = execFileSync(
       'git',
-      ['status', '--porcelain=v1', '--untracked-files=all', '--', ...getContentDirs()],
+      ['status', '--porcelain=v1', '--untracked-files=all', '--', ...paths],
       { cwd: docsRoot(), encoding: 'utf8' },
     )
     return new Set(
@@ -270,6 +270,17 @@ export function scanMarkdownFiles(): Array<FileMeta & { path: string }> {
   }
 
   for (const dir of getContentDirs()) walk(dir)
+  return files
+}
+
+/** Fresh metadata for known files - `null` once one is gone, so the caller rescans everything. */
+export function scanFiles(paths: string[]): Array<FileMeta & { path: string }> | null {
+  const root = docsRoot()
+  const files: Array<FileMeta & { path: string }> = []
+  for (const path of paths) {
+    if (!existsSync(join(root, path))) return null
+    files.push({ path, ...fileMeta(join(root, path)) })
+  }
   return files
 }
 

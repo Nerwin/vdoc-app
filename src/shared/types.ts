@@ -182,7 +182,7 @@ export interface AuthStatus {
   error?: string
 }
 
-interface ScanFile {
+export interface ScanFile {
   path: string
   tracked: boolean
   /** Has uncommitted git changes (purely informational - no sync logic depends on it). */
@@ -283,6 +283,8 @@ export interface FileWriteResult {
 export interface VdocApi {
   platform: 'darwin' | 'win32' | 'linux'
   scan(): Promise<ScanResult>
+  /** Metadata for already-known files; `null` when one no longer exists. */
+  scanFiles(paths: string[]): Promise<ScanFile[] | null>
   checkAll(): Promise<CheckFile[]>
   /** Terminate the active check batch; checkAll resolves with completed batch results. */
   checkCancel(): Promise<void>

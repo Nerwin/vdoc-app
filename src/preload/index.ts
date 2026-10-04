@@ -12,6 +12,7 @@ const subscribe = <T>(channel: string, cb: (payload: T) => void): (() => void) =
 const api: VdocApi = {
   platform: process.platform as VdocApi['platform'],
   scan: () => ipcRenderer.invoke('scan'),
+  scanFiles: paths => ipcRenderer.invoke('scan-files', paths),
   checkAll: () => ipcRenderer.invoke('check-all'),
   checkCancel: () => ipcRenderer.invoke('check-cancel'),
   checkFiles: paths => ipcRenderer.invoke('check-files', paths),

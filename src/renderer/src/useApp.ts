@@ -1,7 +1,7 @@
 import { captureException } from '@sentry/electron/renderer'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { LOG_MAX, type AppUpdateStatus, type AuthStatus, type ChangesScope, type CheckFile, type CredentialKey, type DiffResult, type PushFile, type ScanResult, type Settings, type SettingsInfo, type VdocLogEntry, type VersionEntry } from '../../shared/types.ts'
+import { LOG_MAX, type AppUpdateStatus, type AuthStatus, type ChangesScope, type CheckFile, type CredentialKey, type DiffResult, type PushFile, type ScanFile, type ScanResult, type Settings, type SettingsInfo, type VdocLogEntry, type VersionEntry } from '../../shared/types.ts'
 import { setFrontmatterFlag } from '../../shared/frontmatter.ts'
 import { initMessage } from '../../shared/init.ts'
 import { isLossyPushError } from '../../shared/lossy-push.ts'
@@ -72,6 +72,23 @@ type SavedCheck = CheckFile & { checkedAt?: number }
 const FULL_CHECK_TTL_MS = 60 * 60 * 1000
 /** Focus-triggered partial re-checks are throttled to once a minute. */
 const FOCUS_THROTTLE_MS = 60 * 1000
+/** Edited files are re-checked once the edits settle - autosave fires on every typing pause. */
+const EDIT_CHECK_DELAY_MS = 2500
+/** Beyond this many changed files (a git checkout), one full rescan beats per-file reads. */
+const TARGETED_SCAN_MAX = 50
+
+const toEntry = (file: ScanFile, previous: FileEntry | undefined): FileEntry => ({
+  path: file.path,
+  tracked: file.tracked,
+  gitDirty: file.gitDirty,
+  title: file.title,
+  pageId: file.pageId,
+  ignored: file.ignored,
+  hidden: file.hidden,
+  mtimeMs: file.mtimeMs,
+  check: file.tracked ? previous?.check : undefined,
+  checkedAt: file.tracked ? previous?.checkedAt : undefined,
+})
 
 export function useApp() {
   const api = window.vdoc
@@ -197,25 +214,7 @@ export function useApp() {
 
   const mergeScan = useCallback(({ files, pinnedFiles }: ScanResult) => {
     setPinnedFiles(pinnedFiles)
-    setEntries(prev => {
-      const next = new Map<string, FileEntry>()
-      for (const file of files) {
-        const previous = prev.get(file.path)
-        next.set(file.path, {
-          path: file.path,
-          tracked: file.tracked,
-          gitDirty: file.gitDirty,
-          title: file.title,
-          pageId: file.pageId,
-          ignored: file.ignored,
-          hidden: file.hidden,
-          mtimeMs: file.mtimeMs,
-          check: file.tracked ? previous?.check : undefined,
-          checkedAt: file.tracked ? previous?.checkedAt : undefined,
-        })
-      }
-      return next
-    })
+    setEntries(prev => new Map(files.map(file => [file.path, toEntry(file, prev.get(file.path))])))
   }, [])
 
   const checkAll = useCallback(async () => {
@@ -280,7 +279,9 @@ export function useApp() {
     if (root === '') return
     const results = [...entries.values()].flatMap(entry => (entry.tracked && entry.check ? [{ ...entry.check, checkedAt: entry.checkedAt }] : []))
     if (results.length === 0) return
-    localStorage.setItem(CHECKS_KEY, JSON.stringify({ root, at: lastChecked?.getTime() ?? null, results } satisfies SavedChecks))
+    // Coalesced: entries change on every autosave, and the snapshot is the whole workspace.
+    const timer = setTimeout(() => localStorage.setItem(CHECKS_KEY, JSON.stringify({ root, at: lastChecked?.getTime() ?? null, results } satisfies SavedChecks)), 1000)
+    return () => clearTimeout(timer)
   }, [entries, lastChecked, root])
 
   useEffect(() => {
@@ -293,16 +294,33 @@ export function useApp() {
     applyChecks(progress.results)
   }), [api, applyChecks])
 
+  const entriesRef = useRef(entries)
+  entriesRef.current = entries
+  const pendingChecks = useRef(new Set<string>())
+  const checkTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  useEffect(() => () => clearTimeout(checkTimer.current), [])
+
+  // Known files refresh one by one; a new or deleted file means a full rescan.
   useEffect(() => api.onFilesChanged(changed => {
     void (async () => {
       try {
-        const scan = await api.scan()
-        setRoot(scan.root)
-        mergeScan(scan)
+        const known = changed.length <= TARGETED_SCAN_MAX && changed.every(path => entriesRef.current.has(path))
+        const files = known ? await api.scanFiles(changed) : null
+        if (files) {
+          setEntries(prev => new Map([...prev, ...files.map((file): [string, FileEntry] => [file.path, toEntry(file, prev.get(file.path))])]))
+        } else {
+          const scan = await api.scan()
+          setRoot(scan.root)
+          mergeScan(scan)
+        }
         setDiff(current => (current && changed.includes(current.path) ? null : current))
-        const tracked = new Set(scan.files.filter(file => file.tracked && !file.ignored).map(file => file.path))
-        const present = changed.filter(path => tracked.has(path))
-        if (present.length > 0) applyChecks(await api.checkFiles(present))
+        for (const path of changed) pendingChecks.current.add(path)
+        clearTimeout(checkTimer.current)
+        checkTimer.current = setTimeout(() => {
+          const present = [...pendingChecks.current].filter(path => entriesRef.current.get(path)?.tracked && !entriesRef.current.get(path)?.ignored)
+          pendingChecks.current.clear()
+          if (present.length > 0) void api.checkFiles(present).then(results => applyChecks(results)).catch(fail)
+        }, EDIT_CHECK_DELAY_MS)
       } catch (error) {
         fail(error)
       }

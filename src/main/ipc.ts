@@ -15,7 +15,7 @@ import { LossyPushAccess } from '../shared/lossy-push.ts'
 import { maskSecret } from '../shared/secret.ts'
 import { OperationTickets } from '../shared/operation-tickets.ts'
 import { atomicWriteFile } from './atomic-write.ts'
-import { backlinksTo, docsRoot, fileForPageId, gitDirtyFiles, resolvedVdocBin, runVdoc, runVdocJson, scanMarkdownFiles, searchContent, setVdocBin, VdocCancelledError, vdocLogs } from './vdoc.ts'
+import { backlinksTo, docsRoot, fileForPageId, gitDirtyFiles, resolvedVdocBin, runVdoc, runVdocJson, scanFiles, scanMarkdownFiles, searchContent, setVdocBin, VdocCancelledError, vdocLogs } from './vdoc.ts'
 import { loadSettings, saveSettings } from './settings.ts'
 import { sentryActive, traceAppAction } from './sentry.ts'
 import { checkForUpdates, getUpdateStatus, restartAndInstallUpdate } from './update.ts'
@@ -174,6 +174,14 @@ export function registerIpc(
     }
     const files = scanned.map(({ legacyPin: _, ...file }) => ({ ...file, gitDirty: dirty.has(file.path) }))
     return { root, files, pinnedFiles: loadSettings().pinnedFiles[root] }
+  })
+
+  handle('scan-files', (_event, input: unknown) => {
+    const paths = docsPaths(input)
+    const scanned = scanFiles(paths)
+    if (!scanned) return null
+    const dirty = gitDirtyFiles(paths)
+    return scanned.map(({ legacyPin: _, ...file }) => ({ ...file, gitDirty: dirty.has(file.path) }))
   })
 
   handle('check-all', async event => {
