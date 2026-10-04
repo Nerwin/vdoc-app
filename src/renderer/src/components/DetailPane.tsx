@@ -346,7 +346,7 @@ export function DetailPane(props: Props) {
                 >
                   <MoreIcon size={15} />
                 </button>
-                {menuOpen && <ActionMenu ctx={ctx} items={secondaryActions(ctx)} onClose={() => setMenuOpen(false)} />}
+                {menuOpen && <ActionMenu ctx={ctx} sections={secondaryActions(ctx)} onClose={() => setMenuOpen(false)} />}
               </div>
             </div>
           </div>
@@ -400,7 +400,7 @@ export function DetailPane(props: Props) {
               {layoutOpen && (
                 <ActionMenu
                   ctx={ctx}
-                  items={[{ id: 'view.content', label: 'Editor' }, { id: 'view.split', label: 'Editor + Preview' }]}
+                  sections={[[{ id: 'view.content', label: 'Editor' }, { id: 'view.split', label: 'Editor + Preview' }]]}
                   align="left"
                   onClose={() => setLayoutOpen(false)}
                 />

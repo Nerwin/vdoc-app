@@ -1,7 +1,10 @@
+import darkLogo from '../assets/dark-logo.png'
+import lightLogo from '../assets/light-logo.png'
 import { IS_MAC, shortcutLabel } from '../commands.ts'
 import { BackIcon, ForwardIcon, HomeIcon, PanelToggleIcon, SearchIcon } from '../icons.tsx'
 
 interface Props {
+  theme: 'dark' | 'light'
   sidebarOpen: boolean
   inspectorOpen: boolean
   /** The current view has an inspector - otherwise its toggle stays in place, dimmed. */
@@ -21,11 +24,7 @@ export function TopBar(props: Props) {
   return (
     <header className="drag-region flex h-[46px] shrink-0 items-center gap-3.5 border-b border-line bg-chrome px-[13px]">
       {IS_MAC && <div className="w-[58px] shrink-0" />}
-      <span className="ml-1.5 inline-flex h-[28px] shrink-0 items-center gap-[7px] rounded-[5px] border border-wordmark-edge bg-wordmark-plate px-2.5 font-mono text-[11px] font-bold tracking-[1.5px]">
-        <span className="text-wordmark-ink">VOSKER</span>
-        <span className="h-[13px] w-px bg-wordmark-divider" />
-        <span className="text-wordmark-accent">DOC</span>
-      </span>
+      <img src={props.theme === 'dark' ? darkLogo : lightLogo} alt="VOSKER DOC" className="ml-1.5 h-[22px] w-auto shrink-0" />
 
       <div className="flex w-[150px] shrink-0 items-center gap-0.5">
         <PanelToggle side="left" open={props.sidebarOpen} title={`Toggle sidebar - ${shortcutLabel('view.sidebar')}`} onClick={props.onToggleSidebar} />

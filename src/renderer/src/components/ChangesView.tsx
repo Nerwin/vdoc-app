@@ -47,7 +47,7 @@ const ROW_MENU: Record<'remote' | 'local' | 'conflict', string[]> = {
   local: ['sync.push'],
   conflict: ['sync.forcePush', 'sync.forcePull'],
 }
-const ROW_MENU_COMMON = ['file.editor', 'file.finder', 'file.copyUrl', 'file.browser', 'file.ignore']
+const ROW_MENU_COMMON = ['file.editor', 'file.finder', 'file.copyUrl', 'file.browser']
 
 const GROUP_TITLE: Record<SyncGroup, string> = {
   synced: 'synced',
@@ -397,7 +397,7 @@ function ChangeRow({ row, group, last, focused, finding, author, menuOpen, ctx, 
         {menuOpen && (
           <ActionMenu
             ctx={forPath(ctx, entry.path)}
-            items={[...(group === 'remote' || group === 'local' || group === 'conflict' ? ROW_MENU[group] : []), ...ROW_MENU_COMMON]}
+            sections={[group === 'remote' || group === 'local' || group === 'conflict' ? ROW_MENU[group] : [], ROW_MENU_COMMON]}
             onClose={() => onMenu(false)}
           />
         )}

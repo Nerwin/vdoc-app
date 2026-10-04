@@ -303,9 +303,9 @@ export interface VdocApi {
   postComment(path: string, text: string): Promise<void>
   /** Confluence label names on the page this tracked file maps to. */
   labels(path: string): Promise<string[]>
-  pull(paths: string[], force?: boolean): Promise<PullFile[] | null>
+  pull(paths: string[], force?: boolean): Promise<PullFile[]>
   previewPush(path: string, force?: boolean, allowLossy?: boolean): Promise<PushPreviewTicket>
-  commitPush(token: string): Promise<PushFile | null>
+  commitPush(token: string): Promise<PushFile>
   create(path: string, space: string, parent?: string): Promise<CreateResult>
   /** Add missing authoring frontmatter through `vdoc md init`; existing values are preserved. */
   initFile(path: string): Promise<InitResult>

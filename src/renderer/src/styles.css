@@ -65,13 +65,6 @@
   --color-danger-hover: #4a2530;
   --color-danger-ink: #ffd9de;
 
-  /* Wordmark */
-  --color-wordmark-plate: #242932;
-  --color-wordmark-edge: #343b46;
-  --color-wordmark-ink: #f5f7fa;
-  --color-wordmark-divider: #4b5462;
-  --color-wordmark-accent: #f5c542;
-
   /* Frontmatter status badges */
   --color-badge-done-ink: #3ddc97;
   --color-badge-done-bg: #14312a;
@@ -173,12 +166,6 @@
   --color-danger-edge: #eab8b3;
   --color-danger-hover: #f1d6d3;
   --color-danger-ink: #a32218;
-
-  --color-wordmark-plate: #16324d;
-  --color-wordmark-edge: #0e2438;
-  --color-wordmark-ink: #ffffff;
-  --color-wordmark-divider: #3c5a78;
-  --color-wordmark-accent: #f5c542;
 
   --color-badge-done-ink: #17703d;
   --color-badge-done-bg: #e9f6ee;

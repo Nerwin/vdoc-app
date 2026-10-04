@@ -3,12 +3,13 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import type { SyncGroup } from '../../../shared/types.ts'
 import { displayState, needsAttention, syncGroup, type FileEntry } from '../../../shared/status.ts'
 import { buildTree, filesUnder, flattenVisible, orderPinnedFirst, pinnedGroupEnds, type TreeNode } from '../../../shared/tree.ts'
-import { shortcutLabel, type SidebarMode } from '../commands.ts'
+import { command, fileContextActions, forPath, shortcutLabel, type CommandContext, type SidebarMode } from '../commands.ts'
 import { BanIcon, ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, FolderIcon, PinIcon } from '../icons.tsx'
 import { GROUP_META, STATE_META } from '../state-meta.ts'
 import { StateGlyph } from './StateGlyph.tsx'
 
 interface Props {
+  ctx: CommandContext
   entries: Map<string, FileEntry>
   counts: { files: number, attention: number }
   mode: SidebarMode
@@ -24,15 +25,9 @@ interface Props {
   onOpenDiff(path: string): void
   onCheckFolder(path: string): void
   onTogglePin(path: string): void
-  onSetPinned(path: string, pinned: boolean): void
   onOpenFolder(path: string): void
   onGetPage(path: string): void
   onRemoveFolder(path: string): void
-  onSetIgnore(path: string, ignored: boolean): void
-  onOpenEditor(path: string): void
-  onReveal(path: string): void
-  onCopyPageId(pageId: string): void
-  onCopyPath(path: string): void
 }
 
 interface ContextMenu {
@@ -49,6 +44,7 @@ export function FileTree(props: Props) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [menu, setMenu] = useState<ContextMenu | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const menuCtx = menu?.kind === 'file' ? forPath(props.ctx, menu.path) : null
 
   // While the context menu is open, Escape closes it (and nothing else).
   useEffect(() => {
@@ -215,31 +211,27 @@ export function FileTree(props: Props) {
                     )}
                   </>
                 )
-              : (() => {
-                  const entry = entries.get(menu.path)
-                  const pageId = entry?.check?.pageId ?? entry?.pageId
-                  return (
-                    <>
-                      <MenuItem label="Open in editor" onClick={() => { props.onOpenEditor(menu.path); setMenu(null) }} />
-                      <MenuItem label="Show in folder" onClick={() => { props.onReveal(menu.path); setMenu(null) }} />
-                      <MenuRule />
-                      <MenuItem
-                        icon={<PinIcon size={11} className="text-brand" />}
-                        label={pinnedFiles.includes(menu.path) ? 'Unpin from top' : 'Pin on top'}
-                        onClick={() => { props.onSetPinned(menu.path, !pinnedFiles.includes(menu.path)); setMenu(null) }}
-                      />
-                      <MenuItem
-                        icon={<BanIcon size={13} className="text-ink-mute" />}
-                        label={entry?.ignored ? 'Include in Confluence' : 'Ignore in Confluence'}
-                        hint="edits frontmatter"
-                        onClick={() => { props.onSetIgnore(menu.path, !entry?.ignored); setMenu(null) }}
-                      />
-                      <MenuRule />
-                      {pageId && <MenuItem label="Copy page ID" onClick={() => { props.onCopyPageId(pageId); setMenu(null) }} />}
-                      <MenuItem label="Copy document path" onClick={() => { props.onCopyPath(menu.path); setMenu(null) }} />
-                    </>
-                  )
-                })()}
+              : fileContextActions(menuCtx!).map((section, index) => (
+                  <Fragment key={index}>
+                    {index > 0 && <MenuRule />}
+                    {section.map(item => {
+                      const id = typeof item === 'string' ? item : item.id
+                      const cmd = command(id)
+                      const reason = cmd.reason?.(menuCtx!)
+                      return (
+                        <MenuItem
+                          key={id}
+                          icon={FILE_MENU_DECOR[id]?.icon}
+                          label={typeof item === 'string' ? cmd.label : item.label}
+                          hint={FILE_MENU_DECOR[id]?.hint}
+                          keys={shortcutLabel(id)}
+                          disabled={reason}
+                          onClick={() => { cmd.run(menuCtx!); setMenu(null) }}
+                        />
+                      )
+                    })}
+                  </Fragment>
+                ))}
           </div>
         </div>
       )}
@@ -261,23 +253,34 @@ function ModeButton({ active, title, onClick, children }: { active: boolean, tit
   )
 }
 
+const FILE_MENU_DECOR: Record<string, { icon: React.ReactNode, hint?: string }> = {
+  'file.pin': { icon: <PinIcon size={11} className="text-brand" /> },
+  'file.ignore': { icon: <BanIcon size={13} className="text-ink-mute" />, hint: 'edits frontmatter' },
+}
+
 interface MenuItemProps {
   label: string
   onClick(): void
   icon?: React.ReactNode
   hint?: string
+  keys?: string
   danger?: boolean
+  /** Why the item is unavailable - shown as its tooltip. */
+  disabled?: string
 }
 
-function MenuItem({ label, onClick, icon, hint, danger }: MenuItemProps) {
+function MenuItem({ label, onClick, icon, hint, keys, danger, disabled }: MenuItemProps) {
   return (
     <button
       onClick={onClick}
-      className={`flex w-full items-center gap-[9px] whitespace-nowrap rounded-[5px] px-2.5 py-1.5 text-left text-[12px] ${danger ? 'text-conflict hover:bg-danger' : 'text-ink-body hover:bg-hover'}`}
+      disabled={disabled !== undefined}
+      title={disabled ? `${label} - ${disabled}` : undefined}
+      className={`flex w-full items-center gap-[9px] whitespace-nowrap rounded-[5px] px-2.5 py-1.5 text-left text-[12px] disabled:text-ink-label disabled:hover:bg-transparent ${danger ? 'text-conflict hover:bg-danger' : 'text-ink-body hover:bg-hover'}`}
     >
       {icon && <span className="flex shrink-0">{icon}</span>}
       {label}
       {hint && <span className="ml-auto text-[10.5px] text-ink-label">{hint}</span>}
+      {keys && <span className="ml-auto font-mono text-[11px] text-ink-label">{keys}</span>}
     </button>
   )
 }

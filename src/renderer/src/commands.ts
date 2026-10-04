@@ -114,7 +114,7 @@ const versions = (ctx: CommandContext): string | undefined => {
   return `Local v${check.localVersion ?? '-'} · Confluence v${check.remoteVersion ?? '-'}`
 }
 
-export const copy = (ctx: CommandContext, text: string, what: string): void => {
+const copy = (ctx: CommandContext, text: string, what: string): void => {
   void window.vdoc.copyText(text).then(
     () => ctx.app.notify(`${what} copied`),
     error => ctx.app.reportError(error),
@@ -122,7 +122,7 @@ export const copy = (ctx: CommandContext, text: string, what: string): void => {
 }
 
 /** OS-native absolute path for pasting outside the app (app-internal paths always use '/'). */
-export const absolutePath = (root: string, path: string): string =>
+const absolutePath = (root: string, path: string): string =>
   (root.includes('\\') ? `${root}\\${path.replaceAll('/', '\\')}` : `${root}/${path}`)
 
 /** The same registry, aimed at another document - Changes rows run commands without selecting. */
@@ -167,21 +167,33 @@ export const isPinned = (ctx: CommandContext): boolean => ctx.selection !== null
 /** A menu row: a registry id, optionally relabelled for the surface it sits in. */
 export type MenuItem = string | { id: string, label: string }
 
-/** What `⋯` offers per state (R5 §5) - everything that is not the primary. */
-export function secondaryActions(ctx: CommandContext): MenuItem[] {
-  const pin = { id: 'file.pin', label: isPinned(ctx) ? 'Unpin from top' : 'Pin on top' }
-  const ignore = { id: 'file.ignore', label: ctx.entry?.ignored ? 'Include in Confluence' : 'Ignore in Confluence' }
-  const common: MenuItem[] = ['file.editor', 'file.finder', 'file.copyUrl', 'file.copyPath', pin, ignore]
-  if (!ctx.state) return common
+/** What `⋯` offers per state (R5 §5) - everything that is not the primary: writes and Confluence ops, then side-effect-free actions. */
+export function secondaryActions(ctx: CommandContext): MenuItem[][] {
+  const common: MenuItem[] = ['file.editor', 'file.finder', 'file.copyUrl']
+  const diff = { id: 'view.diff', label: 'Open diff' }
+  const lossy = ctx.selection && ctx.app.lossyPushPaths.has(ctx.selection) ? ['sync.lossyPush'] : []
+  if (!ctx.state) return [common]
   switch (syncGroup(ctx.state)) {
-    case 'synced': return [{ id: 'sync.push', label: 'Push anyway' }, { id: 'sync.pull', label: 'Pull anyway' }, 'sync.lossyPush', ...common]
-    case 'local': return [{ id: 'sync.forcePull', label: 'Discard local changes' }, { id: 'view.diff', label: 'Open diff' }, 'sync.lossyPush', ...common]
-    case 'remote': return [{ id: 'sync.pull', label: 'Pull without reviewing' }, { id: 'file.browser', label: 'Open in Confluence' }, 'sync.forcePush', 'sync.lossyPush', ...common]
-    case 'conflict': return [{ id: 'sync.forcePush', label: 'Keep all mine' }, { id: 'sync.forcePull', label: 'Keep all theirs' }, { id: 'view.diff', label: 'Open diff' }, 'sync.lossyPush', ...common]
-    case 'unchecked': return ['sync.baseline', { id: 'sync.push', label: 'Push' }, 'sync.pull', { id: 'view.diff', label: 'Open diff' }, ...common]
-    case 'unlinked': return ['sync.link', 'file.init', ...common]
-    case 'ignored': return ['file.finder', 'file.copyPath', pin, ignore]
+    case 'synced': return [[{ id: 'sync.push', label: 'Push anyway' }, { id: 'sync.pull', label: 'Pull anyway' }, ...lossy], common]
+    case 'local': return [[{ id: 'sync.forcePull', label: 'Discard local changes' }, ...lossy], [diff, ...common]]
+    case 'remote': return [[{ id: 'sync.pull', label: 'Pull without reviewing' }, 'sync.forcePush', ...lossy], ['file.browser', ...common]]
+    case 'conflict': return [[{ id: 'sync.forcePush', label: 'Keep all mine' }, { id: 'sync.forcePull', label: 'Keep all theirs' }, ...lossy], [diff, ...common]]
+    case 'unchecked': return [['sync.baseline', { id: 'sync.push', label: 'Push' }, 'sync.pull'], [diff, ...common]]
+    case 'unlinked': return [['sync.link', 'file.init'], common]
+    case 'ignored': return [['file.finder']]
   }
+}
+
+/** The tree's file context menu, in rule-separated sections - the only home of pin, ignore and copy path. */
+export function fileContextActions(ctx: CommandContext): MenuItem[][] {
+  return [
+    ['file.editor', 'file.finder'],
+    [
+      { id: 'file.pin', label: isPinned(ctx) ? 'Unpin from top' : 'Pin on top' },
+      { id: 'file.ignore', label: ctx.entry?.ignored ? 'Include in Confluence' : 'Ignore in Confluence' },
+    ],
+    ['file.copyId', 'file.copyPath'],
+  ]
 }
 
 const viewCommand = (view: ViewMode, label: string, keys?: KeyBinding): Command => ({
@@ -382,7 +394,7 @@ export const COMMANDS: Command[] = [
     group: 'File',
     label: 'Search documents…',
     icon: Search,
-    keys: { key: 'k', meta: true },
+    keys: { key: 'p', meta: true },
     run: ctx => ctx.openPalette('file'),
   },
   {
@@ -454,7 +466,7 @@ export const COMMANDS: Command[] = [
   {
     id: 'file.browser',
     group: 'File',
-    label: 'Open page in Confluence',
+    label: 'Open in Confluence',
     icon: ExternalLink,
     keys: { key: 'o', meta: true, shift: true },
     reason: linked,
@@ -463,7 +475,7 @@ export const COMMANDS: Command[] = [
   {
     id: 'file.ignore',
     group: 'File',
-    label: 'Ignore this document',
+    label: 'Ignore in Confluence',
     icon: Ban,
     reason: all(noFile, idle),
     suffix: ctx => (ctx.entry?.ignored ? 'currently ignored - include it again' : undefined),
@@ -472,9 +484,8 @@ export const COMMANDS: Command[] = [
   {
     id: 'file.pin',
     group: 'File',
-    label: 'Pin / unpin on top',
+    label: 'Pin on top',
     icon: Pin,
-    keys: { key: 'p', meta: true },
     reason: all(noFile, idle),
     suffix: ctx => (isPinned(ctx) ? 'currently pinned - unpin it' : undefined),
     run: ctx => ctx.app.setPinned(ctx.selection!, !isPinned(ctx)),
@@ -627,7 +638,7 @@ export const COMMANDS: Command[] = [
   {
     id: 'app.quit',
     group: 'App',
-    label: 'Quit vdoc',
+    label: 'Quit V-DOC',
     icon: Power,
     keys: { key: 'q', meta: true },
     run: ctx => void ctx.app.quit(),

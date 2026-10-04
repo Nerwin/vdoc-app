@@ -366,7 +366,6 @@ export function useApp() {
   const doPull = useCallback((paths: string[], force: boolean) => runOp('pull', async () => {
     const results = await api.pull(paths, force)
     setPullConfirm(null)
-    if (!results) return
     const pulled = results.filter(result => result.status === 'pulled' || result.status === 'updated')
     // Files that did NOT update are the interesting part - say why, per file.
     const skipped = results.filter(result => !pulled.includes(result))
@@ -430,7 +429,7 @@ export function useApp() {
     if (!pushPreview) return
     const { path, force, allowLossy, token } = pushPreview
     void runOp('push', async () => {
-      let result: PushFile | null
+      let result: PushFile
       try {
         result = await api.commitPush(token)
       } catch (error) {
@@ -440,7 +439,6 @@ export function useApp() {
         throw error
       }
       setPushPreview(null)
-      if (!result) return
       setLossyPushPaths(paths => {
         if (!paths.has(path)) return paths
         const next = new Set(paths)

@@ -61,8 +61,6 @@ const PAIRS: Array<[string, string]> = [
   ['info-ink', 'info-bg'],
   ['bad-ink', 'bad-bg'],
   ['keycap-ink', 'keycap-bg'],
-  ['wordmark-ink', 'wordmark-plate'],
-  ['wordmark-accent', 'wordmark-plate'],
 ]
 
 for (const [name, theme] of [['dark', dark], ['light', light]] as const) {

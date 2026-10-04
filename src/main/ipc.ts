@@ -162,22 +162,6 @@ export function registerIpc(
     })
   }
 
-  const confirmForce = async (title: string, message: string, detail: string, confirmLabel: string): Promise<boolean> => {
-    const window = getMainWindow()
-    if (!window) return false
-    const { response } = await dialog.showMessageBox(window, {
-      type: 'warning',
-      title,
-      message,
-      detail,
-      buttons: ['Cancel', confirmLabel],
-      defaultId: 0,
-      cancelId: 0,
-      noLink: true,
-    })
-    return response === 1
-  }
-
   handle('scan', () => {
     const dirty = gitDirtyFiles()
     const scanned = scanMarkdownFiles()
@@ -288,12 +272,6 @@ export function registerIpc(
   handle('pull', async (_event, pathsInput: unknown, forceInput?: unknown) => {
     const paths = docsPaths(pathsInput)
     const force = forceInput === undefined ? false : booleanValue(forceInput, 'force flag')
-    if (force && !await confirmForce(
-      'Overwrite local content?',
-      `Force pull ${paths.length} file(s) from Confluence?`,
-      'Local body changes will be replaced by the remote version. This cannot be undone by V-DOC.',
-      'Force pull',
-    )) return null
     const args = ['cf', 'pull', ...paths]
     if (force) args.push('--force')
     const { files } = await runVdocJson<{ files: PullFile[] }>(args)
@@ -327,18 +305,6 @@ export function registerIpc(
     const pending = pushTickets.take(token)
     if (contentHash(pending.path) !== pending.contentHash) throw new Error('File changed after the push preview; preview it again')
     if (pending.allowLossy && !lossyPushAccess.allows(pending.path)) throw new Error('Push force is no longer available for this file')
-    if (pending.allowLossy && !await confirmForce(
-      'Completely overwrite remote content?',
-      `Push force ${pending.path.split('/').at(-1)}?`,
-      'The remote page will be completely overwritten by this local file. Unsupported layouts, media, or macros will be deleted. This cannot be undone by V-DOC.',
-      'Overwrite remote',
-    )) return null
-    if (!pending.allowLossy && pending.force && !await confirmForce(
-      'Overwrite Confluence content?',
-      `Force push ${pending.path.split('/').at(-1)}?`,
-      'Remote edits will be replaced by the local document. This cannot be undone by V-DOC.',
-      'Force push',
-    )) return null
     const args = ['cf', 'push', pending.path]
     if (pending.force) args.push('--force')
     if (pending.allowLossy) args.push('--allow-lossy')

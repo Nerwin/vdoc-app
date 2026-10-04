@@ -17,7 +17,7 @@ import { Tour } from './components/Tour.tsx'
 import { Toast } from './components/Toast.tsx'
 import { Modal, ModalButton } from './components/Modal.tsx'
 import { CliVersionWarning } from './components/CliVersionWarning.tsx'
-import { absolutePath, commandFor, copy, isMod, selectionState, type CommandContext, type SidebarMode, type ViewMode } from './commands.ts'
+import { commandFor, isMod, selectionState, type CommandContext, type SidebarMode, type ViewMode } from './commands.ts'
 import { useApp } from './useApp.ts'
 import { cliStatus, documentOf, worstOutcome } from '../../shared/cli-status.ts'
 import { lastSyncAt } from '../../shared/status.ts'
@@ -245,6 +245,7 @@ export function App() {
   return (
     <div className="flex h-screen flex-col bg-pane font-sans text-[12.5px] text-ink-body">
       <TopBar
+        theme={theme}
         sidebarOpen={sidebarOpen}
         inspectorOpen={infoOpen}
         inspectorAvailable={inspectorAvailable}
@@ -272,6 +273,7 @@ export function App() {
         {sidebarOpen && (
           <aside data-tour="tree" style={{ width: sidebarWidth }} className="relative shrink-0 border-r border-line bg-sidebar">
             <FileTree
+              ctx={ctx}
               entries={app.entries}
               counts={app.counts}
               mode={sidebarMode}
@@ -286,15 +288,9 @@ export function App() {
               onOpenDiff={openDiff}
               onCheckFolder={app.checkFolder}
               onTogglePin={app.togglePin}
-              onSetPinned={app.setPinned}
               onOpenFolder={path => void app.openFolder(path)}
               onGetPage={path => app.setGetForm({ dir: path })}
               onRemoveFolder={app.removeFolder}
-              onSetIgnore={(path, ignored) => void app.setIgnored(path, ignored)}
-              onOpenEditor={path => void app.openEditor(path)}
-              onReveal={path => void app.revealFinder(path)}
-              onCopyPageId={pageId => copy(ctx, pageId, 'Page ID')}
-              onCopyPath={path => copy(ctx, absolutePath(app.root, path), 'Document path')}
             />
             <div onMouseDown={startSidebarResize} className="absolute inset-y-0 -right-0.5 z-10 w-1 cursor-col-resize" />
           </aside>
