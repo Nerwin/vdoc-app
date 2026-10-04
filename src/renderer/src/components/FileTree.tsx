@@ -59,16 +59,37 @@ export function FileTree(props: Props) {
     return () => window.removeEventListener('keydown', onKey, true)
   }, [menu])
 
-  // Changes mode narrows the same tree to the documents needing attention.
+  // Changes mode narrows the same tree to the documents needing attention - and the open one.
   const { rows, pinnedPaths, groupEnds } = useMemo(() => {
     const pins = [...pinnedDirs, ...pinnedFiles]
     const pinnedPaths = new Set(pins)
     const paths = [...entries.values()]
-      .filter(entry => !entry.hidden && (mode === 'all' || needsAttention(displayState(entry))))
+      .filter(entry => !entry.hidden && (mode === 'all' || entry.path === selection || needsAttention(displayState(entry))))
       .map(entry => entry.path)
     const rows = flattenVisible(orderPinnedFirst(buildTree(paths), pins), collapsed)
     return { rows, pinnedPaths, groupEnds: pinnedGroupEnds(rows, pinnedPaths) }
-  }, [entries, collapsed, pinnedDirs, pinnedFiles, mode])
+  }, [entries, collapsed, pinnedDirs, pinnedFiles, mode, selection])
+
+  // The open document is always revealed in the tree: its folders expand, then its row scrolls into view.
+  const revealRef = useRef<string | null>(null)
+  useEffect(() => {
+    revealRef.current = selection
+    if (!selection) return
+    setCollapsed(prev => {
+      const ancestors = [...prev].filter(dir => selection.startsWith(`${dir}/`))
+      if (ancestors.length === 0) return prev
+      const next = new Set(prev)
+      for (const dir of ancestors) next.delete(dir)
+      return next
+    })
+  }, [selection])
+  useEffect(() => {
+    const path = revealRef.current
+    const row = path && containerRef.current?.querySelector(`[data-path="${CSS.escape(path)}"]`)
+    if (!row) return
+    row.scrollIntoView({ block: 'nearest' })
+    revealRef.current = null
+  }, [rows, selection])
 
   const fileRows = useMemo(() => rows.filter(row => row.kind === 'file'), [rows])
 

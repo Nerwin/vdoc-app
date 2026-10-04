@@ -278,86 +278,85 @@ export function DetailPane(props: Props) {
     <div className="flex h-full min-w-0 bg-pane">
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex flex-col gap-[14px] px-[30px] pt-[22px]">
-          <div className="flex items-start gap-5">
-            <div className="flex min-w-0 flex-1 flex-col gap-[7px]">
-              <h1 className="truncate text-[20px] font-semibold tracking-[-0.2px] text-ink" title={displayTitle(entry)}>{displayTitle(entry)}</h1>
-              <div className="flex flex-wrap items-center gap-[11px] text-[12.5px]">
-                {ignored
-                  ? (
-                      <>
-                        <span className="inline-flex items-center gap-[7px] text-ink-dim"><BanIcon size={12} className="shrink-0 text-ink-mute" />Not synced with Confluence</span>
-                        {isPinned(ctx) && <><Sep /><span className="inline-flex items-center gap-[7px] text-ink-dim"><PinIcon size={11} className="shrink-0 text-brand" />Pinned</span></>}
-                        {entry.mtimeMs !== undefined && <><Sep /><span className="text-ink-mute">edited {timeAgo(entry.mtimeMs)}</span></>}
-                      </>
-                    )
-                  : (
-                      <>
-                        <StateGlyph group={group} word={meta.label} />
-                        {state === 'conflict'
-                          ? <><Sep /><span className="text-ink-dim">both sides changed</span></>
-                          : group === 'unchecked'
-                            ? <><Sep /><span className="text-ink-dim">no baseline recorded</span></>
-                            : check && (check.localVersion !== undefined || check.remoteVersion !== undefined) && (
-                              <>
-                                <Sep />
-                                <span title={versionsTitle} className="text-ink-dim">
-                                  {group === 'remote' ? `Confluence v${check.remoteVersion ?? '-'} · Local v${check.localVersion ?? '-'}` : `Local v${check.localVersion ?? '-'} · Confluence v${check.remoteVersion ?? '-'}`}
-                                </span>
-                              </>
-                            )}
-                        {pageId && (
-                          <>
-                            <Sep />
-                            <button
-                              onClick={() => command('file.browser').run(ctx)}
-                              title={`Open in Confluence - ${space ? `${space} / ` : ''}${pageId}`}
-                              className="inline-flex items-center gap-[5px] text-link hover:text-link-hover"
-                            >
-                              page <span className="font-mono text-[12px]">{pageId}</span><ExternalIcon size={11} className="shrink-0" />
-                            </button>
-                          </>
-                        )}
-                        {check && entry.checkedAt && <><Sep /><span className="text-ink-mute">checked {timeAgo(entry.checkedAt)}</span></>}
-                      </>
-                    )}
-                {saveState !== 'saved' && (
-                  <>
-                    <Sep />
-                    <span className={saveState === 'blocked' ? 'text-conflict' : 'text-ink-label'}>
-                      {saveState === 'unsaved' ? 'Unsaved' : saveState === 'saving' ? 'Saving…' : 'Save blocked'}
-                    </span>
-                  </>
+          <div className="flex min-w-0 flex-col gap-[7px]">
+            <div className="flex items-center gap-5">
+              <h1 className="min-w-0 flex-1 truncate text-[20px] font-semibold tracking-[-0.2px] text-ink" title={displayTitle(entry)}>{displayTitle(entry)}</h1>
+              <div className="flex shrink-0 items-center gap-2">
+                {primary && primaryCommand && (
+                  <button
+                    onClick={() => primaryCommand.run(ctx)}
+                    disabled={primaryReason !== undefined}
+                    title={primaryReason ? `${primary.label} - ${primaryReason}` : `${primary.label} - ${shortcutLabel('doc.primary')}`}
+                    className={`flex items-center gap-2 whitespace-nowrap rounded-md border px-[15px] py-[7px] text-[12.5px] font-medium disabled:opacity-40 ${TONE[primary.tone]}`}
+                  >
+                    {primary.label}
+                    {busy && <span className="h-3 w-3 animate-spin rounded-full border border-current/60 border-t-transparent" />}
+                  </button>
                 )}
+                <div className="relative">
+                  <button
+                    onClick={() => setMenuOpen(open => !open)}
+                    title="More actions"
+                    className="flex h-[30px] w-[30px] items-center justify-center rounded-md border border-control bg-raised text-ink-body hover:bg-hover hover:text-ink"
+                  >
+                    <MoreIcon size={15} />
+                  </button>
+                  {menuOpen && <ActionMenu ctx={ctx} sections={secondaryActions(ctx)} onClose={() => setMenuOpen(false)} />}
+                </div>
               </div>
-              {/* Ellipsised from the left so the filename stays visible. */}
-              <span dir="rtl" className="truncate text-left font-mono text-[11px] text-ink-label" title={path}>
-                <bdi dir="ltr">{path}</bdi>
-              </span>
             </div>
-
-            <div className="flex shrink-0 items-center gap-2">
-              {primary && primaryCommand && (
-                <button
-                  onClick={() => primaryCommand.run(ctx)}
-                  disabled={primaryReason !== undefined}
-                  title={primaryReason ? `${primary.label} - ${primaryReason}` : `${primary.label} - ${shortcutLabel('doc.primary')}`}
-                  className={`flex items-center gap-2 whitespace-nowrap rounded-md border px-[15px] py-[7px] text-[12.5px] font-medium disabled:opacity-40 ${TONE[primary.tone]}`}
-                >
-                  {primary.label}
-                  {busy && <span className="h-3 w-3 animate-spin rounded-full border border-current/60 border-t-transparent" />}
-                </button>
+            <div className="flex flex-wrap items-center gap-[11px] text-[12.5px]">
+              {ignored
+                ? (
+                    <>
+                      <span className="inline-flex items-center gap-[7px] text-ink-dim"><BanIcon size={12} className="shrink-0 text-ink-mute" />Not synced with Confluence</span>
+                      {isPinned(ctx) && <><Sep /><span className="inline-flex items-center gap-[7px] text-ink-dim"><PinIcon size={11} className="shrink-0 text-brand" />Pinned</span></>}
+                      {entry.mtimeMs !== undefined && <><Sep /><span className="text-ink-mute">edited {timeAgo(entry.mtimeMs)}</span></>}
+                    </>
+                  )
+                : (
+                    <>
+                      <StateGlyph group={group} word={meta.label} />
+                      {state === 'conflict'
+                        ? <><Sep /><span className="text-ink-dim">both sides changed</span></>
+                        : group === 'unchecked'
+                          ? <><Sep /><span className="text-ink-dim">no baseline recorded</span></>
+                          : check && (check.localVersion !== undefined || check.remoteVersion !== undefined) && (
+                            <>
+                              <Sep />
+                              <span title={versionsTitle} className="text-ink-dim">
+                                {group === 'remote' ? `Confluence v${check.remoteVersion ?? '-'} · Local v${check.localVersion ?? '-'}` : `Local v${check.localVersion ?? '-'} · Confluence v${check.remoteVersion ?? '-'}`}
+                              </span>
+                            </>
+                          )}
+                      {pageId && (
+                        <>
+                          <Sep />
+                          <button
+                            onClick={() => command('file.browser').run(ctx)}
+                            title={`Open in Confluence - ${space ? `${space} / ` : ''}${pageId}`}
+                            className="inline-flex items-center gap-[5px] text-link hover:text-link-hover"
+                          >
+                            <span className="font-mono text-[12px]">{pageId}</span><ExternalIcon size={11} className="shrink-0" />
+                          </button>
+                        </>
+                      )}
+                      {check && entry.checkedAt && <><Sep /><span className="text-ink-mute">checked {timeAgo(entry.checkedAt)}</span></>}
+                    </>
+                  )}
+              {saveState !== 'saved' && (
+                <>
+                  <Sep />
+                  <span className={saveState === 'blocked' ? 'text-conflict' : 'text-ink-label'}>
+                    {saveState === 'unsaved' ? 'Unsaved' : saveState === 'saving' ? 'Saving…' : 'Save blocked'}
+                  </span>
+                </>
               )}
-              <div className="relative">
-                <button
-                  onClick={() => setMenuOpen(open => !open)}
-                  title="More actions"
-                  className="flex h-[30px] w-[30px] items-center justify-center rounded-md border border-control bg-raised text-ink-body hover:bg-hover hover:text-ink"
-                >
-                  <MoreIcon size={15} />
-                </button>
-                {menuOpen && <ActionMenu ctx={ctx} sections={secondaryActions(ctx)} onClose={() => setMenuOpen(false)} />}
-              </div>
             </div>
+            {/* Ellipsised from the left so the filename stays visible. */}
+            <span dir="rtl" className="truncate text-left font-mono text-[11px] text-ink-label" title={path}>
+              <bdi dir="ltr">{path}</bdi>
+            </span>
           </div>
 
           {ignored && (
