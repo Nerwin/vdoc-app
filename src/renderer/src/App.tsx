@@ -56,6 +56,11 @@ export function App() {
   const [tokenOpen, setTokenOpen] = useState(false)
   const [palette, setPalette] = useState<'file' | 'command' | 'recent' | 'search' | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  // The config file may have been edited by hand since - Settings shows it fresh.
+  const { reloadSettings } = app
+  useEffect(() => {
+    if (settingsOpen) reloadSettings()
+  }, [settingsOpen, reloadSettings])
   const [logsOpen, setLogsOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
   const [tourOpen, setTourOpen] = useState(() => localStorage.getItem('tourSeen') === null)

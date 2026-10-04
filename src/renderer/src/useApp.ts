@@ -240,10 +240,15 @@ export function useApp() {
     }
   }, [api, applyChecks, fail])
 
-  useEffect(() => {
+  /** Full settings, CLI config included - other settings writes reuse the cached CLI fields. */
+  const reloadSettings = useCallback(() => {
     void api.settingsGet().then(setSettings).catch(fail)
-    void api.spaceMappingGet().then(setSpaceMapping).catch(fail)
   }, [api, fail])
+
+  useEffect(() => {
+    reloadSettings()
+    void api.spaceMappingGet().then(setSpaceMapping).catch(fail)
+  }, [api, fail, reloadSettings])
 
   // Initial load: tree first (fast, local), then the auth probe. Checking is never
   // automatic - the first check is always a deliberate click (or ⌘⇧R).
@@ -912,6 +917,7 @@ export function useApp() {
     review,
     setReview,
     applyReview,
+    reloadSettings,
     saveApiKey,
     setAuthMethod,
     clearCredential,

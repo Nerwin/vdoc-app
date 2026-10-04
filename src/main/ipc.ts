@@ -433,7 +433,7 @@ export function registerIpc(
       const window = BrowserWindow.fromWebContents(event.sender)
       if (window) watchDocs(window)
     }
-    return settingsInfo()
+    return settingsInfo('vdocBin' in patch || 'docsRoot' in patch)
   })
 
   handle('pick-folder', async event => {
@@ -536,19 +536,22 @@ export function registerIpc(
   handle('quit', () => app.quit())
 }
 
-async function settingsInfo(): Promise<SettingsInfo> {
-  const configPath = await runVdocJson<{ path: string }>(['config', 'path']).then(r => r.path).catch(() => null)
-  const [assetsDir, site] = await Promise.all([configScalar('confluence.assetsDir'), configScalar('confluence.site')])
+let cliInfo: Pick<SettingsInfo, 'version' | 'configPath' | 'assetsDir' | 'site'> | null = null
+
+/** The CLI-derived fields cost four vdoc spawns - re-probed only when the binary, the repo or the config changed. */
+async function settingsInfo(refreshCli = true): Promise<SettingsInfo> {
+  if (refreshCli || !cliInfo) {
+    const configPath = await runVdocJson<{ path: string }>(['config', 'path']).then(r => r.path).catch(() => null)
+    const [assetsDir, site, version] = await Promise.all([configScalar('confluence.assetsDir'), configScalar('confluence.site'), probeVersion()])
+    cliInfo = { configPath, assetsDir, site, version }
+  }
   return {
     ...loadSettings(),
     resolvedBin: resolvedVdocBin(),
     resolvedRoot: docsRoot(),
-    version: await probeVersion(),
     cliRequirement: loadCliRequirement(),
     appVersion: app.getVersion(),
-    configPath,
-    assetsDir,
-    site,
+    ...cliInfo,
   }
 }
 
