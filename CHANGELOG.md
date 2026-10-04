@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.21.1](https://github.com/Nerwin/vdoc-app/compare/v1.21.0...v1.21.1) (2026-10-04)
+
+### Refactoring
+
+* **detail:** drop open-in-logs link and auto-exit diff view ([af955fd](https://github.com/Nerwin/vdoc-app/commit/af955fd898f8da1db9e062a7a5d78eb72c462d78))
+* **detail:** move actions beside title and reveal open file in tree ([7e5f757](https://github.com/Nerwin/vdoc-app/commit/7e5f7579ac2efdc777376e602eb643c837a8f846))
 ## [1.21.0](https://github.com/Nerwin/vdoc-app/compare/v1.20.2...v1.21.0) (2026-10-04)
 
 ### Features
