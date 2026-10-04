@@ -88,12 +88,16 @@ export function CommandPalette({ ctx, entries, mode, recents, onPick, onRun, onC
       setHits([])
       return
     }
+    // Each query reads the whole corpus in main - only ask once typing pauses.
     let live = true
-    void window.vdoc.searchContent(query)
-      .then(results => live && setHits(results))
-      .catch(() => undefined)
+    const timer = setTimeout(() => {
+      void window.vdoc.searchContent(query)
+        .then(results => live && setHits(results))
+        .catch(() => undefined)
+    }, 200)
     return () => {
       live = false
+      clearTimeout(timer)
     }
   }, [mode, commandMode, search])
 

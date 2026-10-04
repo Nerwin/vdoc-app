@@ -1,5 +1,6 @@
 import { execFile, execFileSync } from 'node:child_process'
-import { closeSync, existsSync, fstatSync, openSync, readdirSync, readFileSync, readSync } from 'node:fs'
+import { closeSync, existsSync, fstatSync, openSync, readdirSync, readSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
 import { BrowserWindow } from 'electron'
@@ -253,10 +254,9 @@ interface FileMeta {
   mtimeMs?: number
 }
 
-/** Relative paths of all Markdown files in the content dirs, tracked = has confluencePageId frontmatter. */
-export function scanMarkdownFiles(): Array<FileMeta & { path: string }> {
-  const files: Array<FileMeta & { path: string }> = []
-
+/** Relative paths of all Markdown files in the content dirs - directory listings only, no file reads. */
+function markdownPaths(): string[] {
+  const paths: string[] = []
   const root = docsRoot()
   const walk = (relDir: string): void => {
     const absDir = join(root, relDir)
@@ -265,12 +265,17 @@ export function scanMarkdownFiles(): Array<FileMeta & { path: string }> {
       if (entry.name.startsWith('.') || EXCLUDED_DIRS.has(entry.name)) continue
       const relPath = `${relDir}/${entry.name}`
       if (entry.isDirectory()) walk(relPath)
-      else if (entry.name.endsWith('.md')) files.push({ path: relPath, ...fileMeta(join(root, relPath)) })
+      else if (entry.name.endsWith('.md')) paths.push(relPath)
     }
   }
-
   for (const dir of getContentDirs()) walk(dir)
-  return files
+  return paths
+}
+
+/** All Markdown files in the content dirs, tracked = has confluencePageId frontmatter. */
+export function scanMarkdownFiles(): Array<FileMeta & { path: string }> {
+  const root = docsRoot()
+  return markdownPaths().map(path => ({ path, ...fileMeta(join(root, path)) }))
 }
 
 /** Fresh metadata for known files - `null` once one is gone, so the caller rescans everything. */
@@ -285,14 +290,14 @@ export function scanFiles(paths: string[]): Array<FileMeta & { path: string }> |
 }
 
 /** Full-text search: first matching line per file, capped. Case-insensitive substring. */
-// ponytail: full rescan per query, same trade as backlinksTo - the debounce lives in the renderer.
-export function searchContent(query: string): SearchHit[] {
+// ponytail: full rescan per query (async, the renderer debounces) - an index if the corpus reaches thousands of large files.
+export async function searchContent(query: string): Promise<SearchHit[]> {
   const trimmed = query.trim()
   if (trimmed.length < 2) return []
   const hits: SearchHit[] = []
-  for (const { path } of scanMarkdownFiles()) {
+  for (const path of markdownPaths()) {
     try {
-      const match = firstMatch(readFileSync(join(docsRoot(), path), 'utf8'), trimmed)
+      const match = firstMatch(await readFile(join(docsRoot(), path), 'utf8'), trimmed)
       if (match) hits.push({ path, ...match })
     } catch {
       // Unreadable file: no hit.
@@ -303,13 +308,16 @@ export function searchContent(query: string): SearchHit[] {
 }
 
 /** Docs under the content dirs whose markdown links resolve to `target`. */
-// ponytail: full rescan per call, no index - the corpus is a few hundred small files.
-export function backlinksTo(target: string): string[] {
+// ponytail: full rescan per call (async), no index - an index if the corpus reaches thousands of large files.
+export async function backlinksTo(target: string): Promise<string[]> {
   const result: string[] = []
-  for (const { path } of scanMarkdownFiles()) {
+  const name = target.split('/').at(-1)!
+  for (const path of markdownPaths()) {
     if (path === target) continue
     try {
-      const text = readFileSync(join(docsRoot(), path), 'utf8')
+      const text = await readFile(join(docsRoot(), path), 'utf8')
+      // A link to the target spells its file name, plain or URI-encoded; most files are skipped without parsing.
+      if (!text.includes(name) && !text.includes(encodeURI(name))) continue
       if (mdLinkTargets(text).some(href => resolveRelative(path, href) === target)) result.push(path)
     } catch {
       // Unreadable file: not a backlink.

@@ -11,11 +11,10 @@ export interface SearchHit {
 export function firstMatch(text: string, query: string): { line: number, snippet: string } | null {
   const needle = query.toLowerCase()
   if (needle === '') return null
-  const lines = text.split('\n')
-  for (let index = 0; index < lines.length; index++) {
-    if (lines[index].toLowerCase().includes(needle)) {
-      return { line: index + 1, snippet: lines[index].trim().slice(0, 200) }
-    }
-  }
-  return null
+  // One pass over the whole file - most files miss, and only a hit pays for splitting lines.
+  const lower = text.toLowerCase()
+  const at = lower.indexOf(needle)
+  if (at === -1) return null
+  const line = lower.slice(0, at).split('\n').length
+  return { line, snippet: (text.split('\n')[line - 1] ?? '').trim().slice(0, 200) }
 }
