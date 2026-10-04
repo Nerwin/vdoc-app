@@ -2,12 +2,14 @@ import { useEffect, useRef } from 'react'
 
 import { applyMonacoTheme, EDITOR_FONT, monaco } from './monaco-setup.ts'
 
-export function CodeView({ content, onChange, onSave, theme }: {
+export function CodeView({ content, onChange, onSave, onEditor, theme }: {
   content: string
   /** Present = editable; called with the full text after every edit. */
   onChange?: (text: string) => void
   /** ⌘S - flush pending edits to disk immediately. */
   onSave?: () => void
+  /** Receives the editor instance once created, `null` on unmount. */
+  onEditor?: (editor: monaco.editor.IStandaloneCodeEditor | null) => void
   theme: 'dark' | 'light'
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -38,9 +40,13 @@ export function CodeView({ content, onChange, onSave, theme }: {
     editor.onDidChangeModelContent(() => onChangeRef.current?.(editor.getValue()))
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => onSaveRef.current?.())
     editorRef.current = editor
+    onEditor?.(editor)
     // The editor owns the implicit model created from `value` and disposes it itself.
-    return () => editor.dispose()
-  }, [])
+    return () => {
+      onEditor?.(null)
+      editor.dispose()
+    }
+  }, [onEditor])
 
   useEffect(() => {
     editorRef.current?.updateOptions({ readOnly: !editable })

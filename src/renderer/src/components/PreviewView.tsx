@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Marked } from 'marked'
 
-import { escapeHtml, previewBody } from '../../../shared/preview-html.ts'
+import { escapeHtml, previewBody, withSourceLine } from '../../../shared/preview-html.ts'
 import { BackIcon, CloseIcon, ForwardIcon } from '../icons.tsx'
 
 /** Fence language → Monaco language id, for the common shorthands. */
@@ -40,6 +40,17 @@ const marked = new Marked({
   },
 })
 
+/** Renders block by block so each top-level element carries its source line (scroll sync). */
+function renderPreview(content: string): string {
+  const { body, firstLine } = previewBody(content)
+  let line = firstLine
+  return marked.lexer(body).map(token => {
+    const html = withSourceLine(marked.parser([token]), line)
+    line += token.raw.split('\n').length - 1
+    return html
+  }).join('')
+}
+
 const INFO_SVG = '<svg class="callout-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>'
 
 /** One H2 of the rendered preview - the inspector's Outline lists them. */
@@ -60,12 +71,14 @@ interface Props {
   onActiveSection(id: string | null): void
   /** Receives the scroll-to-section function, for Outline clicks. */
   jumpRef: React.RefObject<((id: string) => void) | null>
+  /** Receives the scrolling element, for the split view's scroll sync. */
+  onScroller?(element: HTMLDivElement | null): void
 }
 
 /** Unique mermaid render ids - an id colliding with an svg already in the DOM breaks the render. */
 let mermaidSeq = 0
 
-export function PreviewView({ content, theme, findSeq, onOpenLink, onOutline, onActiveSection, jumpRef }: Props) {
+export function PreviewView({ content, theme, findSeq, onOpenLink, onOutline, onActiveSection, jumpRef, onScroller }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [html, setHtml] = useState('')
@@ -98,7 +111,7 @@ export function PreviewView({ content, theme, findSeq, onOpenLink, onOutline, on
   // re-renders, which would silently wipe any DOM patched in behind its back. The plain
   // body shows immediately; the enriched html replaces it.
   useEffect(() => {
-    const body = marked.parse(previewBody(content), { async: false })
+    const body = renderPreview(content)
     setHtml(body)
     const needsMermaid = body.includes('class="mermaid-source"')
     const needsColor = body.includes('data-lang="')
@@ -117,6 +130,7 @@ export function PreviewView({ content, theme, findSeq, onOpenLink, onOutline, on
             const { svg } = await mermaid.render(`preview-mmd-${++mermaidSeq}`, source.textContent ?? '')
             const wrapper = doc.createElement('div')
             wrapper.className = 'mermaid-diagram'
+            if (source.dataset.line) wrapper.dataset.line = source.dataset.line
             wrapper.innerHTML = svg
             source.replaceWith(wrapper)
           } catch {
@@ -168,6 +182,11 @@ export function PreviewView({ content, theme, findSeq, onOpenLink, onOutline, on
     }
     onActiveSection(current ?? container.querySelector('h2')?.id ?? null)
   }
+
+  useEffect(() => {
+    onScroller?.(scrollRef.current)
+    return () => onScroller?.(null)
+  }, [onScroller])
 
   useEffect(() => {
     jumpRef.current = id => containerRef.current?.querySelector(`#${CSS.escape(id)}`)?.scrollIntoView()

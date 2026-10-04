@@ -1,19 +1,20 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { escapeHtml, previewBody } from '../preview-html.ts'
+import { escapeHtml, previewBody, withSourceLine } from '../preview-html.ts'
 
 test('escapeHtml escapes text and attribute delimiters', () => {
   assert.equal(escapeHtml(`<tag data-x="one" data-y='two'>&`), '&lt;tag data-x=&quot;one&quot; data-y=&#39;two&#39;&gt;&amp;')
 })
 
-test('previewBody drops the frontmatter and a leading H1', () => {
-  assert.equal(previewBody('---\ntitle: T\n---\n\n# Title\n\nBody\n# Later'), '\nBody\n# Later')
-  assert.equal(previewBody('Title\n=====\nBody'), 'Body')
+test('previewBody drops only the frontmatter and reports the line the body starts on', () => {
+  assert.deepEqual(previewBody('---\ntitle: T\n---\n\n# Title\nBody'), { body: '\n# Title\nBody', firstLine: 4 })
+  assert.deepEqual(previewBody('---\r\ntitle: T\r\n---\r\n# Title'), { body: '# Title', firstLine: 4 })
+  assert.deepEqual(previewBody('# Title\nBody'), { body: '# Title\nBody', firstLine: 1 })
 })
 
-test('previewBody keeps a document that does not open with an H1', () => {
-  assert.equal(previewBody('---\ntitle: T\n---\n## Section\n\n# Late H1'), '## Section\n\n# Late H1')
-  assert.equal(previewBody('Intro line\nBody'), 'Intro line\nBody')
-  assert.equal(previewBody('#hashtag line'), '#hashtag line')
+test('withSourceLine tags the opening element only', () => {
+  assert.equal(withSourceLine('<p>a <em>b</em></p>\n', 7), '<p data-line="7">a <em>b</em></p>\n')
+  assert.equal(withSourceLine('<hr>', 2), '<hr data-line="2">')
+  assert.equal(withSourceLine('&lt;div&gt;', 3), '&lt;div&gt;')
 })

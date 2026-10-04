@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { editor as MonacoEditor } from 'monaco-editor'
 
 import type { DiffResult, VdocLogEntry } from '../../../shared/types.ts'
 import { parseFrontmatter } from '../../../shared/frontmatter.ts'
@@ -9,6 +10,7 @@ import { timeAgo } from '../../../shared/time.ts'
 import { command, isPinned, isReviewable, primaryAction, secondaryActions, shortcutLabel, type CommandContext, type ViewMode } from '../commands.ts'
 import { AlertIcon, BanIcon, ChevronDownIcon, ExternalIcon, MoreIcon, PinIcon } from '../icons.tsx'
 import { STATE_META } from '../state-meta.ts'
+import { useScrollSync } from '../useScrollSync.ts'
 import { ActionMenu } from './ActionMenu.tsx'
 import { CommentsView } from './CommentsView.tsx'
 import { DocumentInfo } from './DocumentInfo.tsx'
@@ -64,6 +66,9 @@ export function DetailPane(props: Props) {
   const [readFailed, setReadFailed] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [layoutOpen, setLayoutOpen] = useState(false)
+  const [editor, setEditor] = useState<MonacoEditor.IStandaloneCodeEditor | null>(null)
+  const [previewScroller, setPreviewScroller] = useState<HTMLDivElement | null>(null)
+  useScrollSync(editor, previewScroller, view === 'split')
   const diffLayoutKey = `diffLayout:${ctx.app.root}`
   const [diffInline, setDiffInline] = useState(() => localStorage.getItem(diffLayoutKey) === 'inline')
   const [editorLoaded, setEditorLoaded] = useState(false)
@@ -500,7 +505,7 @@ export function DetailPane(props: Props) {
                       <div className={`min-w-0 ${view === 'split' ? 'flex-1' : view === 'preview' ? 'hidden' : 'flex-1'}`}>
                         {editorLoaded && (
                           <Suspense fallback={<CenterNote text="Loading editor…" />}>
-                            <CodeView content={content} onChange={readFailed ? undefined : handleEdit} onSave={flush} theme={props.theme} />
+                            <CodeView content={content} onChange={readFailed ? undefined : handleEdit} onSave={flush} onEditor={setEditor} theme={props.theme} />
                           </Suspense>
                         )}
                       </div>
@@ -515,6 +520,7 @@ export function DetailPane(props: Props) {
                             onOutline={setOutline}
                             onActiveSection={setActiveSection}
                             jumpRef={jumpRef}
+                            onScroller={setPreviewScroller}
                           />
                         )}
                       </div>
