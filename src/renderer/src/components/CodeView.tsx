@@ -38,12 +38,14 @@ export function CodeView({ content, onChange, onSave, onEditor, theme }: {
       occurrencesHighlight: 'off',
     })
     editor.onDidChangeModelContent(() => onChangeRef.current?.(editor.getValue()))
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => onSaveRef.current?.())
+    // addAction, not addCommand: Monaco's global command registry would keep every disposed editor alive.
+    const save = editor.addAction({ id: 'vdoc.save', label: 'Save', keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS], run: () => onSaveRef.current?.() })
     editorRef.current = editor
     onEditor?.(editor)
     // The editor owns the implicit model created from `value` and disposes it itself.
     return () => {
       onEditor?.(null)
+      save.dispose()
       editor.dispose()
     }
   }, [onEditor])
