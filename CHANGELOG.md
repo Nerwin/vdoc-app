@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.20.1](https://github.com/Nerwin/vdoc-app/compare/v1.20.0...v1.20.1) (2026-10-04)
+
+### Refactoring
+
+* **ui:** unify file menus via registry and restore logo ([6653f18](https://github.com/Nerwin/vdoc-app/commit/6653f188c73ff4b0d5520c917ae8b767e9e644bb))
 ## [1.20.0](https://github.com/Nerwin/vdoc-app/compare/v1.19.0...v1.20.0) (2026-09-24)
 
 ### Features
