@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.21.0](https://github.com/Nerwin/vdoc-app/compare/v1.20.2...v1.21.0) (2026-10-04)
+
+### Features
+
+* **review:** replace hunk resolver with diff-based review, and allow choosing changes ([0daf733](https://github.com/Nerwin/vdoc-app/commit/0daf733eb229ea258d39131f62ffddc3e09021ea))
 ## [1.20.2](https://github.com/Nerwin/vdoc-app/compare/v1.20.1...v1.20.2) (2026-10-04)
 
 ### Bug Fixes
