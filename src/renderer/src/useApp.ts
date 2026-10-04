@@ -632,16 +632,19 @@ export function useApp() {
     else verifyAllUnverified()
   }, [checkAll, entries, verifyAllUnverified])
 
+  /** Every author lookup ever started - each result re-renders Changes, which asks again. */
+  const authorsRequested = useRef(new Set<string>())
   const loadAuthors = useCallback((requests: Array<{ path: string, remoteVersion: number }>) => {
-    const missing = requests.filter(request => !authors.has(`${request.path}@v${request.remoteVersion}`))
+    const missing = requests.filter(request => !authorsRequested.current.has(`${request.path}@v${request.remoteVersion}`))
     if (missing.length === 0) return
+    for (const request of missing) authorsRequested.current.add(`${request.path}@v${request.remoteVersion}`)
     void (async () => {
       for (const request of missing) {
         const entry = await api.lastVersion(request.path).catch(() => null)
         setAuthors(prev => new Map(prev).set(`${request.path}@v${request.remoteVersion}`, entry))
       }
     })()
-  }, [api, authors])
+  }, [api])
 
   const saveApiKey = useCallback((apiToken: string) => runOp('save API key', async () => {
     const status = await api.saveApiKey(apiToken)
