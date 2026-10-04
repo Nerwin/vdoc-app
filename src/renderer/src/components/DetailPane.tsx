@@ -202,8 +202,8 @@ export function DetailPane(props: Props) {
     }
   }, [path, entry.tracked, entry.ignored, props.connected, props.reloadKey])
 
-  /** The split view's preview trails typing by 300ms - mermaid re-renders are not free. */
-  const previewContent = useDebouncedContent(content, 300)
+  /** The split view's preview trails typing by 300ms - mermaid re-renders are not free - and rests while hidden. */
+  const previewContent = useDebouncedContent(content, 300, view !== 'preview' && view !== 'split')
 
   const { onSelect } = props
   /** Preview link clicks: local .md files open in-app, http(s) in the browser. */
@@ -550,13 +550,18 @@ export function DetailPane(props: Props) {
  * Trailing debounce; null (file switch, loading) resets immediately, and the first
  * value after a reset lands immediately too - the preview opens without a blank beat.
  */
-function useDebouncedContent(value: string | null, ms: number): string | null {
+function useDebouncedContent(value: string | null, ms: number, paused: boolean): string | null {
   const [debounced, setDebounced] = useState(value)
   const settleRef = useRef(true)
   useEffect(() => {
     if (value === null) {
       settleRef.current = true
       setDebounced(null)
+      return
+    }
+    // Paused keeps the last value; the first value after resuming shows at once.
+    if (paused) {
+      settleRef.current = true
       return
     }
     if (settleRef.current) {
@@ -566,7 +571,7 @@ function useDebouncedContent(value: string | null, ms: number): string | null {
     }
     const timer = setTimeout(() => setDebounced(value), ms)
     return () => clearTimeout(timer)
-  }, [value, ms])
+  }, [value, ms, paused])
   return debounced
 }
 

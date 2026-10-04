@@ -78,6 +78,17 @@ interface Props {
 /** Unique mermaid render ids - an id colliding with an svg already in the DOM breaks the render. */
 let mermaidSeq = 0
 
+/** Rendered diagrams and colorized code by theme + source - typing re-renders only what changed. */
+// ponytail: cleared wholesale past 300 entries; an LRU if editing sessions get long enough to churn it.
+const rendered = new Map<string, string | null>()
+async function cached(key: string, render: () => Promise<string | null>): Promise<string | null> {
+  if (rendered.has(key)) return rendered.get(key)!
+  const html = await render()
+  if (rendered.size >= 300) rendered.clear()
+  rendered.set(key, html)
+  return html
+}
+
 export function PreviewView({ content, theme, findSeq, onOpenLink, onOutline, onActiveSection, jumpRef, onScroller }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -126,16 +137,17 @@ export function PreviewView({ content, theme, findSeq, onOpenLink, onOutline, on
         mermaid.initialize({ startOnLoad: false, theme: theme === 'light' ? 'neutral' : 'dark', securityLevel: 'strict' })
         for (const source of sources) {
           if (!live) return
-          try {
-            const { svg } = await mermaid.render(`preview-mmd-${++mermaidSeq}`, source.textContent ?? '')
-            const wrapper = doc.createElement('div')
-            wrapper.className = 'mermaid-diagram'
-            if (source.dataset.line) wrapper.dataset.line = source.dataset.line
-            wrapper.innerHTML = svg
-            source.replaceWith(wrapper)
-          } catch {
+          const text = source.textContent ?? ''
+          const svg = await cached(`mermaid\n${theme}\n${text}`, () => mermaid.render(`preview-mmd-${++mermaidSeq}`, text).then(result => result.svg, () => null))
+          if (svg === null) {
             source.classList.add('mermaid-error')
+            continue
           }
+          const wrapper = doc.createElement('div')
+          wrapper.className = 'mermaid-diagram'
+          if (source.dataset.line) wrapper.dataset.line = source.dataset.line
+          wrapper.innerHTML = svg
+          source.replaceWith(wrapper)
         }
       }
       if (needsColor) {
@@ -147,8 +159,8 @@ export function PreviewView({ content, theme, findSeq, onOpenLink, onOutline, on
         for (const block of doc.querySelectorAll('pre.code-block[data-lang] > code')) {
           const lang = (block.parentElement as HTMLElement).dataset.lang ?? ''
           if (!known.has(lang) || !live) continue
-          const colorized = await monaco.editor.colorize(block.textContent ?? '', lang, {})
-          block.innerHTML = colorized.replace(/<br\/?>$/, '')
+          const code = block.textContent ?? ''
+          block.innerHTML = (await cached(`code\n${theme}\n${lang}\n${code}`, () => monaco.editor.colorize(code, lang, {})))!.replace(/<br\/?>$/, '')
         }
       }
       if (live) setHtml(doc.body.innerHTML)
