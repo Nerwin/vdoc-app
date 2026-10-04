@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.22.0](https://github.com/Nerwin/vdoc-app/compare/v1.21.1...v1.22.0) (2026-10-04)
+
+### Features
+
+* **preview:** sync scroll between editor and preview in split view ([c4b66da](https://github.com/Nerwin/vdoc-app/commit/c4b66da1ca140d875eb7850172a8a591d5ff5a42))
+
+### Bug Fixes
+
+* **changes:** look up each version author once ([ac68e96](https://github.com/Nerwin/vdoc-app/commit/ac68e96c4e834939f3d9f38f9c100ef497bf9b8f))
+* **cli:** batch check and pull paths under the Windows command-line limit ([22abda7](https://github.com/Nerwin/vdoc-app/commit/22abda75089beaa0cdd44b22d9f88265aa5ffc9e))
+* **editor:** dispose the Monaco save keybinding with its editor ([a43ef2a](https://github.com/Nerwin/vdoc-app/commit/a43ef2a6736a7c0e153302ebfdb467f564f0ab0e))
+
+### Performance
+
+* **build:** minify the renderer bundle, keeping identifiers ([e774417](https://github.com/Nerwin/vdoc-app/commit/e77441749aeb3a6af94065250636973d422e22be))
+* **logs:** store copies of clipped CLI output in the command log ([4846170](https://github.com/Nerwin/vdoc-app/commit/484617085d6b34b4d447f498a31dc12ffcb50567))
+* **preview:** pause the hidden preview and cache rendered diagrams and code ([8be25fd](https://github.com/Nerwin/vdoc-app/commit/8be25fd0d2aa76a966280330845e822c8588a622))
+* **search:** read the corpus asynchronously and debounce full-text search ([5b6a495](https://github.com/Nerwin/vdoc-app/commit/5b6a4952735f538c0ddc69cdd064b857037dd387))
+* **settings:** reuse cached CLI fields on settings writes ([05a25ba](https://github.com/Nerwin/vdoc-app/commit/05a25ba8fe7dc9156d953d95a80d5fdb98b620af))
+* **sync:** refresh changed files in place and batch their re-check ([33fb833](https://github.com/Nerwin/vdoc-app/commit/33fb833204bb94ed98979c996ef4a55315bd9803))
 ## [1.21.1](https://github.com/Nerwin/vdoc-app/compare/v1.21.0...v1.21.1) (2026-10-04)
 
 ### Refactoring
