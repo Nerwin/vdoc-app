@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Marked } from 'marked'
 
 import { escapeHtml, previewBody, withSourceLine } from '../../../shared/preview-html.ts'
+import { docImageUrl } from '../../../shared/links.ts'
 import { BackIcon, CloseIcon, ForwardIcon } from '../icons.tsx'
 
 /** Fence language → Monaco language id, for the common shorthands. */
@@ -41,10 +42,14 @@ const marked = new Marked({
 })
 
 /** Renders block by block so each top-level element carries its source line (scroll sync). */
-function renderPreview(content: string): string {
+function renderPreview(content: string, path: string): string {
   const { body, firstLine } = previewBody(content)
+  const tokens = marked.lexer(body)
+  marked.walkTokens(tokens, token => {
+    if (token.type === 'image') token.href = docImageUrl(path, token.href) ?? token.href
+  })
   let line = firstLine
-  return marked.lexer(body).map(token => {
+  return tokens.map(token => {
     const html = withSourceLine(marked.parser([token]), line)
     line += token.raw.split('\n').length - 1
     return html
@@ -61,6 +66,8 @@ export interface OutlineItem {
 
 interface Props {
   content: string
+  /** Docs-root-relative path of the previewed file, the base for relative image hrefs. */
+  path: string
   theme: 'dark' | 'light'
   /** Bumped by ⌘F - opens the find bar, or reselects its query when already open. */
   findSeq: number
@@ -89,7 +96,7 @@ async function cached(key: string, render: () => Promise<string | null>): Promis
   return html
 }
 
-export function PreviewView({ content, theme, findSeq, onOpenLink, onOutline, onActiveSection, jumpRef, onScroller }: Props) {
+export function PreviewView({ content, path, theme, findSeq, onOpenLink, onOutline, onActiveSection, jumpRef, onScroller }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [html, setHtml] = useState('')
@@ -122,7 +129,7 @@ export function PreviewView({ content, theme, findSeq, onOpenLink, onOutline, on
   // re-renders, which would silently wipe any DOM patched in behind its back. The plain
   // body shows immediately; the enriched html replaces it.
   useEffect(() => {
-    const body = renderPreview(content)
+    const body = renderPreview(content, path)
     setHtml(body)
     const needsMermaid = body.includes('class="mermaid-source"')
     const needsColor = body.includes('data-lang="')
@@ -168,7 +175,7 @@ export function PreviewView({ content, theme, findSeq, onOpenLink, onOutline, on
     return () => {
       live = false
     }
-  }, [content, theme])
+  }, [content, path, theme])
 
   // Outline: ids are assigned to the rendered h2 nodes.
   useEffect(() => {

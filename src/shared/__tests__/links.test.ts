@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { confluencePageId, mdLinkTargets, resolveRelative } from '../links.ts'
+import { confluencePageId, docImageUrl, mdLinkTargets, resolveRelative } from '../links.ts'
 
 test('confluencePageId accepts a bare numeric id and page URLs', () => {
   assert.equal(confluencePageId('5013700642'), '5013700642')
@@ -40,4 +40,14 @@ test('resolveRelative refuses absolutes, schemes, and root escapes', () => {
   assert.equal(resolveRelative('1-Backend/api.md', 'mailto:x@y.z'), null)
   assert.equal(resolveRelative('1-Backend/api.md', '/etc/passwd'), null)
   assert.equal(resolveRelative('1-Backend/api.md', '../../outside.md'), null)
+  assert.equal(resolveRelative('1-Backend/api.md', './50%.md'), null)
+})
+
+test('docImageUrl maps CLI-encoded image hrefs to the docs protocol', () => {
+  assert.equal(
+    docImageUrl('2-DDA/page.md', '../0-Images/42/Diagramme%20sans%20nom%26co.drawio.png'),
+    'vdoc-app://docs/0-Images/42/Diagramme%20sans%20nom%26co.drawio.png',
+  )
+  assert.equal(docImageUrl('2-DDA/page.md', 'https://example.com/x.png'), null)
+  assert.equal(docImageUrl('2-DDA/page.md', '../../outside.png'), null)
 })

@@ -5,9 +5,10 @@ import { pathToFileURL } from 'node:url'
 import { app, BrowserWindow, dialog, Menu, nativeTheme, net, protocol, session } from 'electron'
 
 import { isAllowedNavigation, PACKAGED_RENDERER_URL, SECURE_WEB_PREFERENCES } from '../shared/electron-policy.ts'
+import { resolveExistingPathInsideRoot } from '../shared/path-policy.ts'
 import { CloseGuardState } from '../shared/close-guard.ts'
 import type { Settings } from '../shared/types.ts'
-import { importLoginShellEnv, setVdocBin } from './vdoc.ts'
+import { docsRoot, importLoginShellEnv, setVdocBin } from './vdoc.ts'
 import { loadSettings } from './settings.ts'
 import { registerIpc } from './ipc.ts'
 import { initSentry } from './sentry.ts'
@@ -19,10 +20,24 @@ protocol.registerSchemesAsPrivileged([{
   privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: false },
 }])
 
+const IMAGE_EXTENSIONS = /\.(png|jpe?g|gif|svg|webp)$/i
+
+/** Local images of the previewed markdown (`docImageUrl`), confined to the docs root. */
+function serveDocImage(url: URL): Promise<Response> | Response {
+  try {
+    const path = decodeURIComponent(url.pathname.slice(1))
+    if (!IMAGE_EXTENSIONS.test(path)) return new Response(null, { status: 404 })
+    return net.fetch(pathToFileURL(resolveExistingPathInsideRoot(docsRoot(), path)).href)
+  } catch {
+    return new Response(null, { status: 404 })
+  }
+}
+
 function registerRendererProtocol(): void {
   const root = resolve(__dirname, '../renderer')
   protocol.handle('vdoc-app', request => {
     const url = new URL(request.url)
+    if (url.host === 'docs') return serveDocImage(url)
     if (url.host !== 'renderer') return new Response(null, { status: 404 })
 
     const path = resolve(root, `.${decodeURIComponent(url.pathname)}`)

@@ -2,7 +2,7 @@
   "name": "vdoc-app",
   "version": "1.22.1",
   "private": true,
-  "packageManager": "bun@1.4.0",
+  "packageManager": "bun@1.4.4",
   "description": "App GUI over the vdoc CLI",
   "main": "out/main/index.js",
   "productName": "V-DOC",
@@ -16,7 +16,7 @@
     "url": "https://github.com/Nerwin/vdoc-app.git"
   },
   "vdocCli": {
-    "minimumVersion": "2.5.0",
+    "minimumVersion": "2.7.0",
     "updateCommand": "bun install -g @vosker/vdoc@latest",
     "downloadUrl": "https://bitbucket.org/spypoint/vdoc/downloads/"
   },
@@ -39,31 +39,31 @@
     "knip": "knip"
   },
   "dependencies": {
-    "@sentry/electron": "^7.20.0",
-    "electron-updater": "^6.8.9"
+    "@sentry/electron": "^7.20.1",
+    "electron-updater": "^6.8.10"
   },
   "devDependencies": {
     "@fontsource-variable/inter": "^5.3.0",
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@tailwindcss/vite": "^4.3.3",
-    "@types/node": "^26.6.3",
+    "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^5.2.0",
-    "commit-and-tag-version": "^13.2.1",
-    "electron": "^44.5.1",
+    "commit-and-tag-version": "^13.3.0",
+    "electron": "^44.9.0",
     "electron-builder": "^26.17.0",
     "electron-vite": "^5.0.0",
-    "knip": "^6.39.0",
-    "lucide-react": "^1.49.0",
-    "marked": "^18.0.14",
+    "knip": "^6.42.0",
+    "lucide-react": "^1.59.0",
+    "marked": "^18.1.1",
     "mermaid": "^11.17.2",
     "monaco-editor": "^0.56.0",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
-    "vite": "^7.3.6"
+    "vite": "^7.3.7"
   },
   "build": {
     "appId": "dev.nerwin.vdoc",

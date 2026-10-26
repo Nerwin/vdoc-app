@@ -32,8 +32,13 @@ export function mdLinkTargets(markdown: string): string[] {
  * escape the root.
  */
 export function resolveRelative(fromFile: string, href: string): string | null {
-  const clean = decodeURI(href.split(/[#?]/)[0])
-  if (clean === '' || clean.startsWith('/') || /^[a-z][a-z0-9+.-]*:/i.test(clean)) return null
+  let clean: string
+  try {
+    clean = decodeURIComponent(href.split(/[#?]/)[0])
+  } catch {
+    return null
+  }
+  if (clean === ''|| clean.startsWith('/') || /^[a-z][a-z0-9+.-]*:/i.test(clean)) return null
   const stack: string[] = []
   for (const part of [...fromFile.split('/').slice(0, -1), ...clean.split('/')]) {
     if (part === '' || part === '.') continue
@@ -45,4 +50,10 @@ export function resolveRelative(fromFile: string, href: string): string | null {
     }
   }
   return stack.join('/')
+}
+
+/** Preview URL of a local image, served from the docs root by the main process. Null when not a local path. */
+export function docImageUrl(fromFile: string, href: string): string | null {
+  const path = resolveRelative(fromFile, href)
+  return path === null ? null : `vdoc-app://docs/${path.split('/').map(encodeURIComponent).join('/')}`
 }

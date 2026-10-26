@@ -55,6 +55,9 @@
   --color-warn-text: #ffbd3d;
   --color-brand: #f5c542;
 
+  /* Preview images: transparent diagrams stay readable in both themes */
+  --color-image-bg: #ffffff;
+
   /* Buttons */
   --color-primary: #2b6fd1;
   --color-primary-edge: #3f84e6;
@@ -476,6 +479,7 @@ select:focus {
 
 .preview img {
   max-width: 100%;
+  background: var(--color-image-bg);
 }
 
 .preview .mermaid-diagram {

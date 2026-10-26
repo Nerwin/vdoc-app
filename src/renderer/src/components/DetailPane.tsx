@@ -514,6 +514,7 @@ export function DetailPane(props: Props) {
                         {previewContent !== null && (
                           <PreviewView
                             content={previewContent}
+                            path={path}
                             theme={props.theme}
                             findSeq={props.findSeq}
                             onOpenLink={openLink}
