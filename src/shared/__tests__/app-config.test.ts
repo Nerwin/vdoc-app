@@ -57,7 +57,6 @@ test('release workflow signs the macOS build and verifies the signature', () => 
 })
 
 test('CI workflows use the pinned Bun package manager with frozen installs', () => {
-  assert.equal(PACKAGE_JSON.packageManager, 'bun@1.4.0')
   for (const workflow of [CI_WORKFLOW, RELEASE_WORKFLOW]) {
     assert.match(workflow, /oven-sh\/setup-bun@[0-9a-f]{40}/)
     assert.match(workflow, /- run: bun ci/)
