@@ -1,6 +1,6 @@
 {
   "name": "vdoc-app",
-  "version": "1.22.1",
+  "version": "1.23.0",
   "private": true,
   "packageManager": "bun@1.4.4",
   "description": "App GUI over the vdoc CLI",
