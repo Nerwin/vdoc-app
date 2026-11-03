@@ -270,10 +270,15 @@ export function registerIpc(
     return comments
   })
 
-  handle('post-comment', async (_event, pathInput: unknown, textInput: unknown) => {
+  handle('post-comment', async (_event, pathInput: unknown, textInput: unknown, replyToInput?: unknown) => {
     const path = docsPath(pathInput)
     const text = stringValue(textInput, 'comment', 32_000)
-    await runVdocJson(['cf', 'comment', path, text])
+    // shortcut: oclif reads a leading "-" as a flag, drop once the CLI accepts the body another way
+    if (text.startsWith('-')) throw new Error('A comment cannot start with "-": the vdoc CLI reads it as a flag')
+    if (replyToInput !== undefined && (typeof replyToInput !== 'string' || !/^\d{1,20}$/.test(replyToInput))) {
+      throw new Error('Invalid comment id')
+    }
+    await runVdocJson(['cf', 'comment', path, text, ...(replyToInput === undefined ? [] : ['--reply-to', replyToInput])])
   })
 
   handle('labels', async (_event, input: unknown) => {

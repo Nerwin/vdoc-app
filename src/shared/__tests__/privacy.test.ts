@@ -12,6 +12,10 @@ test('redactVdocArgs hides credentials and comment bodies', () => {
     redactVdocArgs(['cf', 'comment', 'docs/private.md', 'private comment', '--json']),
     ['cf', 'comment', 'docs/private.md', '•••', '--json'],
   )
+  assert.deepEqual(
+    redactVdocArgs(['cf', 'comment', 'docs/private.md', 'private reply', '--reply-to', '6283919437', '--json']),
+    ['cf', 'comment', 'docs/private.md', '•••', '--reply-to', '6283919437', '--json'],
+  )
 })
 
 test('vdoc privacy helpers identify safe command ids and sensitive output', () => {

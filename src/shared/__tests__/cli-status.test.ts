@@ -39,6 +39,12 @@ describe('cliStatus', () => {
     const entry = { args: ['cf', 'diff', 'docs/a.md'], exitCode: 3, stdout: '' }
     assert.match(interpretCli(entry, cliStatus(entry)) ?? '', /Review the diff/)
     assert.equal(interpretCli({ ...entry, exitCode: 0 }, cliStatus({ ...entry, exitCode: 0 })), null)
+    const anchors = {
+      args: ['cf', 'push', 'docs/a.md'],
+      exitCode: 2,
+      stdout: '{"error":{"message":"1 inline comment anchor(s) highlight text that docs/a.md changed - re-run with --allow-lossy","code":"VALIDATION_ERROR"}}',
+    }
+    assert.match(interpretCli(anchors, cliStatus(anchors)) ?? '', /inline comments/)
     assert.equal(documentOf(['cf', 'check', './docs/a.md', 'docs/b.md'], path => path === 'docs/b.md'), 'docs/b.md')
     assert.equal(documentOf(['config', 'path'], () => true), null)
   })

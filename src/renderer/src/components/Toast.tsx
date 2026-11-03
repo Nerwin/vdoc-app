@@ -26,8 +26,8 @@ export function Toast({ message, onDismiss }: { message: Message, onDismiss(): v
       className={`fixed bottom-11 right-4 z-40 flex w-96 max-w-[80vw] items-start gap-2.5 rounded-lg border py-2.5 pl-3.5 pr-2 ${tone.surface}`}
     >
       <tone.icon size={14} className={`mt-px shrink-0 ${tone.accent}`} />
-      <div className="min-w-0 flex-1">
-        <p className={`text-[12px] leading-[1.5] ${tone.accent}`}>{message.text}</p>
+      <div className="max-h-[50vh] min-w-0 flex-1 overflow-y-auto">
+        <p className={`whitespace-pre-line text-[12px] leading-[1.5] ${tone.accent}`}>{message.text}</p>
         {message.detail && (
           <ul className="mt-1.5 space-y-0.5 font-mono text-[11px] text-ink-dim">
             {message.detail.map((line, index) => <li key={index} className="break-words">{line}</li>)}

@@ -93,6 +93,9 @@ function safeJson(text: string): boolean {
 export function interpretCli(entry: Pick<VdocLogEntry, 'args' | 'exitCode' | 'stdout' | 'termination'>, status: CliStatus): string | null {
   if (status.outcome === 'success') return null
   const command = vdocCommandId(entry.args)
+  if (status.outcome === 'error' && /inline comment anchor/i.test(status.summary)) {
+    return 'This is a blocking finding, not a crash. Pushing would detach inline comments whose highlighted text changed.'
+  }
   if (status.outcome === 'error' && /unsupported block|cannot represent|lossy/i.test(status.summary)) {
     return 'This is a blocking finding, not a crash. Pushing would remove remote content that Markdown cannot represent.'
   }

@@ -58,6 +58,8 @@ export interface VersionEntry {
 export interface CommentEntry {
   id: string
   kind: 'footer' | 'inline'
+  /** Absent on top-level comments. */
+  parentId?: string
   author: string
   authorId: string
   createdAt: string
@@ -302,7 +304,7 @@ export interface VdocApi {
   recordBaseline(path: string): Promise<DiffResult>
   lastVersion(path: string): Promise<VersionEntry | null>
   comments(path: string): Promise<CommentEntry[]>
-  postComment(path: string, text: string): Promise<void>
+  postComment(path: string, text: string, replyTo?: string): Promise<void>
   /** Confluence label names on the page this tracked file maps to. */
   labels(path: string): Promise<string[]>
   pull(paths: string[], force?: boolean): Promise<PullFile[]>

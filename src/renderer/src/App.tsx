@@ -446,7 +446,8 @@ export function App() {
           {app.pushPreview.allowLossy ? (
             <p className="mb-2 text-conflict">
               Push force will completely overwrite the remote page with this local file.
-              Unsupported layouts, media, or macros not preserved locally will be deleted. This cannot be undone by V-DOC.
+              Unsupported layouts, media, or macros not preserved locally will be deleted, and inline comments on changed text
+              lose their anchors. This cannot be undone by V-DOC.
             </p>
           ) : app.pushPreview.force && (
             <p className="mb-2 text-conflict">

@@ -11,6 +11,16 @@ test('recognizes the CLI validation error that unlocks a lossy push', () => {
   assert.equal(isLossyPushError(error), true)
 })
 
+test('recognizes the CLI validation error for inline comment anchors on changed text', () => {
+  const error = new Error(
+    '1 inline comment anchor(s) highlight text that docs/page.md changed, removed or repeats a different number of times - '
+    + 'pushing would orphan those comments on Confluence:\n  - "old wording"\n\n'
+    + 'Restore the highlighted text, resolve or delete those comments on the page, or re-run with --allow-lossy to push anyway.',
+  )
+
+  assert.equal(isLossyPushError(error), true)
+})
+
 test('does not unlock a lossy push for unrelated failures', () => {
   assert.equal(isLossyPushError(new Error('Authentication failed')), false)
   assert.equal(isLossyPushError('unsupported block(s) that the file does not preserve'), false)

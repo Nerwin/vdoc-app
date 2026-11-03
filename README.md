@@ -26,7 +26,7 @@ operation spawns `vdoc … --json`, so the CLI and the app can never disagree.
   sync-state filters, ignored files, and git working-tree markers.
 - **Actionable dashboard** - files needing attention, remote authors, bulk verification,
   recent files, quick actions, and recent sync activity in one place.
-- **Confluence context** - page labels, footer and inline comments, footer comment posting,
+- **Confluence context** - page labels, footer and inline comments with their replies, footer comments and replies,
   page IDs, and direct hand-offs to Confluence, the default editor, or the file's folder.
 
 ### Confluence workflows with guardrails
@@ -220,7 +220,7 @@ Everything lives in the command palette (⌘⇧P); the common ones also have but
 **Views** (tabs, ⌘1–⌘5): **Content** (Monaco editor - edits auto-save after 800 ms, ⌘S flushes),
 **Preview** (rendered Markdown with Mermaid; local `.md` links navigate in-app, web links open
 in the browser; GitHub-style rendering, not Confluence's), **Split** (editor | live preview),
-**Diff**, **Comments** (footer + inline comments, with a composer to post footer comments).
+**Diff**, **Comments** (footer + inline threads with nested replies, with a composer to post footer comments or reply).
 The tab row also shows **backlinks** - every doc whose links resolve to the open file.
 
 **Global** (palette / dashboard):
