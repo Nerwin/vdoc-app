@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.24.0](https://github.com/Nerwin/vdoc-app/compare/v1.23.0...v1.24.0) (2026-11-03)
+
+### Features
+
+* **comments:** show comment replies and reply from the app ([6682de5](https://github.com/Nerwin/vdoc-app/commit/6682de52b8289eca5719495ecc6a70bf8541eb0b))
+
 ## [1.23.0](https://github.com/Nerwin/vdoc-app/compare/v1.22.1...v1.23.0) (2026-10-26)
 
 ### Features
