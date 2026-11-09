@@ -250,6 +250,11 @@ export function useApp() {
       setPushQueue([])
       setPullConfirm(null)
       setAuthors(new Map())
+      // Recents and sync activity are relative paths too - they belong to the previous repository.
+      setRecents([])
+      setActivity([])
+      localStorage.removeItem('recentFiles')
+      localStorage.removeItem('syncActivity')
       authorsRequested.current.clear()
       failedAuthors.current.clear()
     }
@@ -777,7 +782,10 @@ export function useApp() {
   const pickDocsRoot = useCallback(async () => {
     try {
       // Drafts are keyed by relative path - one must never land in the other repository.
-      if (!await flushEdits()) return
+      if (!await flushEdits()) {
+        setMessage({ kind: 'error', text: 'Docs repository not changed - resolve the blocked save first' })
+        return
+      }
       const nextSettings = await api.pickDocsRoot()
       if (!nextSettings) return
       setSettings(nextSettings)
