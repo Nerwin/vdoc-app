@@ -432,11 +432,11 @@ export function registerIpc(
     const settings = { ...loadSettings(), ...patch }
     saveSettings(settings)
     setVdocBin(settings.vdocBin)
-    if (patch.contentDirs || 'docsRoot' in patch) {
+    if (patch.contentDirs) {
       const window = BrowserWindow.fromWebContents(event.sender)
       if (window) watchDocs(window)
     }
-    return settingsInfo('vdocBin' in patch || 'docsRoot' in patch)
+    return settingsInfo('vdocBin' in patch)
   })
 
   handle('pick-folder', async event => {

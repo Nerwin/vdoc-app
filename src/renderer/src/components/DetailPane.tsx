@@ -266,7 +266,6 @@ export function DetailPane(props: Props) {
   ]
   const [diffBefore, diffAfter] = diffSides && !reviewing ? [diffSides[1], diffSides[0]] : diffSides ?? []
 
-  const openDiffTab = (): void => (diffReady ? onView('diff') : props.onDiff(path))
   const openSource = (): void => onView(props.sourceLayout)
   const sourceActive = view === 'content' || view === 'split'
 
@@ -429,7 +428,7 @@ export function DetailPane(props: Props) {
                   active={Boolean(showDiff)}
                   disabled={!entry.tracked || loadingDiff || synced}
                   title={synced ? 'No differences to show' : undefined}
-                  onClick={openDiffTab}
+                  onClick={() => props.onDiff(path)}
                 />
                 <Tab label="Comments" active={view === 'comments'} disabled={!entry.tracked} onClick={() => onView('comments')} />
               </>

@@ -445,7 +445,8 @@ export function useApp() {
     if (paths.length > 0) setPullConfirm({ paths, force: false })
   }, [])
 
-  const requestPush = useCallback((path: string, force = false, allowLossy = false) => runOp('push preview', async () => {
+  /** The dry run every push starts with; a lossy-content refusal unlocks Push force for that file. */
+  const openPushPreview = useCallback(async (path: string, force: boolean, allowLossy: boolean) => {
     try {
       const { result, token } = await api.previewPush(path, force, allowLossy)
       setPushPreview({ path, result, force, allowLossy, token })
@@ -455,7 +456,10 @@ export function useApp() {
       }
       throw error
     }
-  }), [api, runOp])
+  }, [api])
+
+  const requestPush = useCallback((path: string, force = false, allowLossy = false) =>
+    runOp('push preview', () => openPushPreview(path, force, allowLossy)), [openPushPreview, runOp])
 
   /** A failed preview ends the batch loudly rather than dropping the rest in silence. */
   const previewNext = useCallback((path: string, rest: string[]) => {
@@ -531,11 +535,10 @@ export function useApp() {
         const disk = await api.readFile(path)
         await api.writeFile({ path, expected: disk, next: spliceMerged(disk, local, text), revision: Date.now() })
         clearDiff([path])
-        const { result, token } = await api.previewPush(path, true, false)
-        setPushPreview({ path, result, force: true, allowLossy: false, token })
+        await openPushPreview(path, true, false)
       })
     }
-  }, [api, clearDiff, diff, requestPull, requestPush, review, runOp])
+  }, [api, clearDiff, diff, openPushPreview, requestPull, requestPush, review, runOp])
 
   const checkOne = useCallback((path: string) => runOp('check', async () => {
     const results = await api.checkFiles([path])
