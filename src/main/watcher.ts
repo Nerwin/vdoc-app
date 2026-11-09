@@ -37,6 +37,8 @@ export function watchDocs(window: BrowserWindow): void {
         clearTimeout(timer)
         timer = setTimeout(flush, 400)
       })
+      // A removed or locked dir emits 'error'; unhandled, it would crash the main process.
+      watcher.on('error', () => watcher.close())
       watchers.push(watcher)
     } catch {
       // Missing content dir: nothing to watch.
