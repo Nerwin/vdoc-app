@@ -139,3 +139,10 @@ test('frontmatterEntries lists every key with scalars, inline and block lists', 
   ])
   assert.deepEqual(frontmatterEntries('# No frontmatter'), [])
 })
+
+test('a body between two horizontal rules is not frontmatter', () => {
+  const md = '# Notes\n\nIntro\n\n---\n\ntitle: oops\n\n---\n\nEnd\n'
+  assert.equal(parseFrontmatter(md).title, undefined)
+  assert.deepEqual(frontmatterEntries(md), [])
+  assert.equal(setFrontmatterFlag(md, 'confluenceIgnore', true), `---\nconfluenceIgnore: true\n---\n\n${md}`)
+})

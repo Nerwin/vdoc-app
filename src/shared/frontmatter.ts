@@ -21,6 +21,12 @@ const unquote = (value: string): string => value.replace(/^(["'])(.*)\1$/, '$2')
 
 const BLOCK = /^---(\r?\n)([\s\S]*?)^---[ \t]*(\r?\n|$)/m
 
+/** The frontmatter block, only when it opens the file - a later `---` is a horizontal rule. */
+function frontmatterBlock(content: string): RegExpExecArray | null {
+  const match = BLOCK.exec(content)
+  return match?.index === 0 ? match : null
+}
+
 function blockBody(match: RegExpExecArray): string {
   return match[2].replace(/\r?\n$/, '')
 }
@@ -44,7 +50,7 @@ function positiveInteger(value: string | undefined): number | undefined {
  * which is all the vdoc frontmatter uses. Anything else is ignored, never an error.
  */
 export function parseFrontmatter(content: string): Frontmatter {
-  const match = BLOCK.exec(content)
+  const match = frontmatterBlock(content)
   if (!match) return {}
   const fields = new Map<string, string>()
   for (const line of blockBody(match).split(/\r?\n/)) {
@@ -78,7 +84,7 @@ export interface FrontmatterEntry {
 
 /** Every top-level key in order, for display: scalars unquoted, inline and block lists as arrays. */
 export function frontmatterEntries(content: string): FrontmatterEntry[] {
-  const match = BLOCK.exec(content)
+  const match = frontmatterBlock(content)
   if (!match) return []
   const entries: FrontmatterEntry[] = []
   for (const line of blockBody(match).split(/\r?\n/)) {
@@ -112,7 +118,7 @@ function upsertFlag(body: string, key: FrontmatterFlag, line: string, eol: strin
 /** Set (or insert) a boolean `key:` in the frontmatter, creating the block if absent. */
 export function setFrontmatterFlag(content: string, key: FrontmatterFlag, value: boolean): string {
   const line = `${key}: ${value}`
-  const match = BLOCK.exec(content)
+  const match = frontmatterBlock(content)
   if (!match) {
     const eol = content.match(/\r\n|\n/)?.[0] ?? '\n'
     return `---${eol}${line}${eol}---${eol}${eol}${content}`
