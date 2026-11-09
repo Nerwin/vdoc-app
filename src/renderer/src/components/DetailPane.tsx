@@ -144,8 +144,10 @@ export function DetailPane(props: Props) {
           setContent(text)
           setSaveState('saved')
         } else {
+          // A draft that outlived its pane (blocked save, quick switch): retry it now.
           setContent(draft)
           setSaveState('unsaved')
+          void flush()
         }
       })
       .catch(() => {
