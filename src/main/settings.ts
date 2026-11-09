@@ -33,6 +33,7 @@ let cache: Settings | null = null
 
 export function loadSettings(): Settings {
   if (cache) return cache
+  let unreadable = false
   try {
     cache = { ...DEFAULTS, ...JSON.parse(readFileSync(settingsFile(), 'utf8')) as Partial<Settings> }
   } catch (error) {
@@ -40,15 +41,16 @@ export function loadSettings(): Settings {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
       try {
         renameSync(settingsFile(), `${settingsFile()}.corrupt`)
-      } catch {
-        // Nothing left to preserve.
+      } catch (renameError) {
+        unreadable = (renameError as NodeJS.ErrnoException).code !== 'ENOENT'
       }
     }
     cache = { ...DEFAULTS }
   }
   if (!cache.installId) {
     cache.installId = randomUUID()
-    saveSettings(cache)
+    // A file that could not be moved aside is left as is until the user saves a setting.
+    if (!unreadable) saveSettings(cache)
   }
   return cache
 }
