@@ -2,6 +2,39 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.24.1](https://github.com/Nerwin/vdoc-app/compare/v1.24.0...v1.24.1) (2026-11-09)
+
+### Bug Fixes
+
+* **app:** save editor drafts before Reload window ([5643669](https://github.com/Nerwin/vdoc-app/commit/564366925bca351e9ff82102ab838e3a207e35a5))
+* **changes:** skip author lookups while disconnected and retry failed ones after login ([73ba66b](https://github.com/Nerwin/vdoc-app/commit/73ba66b6479737f0beb0de4973a3b1f373060e0e))
+* **check:** match check results that a Windows CLI echoes with backslashes ([dbf3a0c](https://github.com/Nerwin/vdoc-app/commit/dbf3a0cfaa86c8c205a070560c41335978d26d7f))
+* **check:** stop re-applying stale batch results when a full check ends ([a2a6e2a](https://github.com/Nerwin/vdoc-app/commit/a2a6e2a70f588fe39acf44fd3d971f53dd717c8b))
+* **dates:** show frontmatter and comment dates on the right day ([7c93e71](https://github.com/Nerwin/vdoc-app/commit/7c93e7122cf0226f5ac3c558b6aae59afaa3b672))
+* **editor:** drop disk reads that land after switching documents ([8e5bde7](https://github.com/Nerwin/vdoc-app/commit/8e5bde72d809a8e209614a3ab144fe0e3df3a552))
+* **editor:** keep editor drafts in the app store so closing a document never drops one ([59337b4](https://github.com/Nerwin/vdoc-app/commit/59337b4b0aec58e9954fed3b6f71bbd739263ee8))
+* **editor:** retry a surviving draft when its document reopens ([666b96f](https://github.com/Nerwin/vdoc-app/commit/666b96ff6290e611ab5aa80e7cfc0413fdfaf68b))
+* **frontmatter:** only treat a leading --- block as frontmatter ([133894a](https://github.com/Nerwin/vdoc-app/commit/133894a6dca320e3c6e29bb6358d6bfe4682037f))
+* **palette:** compare search results with the live query before opening one ([d88de57](https://github.com/Nerwin/vdoc-app/commit/d88de57b6036f740be75380c8f20f6d057688537))
+* **palette:** keep the keyboard selection valid and ignore Enter on stale search results ([cf99c26](https://github.com/Nerwin/vdoc-app/commit/cf99c2659282874f181092ff1d84a7bc6959117e))
+* **preview:** keep the find bar from scrolling back on every edit ([54ab249](https://github.com/Nerwin/vdoc-app/commit/54ab2498a33d8661673c65fc7f7f6ae3a87a17e7))
+* **review:** fetch the diff again when an autosave lands while it loads ([41f527e](https://github.com/Nerwin/vdoc-app/commit/41f527e298e9ca3da70a95ae575edba8d9866885))
+* **review:** honour Cancel all during a push and show the latest diff request ([f5e9978](https://github.com/Nerwin/vdoc-app/commit/f5e9978be77e364b5e53e96c353a9f1ee0a80b90))
+* **scan:** mark uncommitted files with non-ASCII names or a docs root inside the repo ([ca74c6f](https://github.com/Nerwin/vdoc-app/commit/ca74c6ff398539f50ff4095a41d2c579cfbefdd8))
+* **scan:** skip the source path of worktree renames in git status ([9ed4642](https://github.com/Nerwin/vdoc-app/commit/9ed46423990517992f797a07ea54089344369fc6))
+* **settings:** copy the CLI update command through the app clipboard ([36951be](https://github.com/Nerwin/vdoc-app/commit/36951bee1b14aefa430838fc5cd760b7e31abbe8))
+* **settings:** never overwrite settings.json when it can neither be read nor moved aside ([c868f16](https://github.com/Nerwin/vdoc-app/commit/c868f1616aa5b13686e49e96ab9d4472937c9330))
+* **settings:** write settings.json atomically and never overwrite an unreadable one ([a2acb74](https://github.com/Nerwin/vdoc-app/commit/a2acb746b98fbd7fef4192fd1110d02ae219efb0))
+* **watcher:** close a watcher on error instead of crashing the main process ([eac4258](https://github.com/Nerwin/vdoc-app/commit/eac4258420fbc61bb805888950a872c5499b58e5))
+* **workspace:** clear recents and sync activity on a docs root switch, and say why a switch is refused ([fcb0231](https://github.com/Nerwin/vdoc-app/commit/fcb0231fe3fdfbcd9dcdebf6a4242dc440d6e162))
+* **workspace:** start clean when the docs root changes ([5a1da67](https://github.com/Nerwin/vdoc-app/commit/5a1da67f28a9c4e199048574cfb89285a0f2bd5c))
+
+### Refactoring
+
+* **preview:** drop the dangerouslySetInnerHTML memo ([c34db5a](https://github.com/Nerwin/vdoc-app/commit/c34db5a6831e9db5c51ee98fe51c22c78447712b))
+* share the push preview with the merge path and drop dead branches ([25d3101](https://github.com/Nerwin/vdoc-app/commit/25d31012eefca33bbdbb1d2d47c3a772aafc2f5e))
+* **ui:** one useDismiss hook for popover Esc and outside-click closing ([9ba41a1](https://github.com/Nerwin/vdoc-app/commit/9ba41a109fde917f5e31bf3b4241aa330edc0017))
+
 ## [1.24.0](https://github.com/Nerwin/vdoc-app/compare/v1.23.0...v1.24.0) (2026-11-03)
 
 ### Features
