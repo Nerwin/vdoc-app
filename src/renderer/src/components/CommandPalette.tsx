@@ -80,19 +80,20 @@ export function CommandPalette({ ctx, entries, mode, recents, onPick, onRun, onC
   }, [])
 
   // Search mode asks the main process; the deferred query keeps typing smooth.
-  const [hits, setHits] = useState<SearchHit[]>([])
+  /** Results and the query they answer - Enter waits until they match what is typed. */
+  const [hits, setHits] = useState<{ query: string, results: SearchHit[] }>({ query: '', results: [] })
   useEffect(() => {
     if (mode !== 'search' || commandMode) return
     const query = search.trim()
     if (query.length < 2) {
-      setHits([])
+      setHits({ query: '', results: [] })
       return
     }
     // Each query reads the whole corpus in main - only ask once typing pauses.
     let live = true
     const timer = setTimeout(() => {
       void window.vdoc.searchContent(query)
-        .then(results => live && setHits(results))
+        .then(results => live && setHits({ query, results }))
         .catch(() => undefined)
     }, 200)
     return () => {
@@ -103,7 +104,7 @@ export function CommandPalette({ ctx, entries, mode, recents, onPick, onRun, onC
 
   const rows = useMemo<Row[]>(() => {
     if (!commandMode && mode === 'search') {
-      return hits.map(hit => ({ key: hit.path, group: 'FILES', path: hit.path, snippet: hit.snippet }))
+      return hits.results.map(hit => ({ key: hit.path, group: 'FILES', path: hit.path, snippet: hit.snippet }))
     }
     if (!commandMode) {
       // Recent mode: rank within the recents pool, keeping recency order on an empty query.
@@ -157,13 +158,14 @@ export function CommandPalette({ ctx, entries, mode, recents, onPick, onRun, onC
       onClose()
     } else if (event.key === 'ArrowDown') {
       event.preventDefault()
-      setIndex(current => Math.min(current + 1, rows.length - 1))
+      setIndex(current => Math.max(0, Math.min(current + 1, rows.length - 1)))
     } else if (event.key === 'ArrowUp') {
       event.preventDefault()
       setIndex(current => Math.max(current - 1, 0))
     } else if (event.key === 'Enter' && rows[index]) {
       event.preventDefault()
-      activate(rows[index])
+      const stale = !commandMode && mode === 'search' && hits.query !== search.trim()
+      if (!stale) activate(rows[index])
     }
   }
 

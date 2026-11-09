@@ -68,7 +68,7 @@ export function LogsView({ entries, known, selection, notify, onOpenDocument, on
     })
   }, [rows, query, segment, thisDoc, selection])
 
-  useEffect(() => setFocus(current => Math.min(current, Math.max(shown.length - 1, 0))), [shown.length])
+  useEffect(() => setFocus(current => Math.max(0, Math.min(current, shown.length - 1))), [shown.length])
 
   const copy = (text: string, what: string): void => {
     void window.vdoc.copyText(text)
@@ -104,7 +104,7 @@ export function LogsView({ entries, known, selection, notify, onOpenDocument, on
         return
       }
       if (inField) return
-      if (event.key === 'ArrowDown' || event.key === 'j') setFocus(current => Math.min(current + 1, shown.length - 1))
+      if (event.key === 'ArrowDown' || event.key === 'j') setFocus(current => Math.max(0, Math.min(current + 1, shown.length - 1)))
       else if (event.key === 'ArrowUp' || event.key === 'k') setFocus(current => Math.max(current - 1, 0))
       else if (event.key === 'Enter' && shown[focus]) toggle(shown[focus].entry.id)
       else return
