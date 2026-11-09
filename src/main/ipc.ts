@@ -195,13 +195,11 @@ export function registerIpc(
     const signal = checkOperation.start()
     try {
       const tracked = scanMarkdownFiles().filter(file => file.tracked && !file.ignored).map(file => file.path)
-      const results: CheckFile[] = []
       for (let i = 0; i < tracked.length; i += CHECK_BATCH) {
         if (signal.aborted) break
         const batch = tracked.slice(i, i + CHECK_BATCH)
         try {
           const { files } = await runVdocJson<{ files: CheckFile[] }>(['cf', 'check', ...batch], { signal })
-          results.push(...files)
           if (!event.sender.isDestroyed()) {
             event.sender.send('check-progress', {
               done: Math.min(i + CHECK_BATCH, tracked.length),
@@ -214,7 +212,7 @@ export function registerIpc(
           throw error
         }
       }
-      return results
+      return { cancelled: signal.aborted }
     } finally {
       checkOperation.finish(signal)
     }

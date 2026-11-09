@@ -287,8 +287,9 @@ export interface VdocApi {
   scan(): Promise<ScanResult>
   /** Metadata for already-known files; `null` when one no longer exists. */
   scanFiles(paths: string[]): Promise<ScanFile[] | null>
-  checkAll(): Promise<CheckFile[]>
-  /** Terminate the active check batch; checkAll resolves with completed batch results. */
+  /** Results arrive batch by batch through onCheckProgress; resolves once the run ends. */
+  checkAll(): Promise<{ cancelled: boolean }>
+  /** Terminate the active check batch; checkAll resolves with `cancelled: true`. */
   checkCancel(): Promise<void>
   checkFiles(paths: string[]): Promise<CheckFile[]>
   readFile(path: string): Promise<string>

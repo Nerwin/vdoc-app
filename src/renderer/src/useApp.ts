@@ -232,15 +232,16 @@ export function useApp() {
     checkingRef.current = true
     setChecking({ done: 0, total: 0 })
     try {
-      applyChecks(await api.checkAll())
-      setLastChecked(new Date())
+      // Each batch was applied as it arrived - re-applying them now would undo newer targeted checks.
+      const { cancelled } = await api.checkAll()
+      if (!cancelled) setLastChecked(new Date())
     } catch (error) {
       fail(error)
     } finally {
       checkingRef.current = false
       setChecking(null)
     }
-  }, [api, applyChecks, fail])
+  }, [api, fail])
 
   const recheck = useCallback(async (paths: string[]) => {
     try {
