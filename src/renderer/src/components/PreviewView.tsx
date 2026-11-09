@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { renderPreview } from '../../../shared/preview-html.ts'
 import { BackIcon, CloseIcon, ForwardIcon } from '../icons.tsx'
@@ -61,17 +61,9 @@ export function PreviewView({ content, path, theme, findSeq, onOpenLink, onOutli
     onOpenLink?.(href)
   }, [onOpenLink])
 
-  // React 19 re-applies dangerouslySetInnerHTML whenever this element re-renders,
-  // rebuilding every node under it - which wipes the heading ids and collapses the
-  // find-bar's highlight ranges. Memoizing the element skips that subtree in
-  // reconciliation, so the DOM only rebuilds when the html itself changes.
-  const contentEl = useMemo(() => (
-    <div ref={containerRef} onClick={handleClick} className="preview min-w-0 max-w-[720px] flex-1" dangerouslySetInnerHTML={{ __html: html }} />
-  ), [html, handleClick])
-
   // Mermaid diagrams and colorized code are rendered into the html string itself, not
-  // patched into the container afterwards - React re-applies dangerouslySetInnerHTML on
-  // re-renders, which would silently wipe any DOM patched in behind its back. The plain
+  // patched into the container afterwards - React rebuilds the container whenever the html
+  // string changes, which would silently wipe any DOM patched in behind its back. The plain
   // body shows immediately; the enriched html replaces it.
   useEffect(() => {
     const body = renderPreview(content, path)
@@ -172,7 +164,7 @@ export function PreviewView({ content, path, theme, findSeq, onOpenLink, onOutli
       )}
       <div ref={scrollRef} onScroll={onScroll} className="h-full overflow-y-auto scroll-smooth motion-reduce:scroll-auto">
         <div className="flex px-10 py-[34px]">
-          {contentEl}
+          <div ref={containerRef} onClick={handleClick} className="preview min-w-0 max-w-[720px] flex-1" dangerouslySetInnerHTML={{ __html: html }} />
         </div>
       </div>
     </div>
@@ -184,8 +176,8 @@ const FIND_ACTIVE = 'vdoc-find-active'
 
 /**
  * In-document find over the rendered preview. Matches are painted with the CSS
- * Custom Highlight API - ranges, not DOM edits, so dangerouslySetInnerHTML
- * re-renders can never wipe them (see the mermaid gotcha above).
+ * Custom Highlight API - ranges, not DOM edits, so an html rebuild can never
+ * wipe them (see the mermaid gotcha above).
  */
 function FindBar({ containerRef, scrollRef, html, seq, onClose }: {
   containerRef: React.RefObject<HTMLDivElement | null>
