@@ -1,62 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Marked } from 'marked'
 
-import { escapeHtml, previewBody, withSourceLine } from '../../../shared/preview-html.ts'
-import { docImageUrl } from '../../../shared/links.ts'
+import { renderPreview } from '../../../shared/preview-html.ts'
 import { BackIcon, CloseIcon, ForwardIcon } from '../icons.tsx'
-
-/** Fence language → Monaco language id, for the common shorthands. */
-const LANG_ALIASES: Record<string, string> = {
-  js: 'javascript',
-  jsx: 'javascript',
-  ts: 'typescript',
-  tsx: 'typescript',
-  sh: 'shell',
-  bash: 'shell',
-  zsh: 'shell',
-  yml: 'yaml',
-  py: 'python',
-  md: 'markdown',
-}
-
-/** Body-only markdown → HTML. Raw HTML in the source is escaped, never executed. */
-const marked = new Marked({
-  gfm: true,
-  renderer: {
-    html({ text }) {
-      return escapeHtml(text)
-    },
-    code({ text, lang }) {
-      if (lang === 'mermaid') return `<pre class="mermaid-source">${escapeHtml(text)}</pre>`
-      const language = LANG_ALIASES[lang ?? ''] ?? lang ?? ''
-      const attr = /^[\w+-]+$/.test(language) ? ` data-lang="${language}"` : ''
-      return `<pre class="code-block"${attr}><code>${escapeHtml(text)}</code></pre>`
-    },
-    // A callout strip: the Lucide info icon, no left accent border.
-    blockquote({ tokens }) {
-      // GitHub alert markers (`> [!NOTE]`) are syntax, not content.
-      const body = this.parser.parse(tokens).replace(/^<p>\[!\w+\]\s*/, '<p>')
-      return `<blockquote class="callout">${INFO_SVG}<div>${body}</div></blockquote>`
-    },
-  },
-})
-
-/** Renders block by block so each top-level element carries its source line (scroll sync). */
-function renderPreview(content: string, path: string): string {
-  const { body, firstLine } = previewBody(content)
-  const tokens = marked.lexer(body)
-  marked.walkTokens(tokens, token => {
-    if (token.type === 'image') token.href = docImageUrl(path, token.href) ?? token.href
-  })
-  let line = firstLine
-  return tokens.map(token => {
-    const html = withSourceLine(marked.parser([token]), line)
-    line += token.raw.split('\n').length - 1
-    return html
-  }).join('')
-}
-
-const INFO_SVG = '<svg class="callout-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>'
 
 /** One H2 of the rendered preview - the inspector's Outline lists them. */
 export interface OutlineItem {
