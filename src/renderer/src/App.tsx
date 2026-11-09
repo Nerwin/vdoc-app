@@ -73,23 +73,18 @@ export function App() {
     const saved = Number(localStorage.getItem('sidebarWidth'))
     return saved >= SIDEBAR_MIN && saved <= SIDEBAR_MAX ? saved : 258
   })
-  const editorFlushRef = useRef<() => Promise<boolean>>(async () => true)
-
-  const registerEditorFlush = useCallback((flush: (() => Promise<boolean>) | null) => {
-    editorFlushRef.current = flush ?? (async () => true)
-  }, [])
-
+  const { flushEdits, reportError } = app
   useEffect(() => window.vdoc.onCloseRequested(() => {
     void (async () => {
       let saved = false
       try {
-        saved = await editorFlushRef.current()
+        saved = await flushEdits()
       } catch (error) {
-        app.reportError(error)
+        reportError(error)
       }
-      await window.vdoc.closeReady(saved).catch(app.reportError)
+      await window.vdoc.closeReady(saved).catch(reportError)
     })()
-  }), [app.reportError])
+  }), [flushEdits, reportError])
 
   const theme = useResolvedTheme(app.settings?.theme ?? 'system')
   // Layout effect: set before child effects read the tokens (Monaco themes).
@@ -303,7 +298,6 @@ export function App() {
                     findSeq={findSeq}
                     onView={setView}
                     onError={app.reportError}
-                    onRegisterFlush={registerEditorFlush}
                     onHelp={() => setHelpOpen(true)}
                     onSelect={path => {
                       if (app.entries.has(path)) app.setSelection(path)

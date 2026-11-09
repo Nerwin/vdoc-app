@@ -6,6 +6,7 @@ import { setFrontmatterFlag } from '../../shared/frontmatter.ts'
 import { initMessage } from '../../shared/init.ts'
 import { isLossyPushError } from '../../shared/lossy-push.ts'
 import { reviewOutcome, spliceMerged } from '../../shared/review.ts'
+import { GuardedSaveQueue } from '../../shared/save-queue.ts'
 import { countStates, displayState, needsAttention, type FileEntry } from '../../shared/status.ts'
 import { updateCheckMessage } from '../../shared/update.ts'
 import { verifyBatch } from '../../shared/verification.ts'
@@ -135,6 +136,8 @@ export function useApp() {
   /** Last few pulls / pushes / gets - the dashboard's sync-activity card. */
   const [activity, setActivity] = useState<SyncEvent[]>(() => loadJson('syncActivity', []))
 
+  /** Editor drafts outlive the document pane - closing it or quitting must never drop one. */
+  const [saveQueue] = useState(() => new GuardedSaveQueue(request => api.writeFile(request)))
   const checkingRef = useRef(false)
   const lastFocusCheckRef = useRef(0)
 
@@ -190,6 +193,13 @@ export function useApp() {
     captureException(error)
     setMessage({ kind: 'error', text: errorText(error) })
   }, [])
+
+  /** Resolves true once every editor draft is on disk; failures surface as toasts. */
+  const flushEdits = useCallback(async (): Promise<boolean> => {
+    const result = await saveQueue.flush()
+    for (const failure of result.failures) fail(failure.error)
+    return result.saved
+  }, [fail, saveQueue])
 
   // Anything that escapes the per-action catches still surfaces as a toast.
   useEffect(() => {
@@ -932,6 +942,8 @@ export function useApp() {
     dismissMessage: () => setMessage(null),
     notify: (text: string) => setMessage({ kind: 'info', text }),
     reportError: fail,
+    saveQueue,
+    flushEdits,
     counts,
     checkAll,
     cancelCheck,

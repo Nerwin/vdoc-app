@@ -4,7 +4,6 @@ import type { editor as MonacoEditor } from 'monaco-editor'
 import type { DiffResult, VdocLogEntry } from '../../../shared/types.ts'
 import { parseFrontmatter } from '../../../shared/frontmatter.ts'
 import { resolveRelative } from '../../../shared/links.ts'
-import { GuardedSaveQueue } from '../../../shared/save-queue.ts'
 import { displayState, displayTitle, syncGroup, type FileEntry } from '../../../shared/status.ts'
 import { timeAgo } from '../../../shared/time.ts'
 import { command, isPinned, isReviewable, primaryAction, secondaryActions, shortcutLabel, type CommandContext, type ViewMode } from '../commands.ts'
@@ -44,7 +43,6 @@ interface Props {
   findSeq: number
   onView(view: ViewMode): void
   onError(error: unknown): void
-  onRegisterFlush(flush: (() => Promise<boolean>) | null): void
   /** Open the sync-concepts help modal (the state strips link to it). */
   onHelp(): void
   /** Navigate to another file in the tree (backlink row, local link in the preview). */
@@ -88,9 +86,7 @@ export function DetailPane(props: Props) {
     if (view === 'content' || view === 'split') setEditorLoaded(true)
   }, [view])
 
-  const saveQueueRef = useRef<GuardedSaveQueue | null>(null)
-  if (!saveQueueRef.current) saveQueueRef.current = new GuardedSaveQueue(request => window.vdoc.writeFile(request))
-  const saveQueue = saveQueueRef.current
+  const { saveQueue } = ctx.app
   const activePathRef = useRef(path)
   const loadedRef = useRef({ path, reloadKey: props.reloadKey })
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -102,7 +98,8 @@ export function DetailPane(props: Props) {
       setSaveState('saving')
     }
     const result = await saveQueue.flush()
-    for (const failure of result.failures) onError(failure.error)
+    // Another file's blocked draft was reported when it failed first; it waits for its pane or quit.
+    for (const failure of result.failures) if (failure.path === path) onError(failure.error)
     if (activePathRef.current === path) setSaveState(saveQueue.hasPending(path) ? 'blocked' : 'saved')
     return result.saved
   }, [onError, path, saveQueue])
@@ -125,11 +122,6 @@ export function DetailPane(props: Props) {
   useEffect(() => () => {
     void flush()
   }, [path, flush])
-
-  useEffect(() => {
-    props.onRegisterFlush(flush)
-    return () => props.onRegisterFlush(null)
-  }, [flush, props.onRegisterFlush])
 
   useEffect(() => {
     // Reload (⌘⌥R) is an explicit "take the disk version": drop any pending draft.
