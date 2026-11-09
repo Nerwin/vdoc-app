@@ -410,7 +410,7 @@ function Cli({ settings, busy, onUpdate, onReloadVersion }: Props) {
   const copyUpdateCommand = (): void => {
     const command = settings.cliRequirement?.updateCommand;
     if (!command) return;
-    void navigator.clipboard.writeText(command).then(() => setCopied(true)).catch(() => undefined);
+    void window.vdoc.copyText(command).then(() => setCopied(true)).catch(() => undefined);
   };
 
   return (

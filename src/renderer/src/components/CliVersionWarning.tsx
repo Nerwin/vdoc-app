@@ -16,7 +16,7 @@ export function CliVersionWarning(props: Props) {
 
   const copyUpdateCommand = (): void => {
     if (!props.requirement.updateCommand) return
-    void navigator.clipboard.writeText(props.requirement.updateCommand).then(
+    void window.vdoc.copyText(props.requirement.updateCommand).then(
       () => props.onNotify('CLI update command copied'),
       () => props.onNotify(`Update the CLI with: ${props.requirement.updateCommand}`),
     )
