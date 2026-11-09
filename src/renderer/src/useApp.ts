@@ -142,6 +142,10 @@ export function useApp() {
   /** Every author lookup ever started - each result re-renders Changes, which asks again. */
   const authorsRequested = useRef(new Set<string>())
   const rootRef = useRef('')
+  /** The latest diff request - an older or invalidated response is dropped. */
+  const diffRequest = useRef({ id: 0, path: '' })
+  /** Bumped by Cancel all - a push finishing afterwards does not open the next preview. */
+  const pushRun = useRef(0)
   const lastFocusCheckRef = useRef(0)
 
   const recordActivity = useCallback((op: SyncEvent['op'], paths: string[]) => {
@@ -227,6 +231,12 @@ export function useApp() {
     })
   }, [])
 
+  /** Drops the diff of these files, and a diff request for them still in flight - it predates the change. */
+  const clearDiff = useCallback((paths: string[]) => {
+    if (paths.includes(diffRequest.current.path)) diffRequest.current.id++
+    setDiff(current => (current && paths.includes(current.path) ? null : current))
+  }, [])
+
   /** Rescan the tree. A different docs root starts over: no check, diff or history carries across. */
   const rescan = useCallback(async (): Promise<ScanResult> => {
     const scan = await api.scan()
@@ -239,6 +249,8 @@ export function useApp() {
       setSelection(null)
       setHistory([])
       setForward([])
+      diffRequest.current.id++
+      pushRun.current++
       setDiff(null)
       setDiffLoading(null)
       setReview(null)
@@ -351,7 +363,7 @@ export function useApp() {
         } else {
           await rescan()
         }
-        setDiff(current => (current && changed.includes(current.path) ? null : current))
+        clearDiff(changed)
         for (const path of changed) pendingChecks.current.add(path)
         clearTimeout(checkTimer.current)
         checkTimer.current = setTimeout(() => {
@@ -363,7 +375,7 @@ export function useApp() {
         fail(error)
       }
     })()
-  }), [api, applyChecks, fail, rescan])
+  }), [api, applyChecks, clearDiff, fail, rescan])
 
   // On window focus: refresh what a check (this session or restored) already established -
   // full re-check when over an hour old, otherwise just the files needing attention.
@@ -390,10 +402,12 @@ export function useApp() {
   const loadDiff = useCallback(async (path: string, force = false) => {
     if (entries.get(path)?.ignored) return
     if (!force && diff?.path === path) return
+    const id = ++diffRequest.current.id
+    diffRequest.current.path = path
     setDiffLoading(path)
     try {
       const result = await api.diff(path)
-      setDiff({ path, result })
+      if (diffRequest.current.id === id) setDiff({ path, result })
     } catch (error) {
       fail(error)
     } finally {
@@ -433,9 +447,9 @@ export function useApp() {
     setMessage({ kind: 'info', text: `Pull: ${pulled.length}/${results.length} file(s) updated`, detail: detail.length > 0 ? detail : undefined })
     if (paths.length > 1 && pulled.length > 0) setBulkResult({ text: `${pulled.length} document${pulled.length > 1 ? 's' : ''} updated`, at: Date.now() })
     recordActivity('pulled', pulled.map(result => normalize(result.file)))
-    setDiff(current => (current && paths.includes(current.path) ? null : current))
+    clearDiff(paths)
     await recheck(paths)
-  }), [api, recheck, recordActivity, runOp])
+  }), [api, clearDiff, recheck, recordActivity, runOp])
 
   const requestPull = useCallback((path: string) => {
     const entry = entries.get(path)
@@ -480,6 +494,7 @@ export function useApp() {
   }, [previewNext])
 
   const cancelPushPreview = useCallback(() => {
+    pushRun.current++
     setPushPreview(null)
     setPushQueue([])
   }, [])
@@ -487,6 +502,7 @@ export function useApp() {
   const confirmPush = useCallback(() => {
     if (!pushPreview) return
     const { path, force, allowLossy, token } = pushPreview
+    const run = pushRun.current
     void runOp('push', async () => {
       let result: PushFile
       try {
@@ -506,9 +522,10 @@ export function useApp() {
       })
       recordActivity('pushed', [path])
       setMessage({ kind: 'info', text: `${allowLossy ? 'Push force completed for' : force ? 'Force pushed' : 'Pushed'} ${path} to v${result.version}` })
-      setDiff(current => (current?.path === path ? null : current))
+      clearDiff([path])
       await recheck([path])
     }).then(ok => {
+      if (run !== pushRun.current) return
       const [next, ...rest] = pushQueue
       if (!next) return
       if (ok) previewNext(next, rest)
@@ -517,7 +534,7 @@ export function useApp() {
         setMessage(current => ({ kind: 'error', text: `${current?.text ?? 'Push failed'} - ${pushQueue.length} queued document(s) not pushed` }))
       }
     })
-  }, [api, previewNext, pushPreview, pushQueue, recheck, recordActivity, runOp])
+  }, [api, clearDiff, previewNext, pushPreview, pushQueue, recheck, recordActivity, runOp])
 
   /**
    * Applies the reviewed diff: untouched = pull, fully reverted = force push, a mix is written
@@ -533,12 +550,12 @@ export function useApp() {
       case 'merged': return void runOp('merge', async () => {
         const disk = await api.readFile(path)
         await api.writeFile({ path, expected: disk, next: spliceMerged(disk, local, text), revision: Date.now() })
-        setDiff(current => (current?.path === path ? null : current))
+        clearDiff([path])
         const { result, token } = await api.previewPush(path, true, false)
         setPushPreview({ path, result, force: true, allowLossy: false, token })
       })
     }
-  }, [api, diff, requestPull, requestPush, review, runOp])
+  }, [api, clearDiff, diff, requestPull, requestPush, review, runOp])
 
   const checkOne = useCallback((path: string) => runOp('check', async () => {
     const results = await api.checkFiles([path])
