@@ -132,7 +132,9 @@ export function useApp() {
   const failedAuthors = useRef(new Set<string>())
   const rootRef = useRef('')
   /** The latest diff request - an older or invalidated response is dropped. */
-  const diffRequest = useRef({ id: 0, path: '' })
+  const diffRequest = useRef({ id: 0, path: '', pending: false })
+  /** The latest loadDiff, for the file watcher's long-lived subscription. */
+  const loadDiffRef = useRef<(path: string, force?: boolean) => Promise<void>>(async () => undefined)
   /** Bumped by Cancel all - a push finishing afterwards does not open the next preview. */
   const pushRun = useRef(0)
   const lastFocusCheckRef = useRef(0)
@@ -210,10 +212,18 @@ export function useApp() {
     setEntries(prev => mergeChecks(prev, results, fresh, now))
   }, [])
 
-  /** Drops the diff of these files, and a diff request for them still in flight - it predates the change. */
-  const clearDiff = useCallback((paths: string[]) => {
-    if (paths.includes(diffRequest.current.path)) diffRequest.current.id++
+  /**
+   * Drops the diff of these files, and a diff request for them still in flight - it predates the change.
+   * Returns the path of that cancelled request, if any.
+   */
+  const clearDiff = useCallback((paths: string[]): string | null => {
     setDiff(current => (current && paths.includes(current.path) ? null : current))
+    const request = diffRequest.current
+    if (!request.pending || !paths.includes(request.path)) return null
+    request.id++
+    request.pending = false
+    setDiffLoading(null)
+    return request.path
   }, [])
 
   /** Rescan the tree. A different docs root starts over: no check, diff or history carries across. */
@@ -229,6 +239,7 @@ export function useApp() {
       setHistory([])
       setForward([])
       diffRequest.current.id++
+      diffRequest.current.pending = false
       pushRun.current++
       setDiff(null)
       setDiffLoading(null)
@@ -343,7 +354,9 @@ export function useApp() {
         } else {
           await rescan()
         }
-        clearDiff(changed)
+        // A diff asked for before this save (autosave right after typing) is fetched again.
+        const cancelled = clearDiff(changed)
+        if (cancelled) void loadDiffRef.current(cancelled, true)
         for (const path of changed) pendingChecks.current.add(path)
         clearTimeout(checkTimer.current)
         checkTimer.current = setTimeout(() => {
@@ -382,18 +395,23 @@ export function useApp() {
   const loadDiff = useCallback(async (path: string, force = false) => {
     if (entries.get(path)?.ignored) return
     if (!force && diff?.path === path) return
-    const id = ++diffRequest.current.id
-    diffRequest.current.path = path
+    const id = diffRequest.current.id + 1
+    diffRequest.current = { id, path, pending: true }
+    const latest = (): boolean => diffRequest.current.id === id
     setDiffLoading(path)
     try {
       const result = await api.diff(path)
-      if (diffRequest.current.id === id) setDiff({ path, result })
+      if (latest()) setDiff({ path, result })
     } catch (error) {
-      fail(error)
+      if (latest()) fail(error)
     } finally {
-      setDiffLoading(current => (current === path ? null : current))
+      if (latest()) {
+        diffRequest.current.pending = false
+        setDiffLoading(null)
+      }
     }
   }, [api, diff, entries, fail])
+  loadDiffRef.current = loadDiff
 
   useEffect(() => {
     if (!message) return
