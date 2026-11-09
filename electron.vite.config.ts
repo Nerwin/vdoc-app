@@ -6,7 +6,12 @@ export default defineConfig({
   main: { plugins: [externalizeDepsPlugin()] },
   preload: { plugins: [externalizeDepsPlugin()] },
   renderer: {
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      // The dev server's hot-reload socket has no place in the packaged CSP.
+      { name: 'strip-dev-csp', apply: 'build', transformIndexHtml: (html: string) => html.replace(' ws://localhost:*', '') },
+    ],
     // electron-vite leaves the renderer unminified. Whitespace and syntax only: no source maps are
     // uploaded, so identifiers stay readable in Sentry stack traces.
     build: { minify: 'esbuild' },
