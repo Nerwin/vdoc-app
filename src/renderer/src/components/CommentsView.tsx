@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 
 import type { CommentEntry } from '../../../shared/types.ts'
 import { commentThreads, type CommentThread } from '../../../shared/comments.ts'
+import { localDay } from '../../../shared/time.ts'
 import { CloseIcon } from '../icons.tsx'
 
 interface Props {
@@ -113,7 +114,7 @@ function Comment({ thread: { comment, replies }, nested = false, disabled, onRep
     <>
       <div className="mb-1 flex items-baseline gap-2 font-mono text-[11px]">
         <span className="text-ink">{comment.author}</span>
-        <span className="text-ink-label">{comment.createdAt.slice(0, 10)}</span>
+        <span className="text-ink-label">{localDay(comment.createdAt)}</span>
         {!nested && <span className={comment.kind === 'inline' ? 'text-warn-text' : 'text-ink-label'}>{comment.kind}</span>}
         {comment.resolutionStatus === 'resolved' && <span className="text-sync-text">resolved</span>}
         <button

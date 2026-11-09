@@ -18,3 +18,11 @@ export function timeAgo(at: number | string | Date, style: keyof typeof UNITS = 
   const word = UNITS[style][unit]
   return style === 'long' ? `${value} ${word}${value === 1 ? '' : 's'} ago` : `${value} ${word} ago`
 }
+
+/** The local calendar day of an instant as `YYYY-MM-DD` - a UTC slice shows 9 pm in Montréal as the next day. */
+export function localDay(at: string): string {
+  const date = new Date(at)
+  if (Number.isNaN(date.getTime())) return at.slice(0, 10)
+  const pad = (value: number): string => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}

@@ -242,7 +242,9 @@ function FrontmatterValue({ field }: { field: FrontmatterEntry }) {
   }
   if (DATE.test(value)) {
     const date = new Date(value)
-    if (!Number.isNaN(date.getTime())) return <span>{date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+    // A bare date parses as UTC midnight - format it in UTC or it shows the day before west of Greenwich.
+    const timeZone = value.length === 10 ? 'UTC' : undefined
+    if (!Number.isNaN(date.getTime())) return <span>{date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone })}</span>
   }
   if (value === 'true' || value === 'false') return <span className="font-mono text-ink">{value}</span>
   return <span className="break-words font-mono">{value}</span>
