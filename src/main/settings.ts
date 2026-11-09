@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync, renameSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { app } from 'electron'
 
 import type { Settings } from '../shared/types.ts'
+import { atomicWriteFile } from './atomic-write.ts'
 
 /** Docs repo fallback when neither the docsRoot setting nor $VDOC_APP_ROOT is set. */
 export const DEFAULT_DOCS_ROOT = homedir()
@@ -34,7 +35,15 @@ export function loadSettings(): Settings {
   if (cache) return cache
   try {
     cache = { ...DEFAULTS, ...JSON.parse(readFileSync(settingsFile(), 'utf8')) as Partial<Settings> }
-  } catch {
+  } catch (error) {
+    // Keep an unreadable file aside instead of overwriting it with defaults.
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      try {
+        renameSync(settingsFile(), `${settingsFile()}.corrupt`)
+      } catch {
+        // Nothing left to preserve.
+      }
+    }
     cache = { ...DEFAULTS }
   }
   if (!cache.installId) {
@@ -46,5 +55,5 @@ export function loadSettings(): Settings {
 
 export function saveSettings(settings: Settings): void {
   cache = settings
-  writeFileSync(settingsFile(), JSON.stringify(settings, null, 2))
+  atomicWriteFile(settingsFile(), JSON.stringify(settings, null, 2))
 }
