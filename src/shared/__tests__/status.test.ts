@@ -71,6 +71,11 @@ describe('check merging', () => {
     assert.equal(restored.get('docs/a.md')?.checkedAt, 5)
   })
 
+  it('matches results echoed with Windows separators', () => {
+    const merged = mergeChecks(entries(), [{ file: '.\\docs\\a.md', state: 'behind' }], true, 100)
+    assert.equal(merged.get('docs/a.md')?.check?.state, 'behind')
+  })
+
   it('drops results for files the tree does not list', () => {
     const merged = mergeChecks(entries(), [{ file: 'docs/gone.md', state: 'in-sync', localEdits: false }], true, 100)
     assert.deepEqual([...merged.keys()], ['docs/a.md'])

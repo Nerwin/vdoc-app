@@ -42,7 +42,8 @@ export function scanEntry(file: ScanFile, previous: FileEntry | undefined): File
 export function mergeChecks(entries: Map<string, FileEntry>, results: Array<CheckFile & { checkedAt?: number }>, fresh: boolean, now: number): Map<string, FileEntry> {
   const next = new Map(entries)
   for (const { checkedAt, ...result } of results) {
-    const path = result.file.replace(/^\.\//, '')
+    // App paths always use '/' - a Windows CLI may echo them back with '\\'.
+    const path = result.file.replaceAll('\\', '/').replace(/^\.\//, '')
     const entry = next.get(path)
     if (entry) next.set(path, { ...entry, check: result, checkedAt: fresh ? now : checkedAt })
   }
