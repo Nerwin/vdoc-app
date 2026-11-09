@@ -469,6 +469,8 @@ export function registerIpc(
     if (result.canceled || result.filePaths.length === 0) return null
     const root = realpathSync(result.filePaths[0])
     if (!statSync(root).isDirectory() || !isAbsolute(root)) throw new Error('Invalid docs repository root')
+    // A running check would spawn its next batches in the new root with the old root's paths.
+    checkOperation.cancel()
     saveSettings({ ...loadSettings(), docsRoot: root })
     watchDocs(window)
     return settingsInfo()

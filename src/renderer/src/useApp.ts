@@ -139,6 +139,9 @@ export function useApp() {
   /** Editor drafts outlive the document pane - closing it or quitting must never drop one. */
   const [saveQueue] = useState(() => new GuardedSaveQueue(request => api.writeFile(request)))
   const checkingRef = useRef(false)
+  /** Every author lookup ever started - each result re-renders Changes, which asks again. */
+  const authorsRequested = useRef(new Set<string>())
+  const rootRef = useRef('')
   const lastFocusCheckRef = useRef(0)
 
   const recordActivity = useCallback((op: SyncEvent['op'], paths: string[]) => {
@@ -216,16 +219,39 @@ export function useApp() {
       for (const { checkedAt, ...result } of results) {
         const path = normalize(result.file)
         const entry = next.get(path)
-        next.set(path, { ...entry, path, tracked: entry?.tracked ?? true, check: result, checkedAt: fresh ? now : checkedAt })
+        // A result for a file this tree does not list (late, or from a previous docs root) is dropped.
+        if (!entry) continue
+        next.set(path, { ...entry, check: result, checkedAt: fresh ? now : checkedAt })
       }
       return next
     })
   }, [])
 
-  const mergeScan = useCallback(({ files, pinnedFiles }: ScanResult) => {
-    setPinnedFiles(pinnedFiles)
-    setEntries(prev => new Map(files.map(file => [file.path, toEntry(file, prev.get(file.path))])))
-  }, [])
+  /** Rescan the tree. A different docs root starts over: no check, diff or history carries across. */
+  const rescan = useCallback(async (): Promise<ScanResult> => {
+    const scan = await api.scan()
+    const switched = rootRef.current !== '' && rootRef.current !== scan.root
+    rootRef.current = scan.root
+    setRoot(scan.root)
+    setPinnedFiles(scan.pinnedFiles)
+    setEntries(prev => new Map(scan.files.map(file => [file.path, toEntry(file, switched ? undefined : prev.get(file.path))])))
+    if (switched) {
+      setSelection(null)
+      setHistory([])
+      setForward([])
+      setDiff(null)
+      setDiffLoading(null)
+      setReview(null)
+      setLastChecked(null)
+      setLossyPushPaths(new Set())
+      setPushPreview(null)
+      setPushQueue([])
+      setPullConfirm(null)
+      setAuthors(new Map())
+      authorsRequested.current.clear()
+    }
+    return scan
+  }, [api])
 
   const checkAll = useCallback(async () => {
     if (checkingRef.current) return
@@ -266,9 +292,7 @@ export function useApp() {
   useEffect(() => {
     void (async () => {
       try {
-        const scan = await api.scan()
-        setRoot(scan.root)
-        mergeScan(scan)
+        const scan = await rescan()
         // Restore the last session's check results (age shown as "last checked …";
         // the focus refresh re-checks when they are over an hour old).
         const saved = loadJson<SavedChecks | null>(CHECKS_KEY, null)
@@ -287,7 +311,7 @@ export function useApp() {
         fail(error)
       }
     })()
-  }, [api, applyChecks, fail, mergeScan])
+  }, [api, applyChecks, fail, rescan])
 
   // Persist whatever check results exist - full checks, single files, folder checks.
   // An empty result set never overwrites a saved snapshot (startup runs before restore).
@@ -325,9 +349,7 @@ export function useApp() {
         if (files) {
           setEntries(prev => new Map([...prev, ...files.map((file): [string, FileEntry] => [file.path, toEntry(file, prev.get(file.path))])]))
         } else {
-          const scan = await api.scan()
-          setRoot(scan.root)
-          mergeScan(scan)
+          await rescan()
         }
         setDiff(current => (current && changed.includes(current.path) ? null : current))
         for (const path of changed) pendingChecks.current.add(path)
@@ -341,7 +363,7 @@ export function useApp() {
         fail(error)
       }
     })()
-  }), [api, applyChecks, fail, mergeScan])
+  }), [api, applyChecks, fail, rescan])
 
   // On window focus: refresh what a check (this session or restored) already established -
   // full re-check when over an hour old, otherwise just the files needing attention.
@@ -567,20 +589,15 @@ export function useApp() {
     const initialized = result.files[0]
     if (!initialized) throw new Error(`vdoc md init returned no result for ${path}`)
 
-    const scan = await api.scan()
-    setRoot(scan.root)
-    mergeScan(scan)
-
+    await rescan()
     setMessage({ kind: 'info', text: initMessage(path, initialized.added) })
-  }), [api, mergeScan, runOp])
+  }), [api, rescan, runOp])
 
   const submitGet = useCallback((input: string, dir: string, recursive: boolean) => runOp('get', async () => {
     if (recursive) {
       const result = await api.getPageRecursive(input.trim(), dir)
       setGetForm(null)
-      const scan = await api.scan()
-      setRoot(scan.root)
-      mergeScan(scan)
+      const scan = await rescan()
       const fetched = result.pages.map(page => normalize(page.file)).filter(path => scan.files.some(file => file.path === path))
       const skipped = result.skipped.length > 0 ? `, ${result.skipped.length} skipped` : ''
       setMessage({ kind: 'info', text: `Fetched ${result.pages.length} page(s) into ${dir}${skipped}` })
@@ -594,9 +611,7 @@ export function useApp() {
     const result = await api.getPage(input.trim(), dir)
     setGetForm(null)
     // The watcher also fires, but rescan now so the new file can be selected immediately.
-    const scan = await api.scan()
-    setRoot(scan.root)
-    mergeScan(scan)
+    const scan = await rescan()
     const path = normalize(result.file ?? '')
     setMessage({ kind: 'info', text: `Fetched "${result.title}" (v${result.version}) → ${path}` })
     if (scan.files.some(file => file.path === path)) {
@@ -604,7 +619,7 @@ export function useApp() {
       select(path)
       await recheck([path])
     }
-  }), [api, mergeScan, recheck, recordActivity, runOp, select])
+  }), [api, recheck, recordActivity, rescan, runOp, select])
 
   const runLint = useCallback((path: string) => runOp('lint', async () => {
     const files = await api.lint(path)
@@ -666,8 +681,6 @@ export function useApp() {
     else verifyAllUnverified()
   }, [checkAll, entries, verifyAllUnverified])
 
-  /** Every author lookup ever started - each result re-renders Changes, which asks again. */
-  const authorsRequested = useRef(new Set<string>())
   const loadAuthors = useCallback((requests: Array<{ path: string, remoteVersion: number }>) => {
     const missing = requests.filter(request => !authorsRequested.current.has(`${request.path}@v${request.remoteVersion}`))
     if (missing.length === 0) return
@@ -720,28 +733,25 @@ export function useApp() {
   const applyFolderSettings = useCallback(async (patch: Partial<Settings>) => {
     try {
       setSettings(await api.settingsSet(patch))
-      const scan = await api.scan()
-      setRoot(scan.root)
-      mergeScan(scan)
+      await rescan()
     } catch (error) {
       fail(error)
     }
-  }, [api, fail, mergeScan])
+  }, [api, fail, rescan])
 
   const pickDocsRoot = useCallback(async () => {
     try {
+      // Drafts are keyed by relative path - one must never land in the other repository.
+      if (!await flushEdits()) return
       const nextSettings = await api.pickDocsRoot()
       if (!nextSettings) return
-      setSelection(null)
       setSettings(nextSettings)
-      const scan = await api.scan()
-      setRoot(scan.root)
-      mergeScan(scan)
+      await rescan()
       setMessage({ kind: 'info', text: `Docs repository is now ${nextSettings.resolvedRoot}` })
     } catch (error) {
       fail(error)
     }
-  }, [api, fail, mergeScan])
+  }, [api, fail, flushEdits, rescan])
 
   const addFolder = useCallback(async () => {
     try {
