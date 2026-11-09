@@ -160,14 +160,21 @@ export function DetailPane(props: Props) {
 
   // Disk changed under us (external editor, pull, own save echo): refresh the
   // buffer when there is no active draft to protect.
-  useEffect(() => window.vdoc.onFilesChanged(changed => {
-    if (!changed.includes(path) || saveQueue.hasPending(path) || saveQueue.isSaving(path)) return
-    void window.vdoc.readFile(path).then(text => {
-      if (saveQueue.hasPending(path) || saveQueue.isSaving(path)) return
-      saveQueue.setDisk(path, text)
-      setContent(text)
-    }).catch(() => undefined)
-  }), [path, saveQueue])
+  useEffect(() => {
+    let live = true
+    const unsubscribe = window.vdoc.onFilesChanged(changed => {
+      if (!changed.includes(path) || saveQueue.hasPending(path) || saveQueue.isSaving(path)) return
+      void window.vdoc.readFile(path).then(text => {
+        if (!live || saveQueue.hasPending(path) || saveQueue.isSaving(path)) return
+        saveQueue.setDisk(path, text)
+        setContent(text)
+      }).catch(() => undefined)
+    })
+    return () => {
+      live = false
+      unsubscribe()
+    }
+  }, [path, saveQueue])
 
   const [backlinks, setBacklinks] = useState<string[]>([])
   useEffect(() => {

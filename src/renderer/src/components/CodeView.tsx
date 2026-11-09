@@ -16,6 +16,8 @@ export function CodeView({ content, onChange, onSave, onEditor, theme }: {
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
   const onChangeRef = useRef(onChange)
   const onSaveRef = useRef(onSave)
+  /** True while external content is pushed in - that is not a user edit. */
+  const applyingRef = useRef(false)
   onChangeRef.current = onChange
   onSaveRef.current = onSave
   const editable = Boolean(onChange)
@@ -37,7 +39,9 @@ export function CodeView({ content, onChange, onSave, onEditor, theme }: {
       renderLineHighlight: 'none',
       occurrencesHighlight: 'off',
     })
-    editor.onDidChangeModelContent(() => onChangeRef.current?.(editor.getValue()))
+    editor.onDidChangeModelContent(() => {
+      if (!applyingRef.current) onChangeRef.current?.(editor.getValue())
+    })
     // addAction, not addCommand: Monaco's global command registry would keep every disposed editor alive.
     const save = editor.addAction({ id: 'vdoc.save', label: 'Save', keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS], run: () => onSaveRef.current?.() })
     editorRef.current = editor
@@ -60,7 +64,13 @@ export function CodeView({ content, onChange, onSave, onEditor, theme }: {
   // setValue would reset the cursor on every keystroke.
   useEffect(() => {
     const editor = editorRef.current
-    if (editor && editor.getValue() !== content) editor.setValue(content)
+    if (!editor || editor.getValue() === content) return
+    applyingRef.current = true
+    try {
+      editor.setValue(content)
+    } finally {
+      applyingRef.current = false
+    }
   }, [content])
 
   return <div ref={containerRef} className="h-full w-full" />
