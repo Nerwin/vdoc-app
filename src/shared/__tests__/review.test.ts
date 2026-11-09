@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { reviewOutcome, spliceMerged } from '../review.ts'
+import { reviewedText, reviewOutcome, spliceMerged } from '../review.ts'
+import type { DiffResult } from '../types.ts'
 
 describe('review outcome', () => {
   it('tells an untouched, a fully reverted and a mixed review apart', () => {
@@ -31,5 +32,14 @@ describe('splice merged', () => {
   it('refuses a body that is missing or ambiguous on disk', () => {
     assert.throws(() => spliceMerged('other', 'body', 'BODY'), /does not map back/)
     assert.throws(() => spliceMerged('body\nbody', 'body', 'BODY'), /does not map back/)
+  })
+})
+
+describe('reviewed text', () => {
+  it('uses the edit only when it belongs to the diff under review', () => {
+    const diff = { local: 'mine', remote: 'theirs' } as DiffResult
+    assert.equal(reviewedText(diff, null), 'theirs')
+    assert.equal(reviewedText(diff, { result: diff, text: 'merged' }), 'merged')
+    assert.equal(reviewedText(diff, { result: { ...diff }, text: 'stale' }), 'theirs')
   })
 })

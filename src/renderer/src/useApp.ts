@@ -1,13 +1,13 @@
 import { captureException } from '@sentry/electron/renderer'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { LOG_MAX, type AppUpdateStatus, type AuthStatus, type ChangesScope, type CheckFile, type CredentialKey, type DiffResult, type PushFile, type ScanFile, type ScanResult, type Settings, type SettingsInfo, type VdocLogEntry, type VersionEntry } from '../../shared/types.ts'
+import { LOG_MAX, type AppUpdateStatus, type AuthStatus, type ChangesScope, type CheckFile, type CredentialKey, type DiffResult, type PushFile, type ScanResult, type Settings, type SettingsInfo, type VdocLogEntry, type VersionEntry } from '../../shared/types.ts'
 import { setFrontmatterFlag } from '../../shared/frontmatter.ts'
 import { initMessage } from '../../shared/init.ts'
 import { isLossyPushError } from '../../shared/lossy-push.ts'
-import { reviewOutcome, spliceMerged } from '../../shared/review.ts'
+import { reviewedText, reviewOutcome, spliceMerged } from '../../shared/review.ts'
 import { GuardedSaveQueue } from '../../shared/save-queue.ts'
-import { countStates, displayState, needsAttention, type FileEntry } from '../../shared/status.ts'
+import { countStates, displayState, mergeChecks, needsAttention, scanEntry, type FileEntry } from '../../shared/status.ts'
 import { updateCheckMessage } from '../../shared/update.ts'
 import { verifyBatch } from '../../shared/verification.ts'
 import { STATE_META } from './state-meta.ts'
@@ -77,19 +77,6 @@ const FOCUS_THROTTLE_MS = 60 * 1000
 const EDIT_CHECK_DELAY_MS = 2500
 /** Beyond this many changed files (a git checkout), one full rescan beats per-file reads. */
 const TARGETED_SCAN_MAX = 50
-
-const toEntry = (file: ScanFile, previous: FileEntry | undefined): FileEntry => ({
-  path: file.path,
-  tracked: file.tracked,
-  gitDirty: file.gitDirty,
-  title: file.title,
-  pageId: file.pageId,
-  ignored: file.ignored,
-  hidden: file.hidden,
-  mtimeMs: file.mtimeMs,
-  check: file.tracked ? previous?.check : undefined,
-  checkedAt: file.tracked ? previous?.checkedAt : undefined,
-})
 
 export function useApp() {
   const api = window.vdoc
@@ -220,17 +207,7 @@ export function useApp() {
   /** Fresh results are stamped now; restored ones keep their saved stamp. */
   const applyChecks = useCallback((results: SavedCheck[], fresh = true) => {
     const now = Date.now()
-    setEntries(prev => {
-      const next = new Map(prev)
-      for (const { checkedAt, ...result } of results) {
-        const path = normalize(result.file)
-        const entry = next.get(path)
-        // A result for a file this tree does not list (late, or from a previous docs root) is dropped.
-        if (!entry) continue
-        next.set(path, { ...entry, check: result, checkedAt: fresh ? now : checkedAt })
-      }
-      return next
-    })
+    setEntries(prev => mergeChecks(prev, results, fresh, now))
   }, [])
 
   /** Drops the diff of these files, and a diff request for them still in flight - it predates the change. */
@@ -246,7 +223,7 @@ export function useApp() {
     rootRef.current = scan.root
     setRoot(scan.root)
     setPinnedFiles(scan.pinnedFiles)
-    setEntries(prev => new Map(scan.files.map(file => [file.path, toEntry(file, switched ? undefined : prev.get(file.path))])))
+    setEntries(prev => new Map(scan.files.map(file => [file.path, scanEntry(file, switched ? undefined : prev.get(file.path))])))
     if (switched) {
       setSelection(null)
       setHistory([])
@@ -362,7 +339,7 @@ export function useApp() {
         const known = changed.length <= TARGETED_SCAN_MAX && changed.every(path => entriesRef.current.has(path))
         const files = known ? await api.scanFiles(changed) : null
         if (files) {
-          setEntries(prev => new Map([...prev, ...files.map((file): [string, FileEntry] => [file.path, toEntry(file, prev.get(file.path))])]))
+          setEntries(prev => new Map([...prev, ...files.map((file): [string, FileEntry] => [file.path, scanEntry(file, prev.get(file.path))])]))
         } else {
           await rescan()
         }
@@ -546,7 +523,7 @@ export function useApp() {
   const applyReview = useCallback((path: string) => {
     if (diff?.path !== path) return
     const { local, remote } = diff.result
-    const text = review?.result === diff.result ? review.text : remote
+    const text = reviewedText(diff.result, review)
     switch (reviewOutcome(text, local, remote)) {
       case 'theirs': return requestPull(path)
       case 'mine': return void requestPush(path, true)

@@ -1,4 +1,4 @@
-import type { CheckFile, DisplayState, SyncGroup, VersionEntry } from './types.ts'
+import type { CheckFile, DisplayState, ScanFile, SyncGroup, VersionEntry } from './types.ts'
 
 export interface FileEntry {
   path: string
@@ -17,6 +17,36 @@ export interface FileEntry {
   check?: CheckFile
   /** Epoch ms of the check that produced `check`. */
   checkedAt?: number
+}
+
+/** A scanned file as a tree entry - it keeps its previous check only while it stays tracked. */
+export function scanEntry(file: ScanFile, previous: FileEntry | undefined): FileEntry {
+  return {
+    path: file.path,
+    tracked: file.tracked,
+    gitDirty: file.gitDirty,
+    title: file.title,
+    pageId: file.pageId,
+    ignored: file.ignored,
+    hidden: file.hidden,
+    mtimeMs: file.mtimeMs,
+    check: file.tracked ? previous?.check : undefined,
+    checkedAt: file.tracked ? previous?.checkedAt : undefined,
+  }
+}
+
+/**
+ * Check results applied to the tree: fresh ones stamped `now`, restored ones keep their stamp.
+ * A result for a file the tree does not list (late, or from a previous docs root) is dropped.
+ */
+export function mergeChecks(entries: Map<string, FileEntry>, results: Array<CheckFile & { checkedAt?: number }>, fresh: boolean, now: number): Map<string, FileEntry> {
+  const next = new Map(entries)
+  for (const { checkedAt, ...result } of results) {
+    const path = result.file.replace(/^\.\//, '')
+    const entry = next.get(path)
+    if (entry) next.set(path, { ...entry, check: result, checkedAt: fresh ? now : checkedAt })
+  }
+  return next
 }
 
 /**

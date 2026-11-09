@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowDownToLine, ArrowUp, ArrowUpToLine, Ban, Check, ChevronLeft, ChevronRight, CircleArrowUp, CircleHelp, Columns3, Clock, Command as CommandKey, Copy, CornerDownLeft, Download, ExternalLink, FilePlus, FileText, FolderOpen, House, KeyRound, Link, ListTree, PanelLeft, PanelRight, Pin, Plus, Power, RefreshCw, RotateCw, Search, Settings, Sparkles, SquarePen, SunMoon, Terminal, TriangleAlert, X, type LucideIcon } from 'lucide-react'
 import type { ChangesScope, DisplayState } from '../../shared/types.ts'
-import { reviewOutcome } from '../../shared/review.ts'
+import { reviewedText, reviewOutcome } from '../../shared/review.ts'
+import { reviewPrimary, statePrimary, type PrimaryAction } from '../../shared/actions.ts'
 import { displayState, syncGroup, type FileEntry } from '../../shared/status.ts'
 import type { AppStore } from './useApp.ts'
 
@@ -130,49 +131,19 @@ export function forPath(ctx: CommandContext, path: string): CommandContext {
   return { ...ctx, selection: path, entry, state: selectionState(entry) }
 }
 
-export interface PrimaryAction {
-  label: string
-  commandId: string
-  tone: 'primary' | 'secondary' | 'danger'
-}
-
 /** Both sides can win - the diff's Confluence side is then the editable merge result. */
 export const isReviewable = (state: DisplayState | null): boolean => state === 'conflict' || (state !== null && syncGroup(state) === 'remote')
 
 const inReview = (ctx: CommandContext): boolean =>
   ctx.view === 'diff' && isReviewable(ctx.state) && ctx.app.diff?.path === ctx.selection
 
-/** The diff under review, as far as the reverted changes go. */
-function reviewPrimary(ctx: CommandContext): PrimaryAction {
-  const { local, remote } = ctx.app.diff!.result
-  const text = ctx.app.review?.result === ctx.app.diff!.result ? ctx.app.review.text : remote
-  switch (reviewOutcome(text, local, remote)) {
-    case 'theirs': return ctx.state === 'conflict'
-      ? { label: 'Accept Confluence version', commandId: 'sync.applyReview', tone: 'danger' }
-      : { label: 'Pull changes', commandId: 'sync.applyReview', tone: 'primary' }
-    case 'mine': return { label: 'Keep mine - overwrite Confluence', commandId: 'sync.applyReview', tone: 'danger' }
-    case 'merged': return { label: 'Save merge and push', commandId: 'sync.applyReview', tone: 'danger' }
-  }
-}
-
-/** One primary per document, derived from its state - in review, from the reverted changes. Synced is the only calm (secondary) one. */
+/** One primary per document, derived from its state - in review, from the reverted changes. */
 export function primaryAction(ctx: CommandContext): PrimaryAction | null {
   const { state } = ctx
   if (!state) return null
-  if (inReview(ctx)) return reviewPrimary(ctx)
-  switch (syncGroup(state)) {
-    case 'synced': return { label: 'Recheck', commandId: 'sync.check', tone: 'secondary' }
-    case 'local': return { label: 'Push to Confluence', commandId: 'sync.push', tone: 'primary' }
-    case 'remote': return { label: 'Review changes', commandId: 'view.diff', tone: 'primary' }
-    case 'conflict': return state === 'conflict'
-      ? { label: 'Resolve conflict', commandId: 'view.diff', tone: 'danger' }
-      : { label: 'Recheck', commandId: 'sync.check', tone: 'secondary' }
-    case 'unchecked': return state === 'unverified'
-      ? { label: 'Verify document', commandId: 'sync.baseline', tone: 'primary' }
-      : { label: 'Check document', commandId: 'sync.check', tone: 'primary' }
-    case 'unlinked': return { label: 'Create page', commandId: 'sync.create', tone: 'primary' }
-    case 'ignored': return { label: 'Open in editor', commandId: 'file.editor', tone: 'secondary' }
-  }
+  if (!inReview(ctx)) return statePrimary(state)
+  const { result } = ctx.app.diff!
+  return reviewPrimary(reviewOutcome(reviewedText(result, ctx.app.review), result.local, result.remote), state)
 }
 
 /** What ⌘⏎ runs: the document's primary, or on Changes the bulk pull when anything is remote. */
@@ -351,7 +322,7 @@ export const COMMANDS: Command[] = [
     icon: TriangleAlert,
     tint: 'danger',
     reason: all(linked, ctx => (inReview(ctx) ? undefined : 'open the diff of a document with remote changes'), idle, online),
-    suffix: ctx => (inReview(ctx) ? reviewPrimary(ctx).label : undefined),
+    suffix: ctx => (inReview(ctx) ? primaryAction(ctx)?.label : undefined),
     run: ctx => ctx.app.applyReview(ctx.selection!),
   },
   {

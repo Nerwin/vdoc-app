@@ -1,3 +1,5 @@
+import type { DiffResult } from './types.ts'
+
 export type ReviewOutcome = 'theirs' | 'mine' | 'merged'
 
 const lf = (text: string): string => text.replace(/\r\n/g, '\n')
@@ -7,6 +9,11 @@ export function reviewOutcome(result: string, local: string, remote: string): Re
   if (lf(result) === lf(remote)) return 'theirs'
   if (lf(result) === lf(local)) return 'mine'
   return 'merged'
+}
+
+/** The Confluence side as reviewed: the edited text when the edit belongs to this diff, else untouched. */
+export function reviewedText(diff: DiffResult, review: { result: DiffResult, text: string } | null): string {
+  return review?.result === diff ? review.text : diff.remote
 }
 
 /**

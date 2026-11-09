@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { countStates, displayState, lastSyncAt, needsAttention, syncGroup } from '../status.ts'
+import { countStates, displayState, lastSyncAt, mergeChecks, needsAttention, scanEntry, syncGroup, type FileEntry } from '../status.ts'
 
 describe('sync state model', () => {
   it('maps every CLI state to one of the five groups', () => {
@@ -57,5 +57,30 @@ describe('lastSyncAt', () => {
     const pulled = Date.parse('2026-09-23T08:00:00Z')
     assert.equal(lastSyncAt(check, v8, pulled), pulled)
     assert.equal(lastSyncAt(undefined, null, pulled), pulled)
+  })
+})
+
+describe('check merging', () => {
+  const entries = (): Map<string, FileEntry> => new Map([['docs/a.md', { path: 'docs/a.md', tracked: true }]])
+
+  it('stamps fresh results now and keeps the stamp of restored ones', () => {
+    const fresh = mergeChecks(entries(), [{ file: './docs/a.md', state: 'behind', checkedAt: 5 }], true, 100)
+    assert.equal(fresh.get('docs/a.md')?.checkedAt, 100)
+    assert.equal(fresh.get('docs/a.md')?.check?.state, 'behind')
+    const restored = mergeChecks(entries(), [{ file: 'docs/a.md', state: 'behind', checkedAt: 5 }], false, 100)
+    assert.equal(restored.get('docs/a.md')?.checkedAt, 5)
+  })
+
+  it('drops results for files the tree does not list', () => {
+    const merged = mergeChecks(entries(), [{ file: 'docs/gone.md', state: 'in-sync', localEdits: false }], true, 100)
+    assert.deepEqual([...merged.keys()], ['docs/a.md'])
+  })
+
+  it('keeps a check across rescans only while the file stays tracked', () => {
+    const previous: FileEntry = { path: 'docs/a.md', tracked: true, check: { file: 'docs/a.md', state: 'in-sync', localEdits: false }, checkedAt: 7 }
+    const scanned = { path: 'docs/a.md', tracked: true, gitDirty: false }
+    assert.equal(scanEntry(scanned, previous).check?.state, 'in-sync')
+    assert.equal(scanEntry({ ...scanned, tracked: false }, previous).check, undefined)
+    assert.equal(scanEntry(scanned, undefined).check, undefined)
   })
 })
