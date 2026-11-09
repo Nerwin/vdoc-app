@@ -657,7 +657,8 @@ export const COMMANDS: Command[] = [
     label: 'Reload window',
     icon: RotateCw,
     keys: { key: 'i', meta: true, alt: true },
-    run: () => location.reload(),
+    // A reload is not a window close: save drafts first, and stay put if one cannot be saved.
+    run: ctx => void ctx.app.flushEdits().then(saved => saved && location.reload()),
   },
   {
     id: 'app.quit',
