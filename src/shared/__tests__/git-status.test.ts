@@ -9,8 +9,8 @@ test('parseGitStatus keeps non-ASCII and spaced paths as they are', () => {
 })
 
 test('parseGitStatus keeps the new path of a rename', () => {
-  const output = 'R  docs/b.md\0docs/a.md\0 M docs/c.md\0'
-  assert.deepEqual(parseGitStatus(output, ''), new Set(['docs/b.md', 'docs/c.md']))
+  const output = 'R  docs/b.md\0docs/a.md\0 R docs/e.md\0docs/d.md\0 M docs/c.md\0'
+  assert.deepEqual(parseGitStatus(output, ''), new Set(['docs/b.md', 'docs/e.md', 'docs/c.md']))
 })
 
 test('parseGitStatus makes paths relative to a docs root inside the repo', () => {
