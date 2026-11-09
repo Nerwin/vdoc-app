@@ -96,12 +96,14 @@ export function ChangesView(props: Props) {
     return next
   }, [groups, props.checking])
 
+  const { connected } = props.ctx
   useEffect(() => {
+    if (!connected) return
     const requests = [...(ordered.get('remote') ?? []), ...(ordered.get('conflict') ?? [])]
       .filter(row => row.entry.check?.remoteVersion !== undefined)
       .map(row => ({ path: row.entry.path, remoteVersion: row.entry.check!.remoteVersion! }))
     if (requests.length > 0) loadAuthors(requests)
-  }, [ordered, loadAuthors])
+  }, [connected, ordered, loadAuthors])
 
   const visibleGroups = CHANGE_GROUPS.filter(group => (scope ? group === scope : true))
   const attention = visibleGroups.reduce((sum, group) => sum + (ordered.get(group)?.length ?? 0), 0)

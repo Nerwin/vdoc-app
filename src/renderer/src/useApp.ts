@@ -141,6 +141,8 @@ export function useApp() {
   const checkingRef = useRef(false)
   /** Every author lookup ever started - each result re-renders Changes, which asks again. */
   const authorsRequested = useRef(new Set<string>())
+  /** Lookups that failed - retried once Confluence is connected again. */
+  const failedAuthors = useRef(new Set<string>())
   const rootRef = useRef('')
   /** The latest diff request - an older or invalidated response is dropped. */
   const diffRequest = useRef({ id: 0, path: '' })
@@ -261,6 +263,7 @@ export function useApp() {
       setPullConfirm(null)
       setAuthors(new Map())
       authorsRequested.current.clear()
+      failedAuthors.current.clear()
     }
     return scan
   }, [api])
@@ -704,11 +707,28 @@ export function useApp() {
     for (const request of missing) authorsRequested.current.add(`${request.path}@v${request.remoteVersion}`)
     void (async () => {
       for (const request of missing) {
-        const entry = await api.lastVersion(request.path).catch(() => null)
-        setAuthors(prev => new Map(prev).set(`${request.path}@v${request.remoteVersion}`, entry))
+        const key = `${request.path}@v${request.remoteVersion}`
+        const entry = await api.lastVersion(request.path).catch(() => {
+          failedAuthors.current.add(key)
+          return null
+        })
+        setAuthors(prev => new Map(prev).set(key, entry))
       }
     })()
   }, [api])
+
+  const connected = auth?.ok === true
+  useEffect(() => {
+    if (!connected || failedAuthors.current.size === 0) return
+    const failed = [...failedAuthors.current]
+    failedAuthors.current.clear()
+    for (const key of failed) authorsRequested.current.delete(key)
+    setAuthors(prev => {
+      const next = new Map(prev)
+      for (const key of failed) next.delete(key)
+      return next
+    })
+  }, [connected])
 
   const saveApiKey = useCallback((apiToken: string) => runOp('save API key', async () => {
     const status = await api.saveApiKey(apiToken)
