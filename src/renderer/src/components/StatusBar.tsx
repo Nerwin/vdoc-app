@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { CliOutcome } from '../../../shared/cli-status.ts'
 import type { AppUpdateStatus, AuthStatus, ChangesScope } from '../../../shared/types.ts'
 import { humanTtl } from '../../../shared/time.ts'
 import { shortcutLabel } from '../commands.ts'
 import { CloseIcon, SettingsIcon } from '../icons.tsx'
+import { useDismiss } from '../useDismiss.ts'
 import { OutcomeIcon, StateGlyph } from './StateGlyph.tsx'
 
 interface Props {
@@ -177,24 +178,8 @@ function ConnectionButton({ auth, site, onRefresh }: { auth: AuthStatus | null, 
   const [open, setOpen] = useState(false)
   const wrapperRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    if (!open) return
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') {
-        event.stopPropagation()
-        setOpen(false)
-      }
-    }
-    const onClick = (event: MouseEvent): void => {
-      if (!wrapperRef.current?.contains(event.target as Node)) setOpen(false)
-    }
-    window.addEventListener('keydown', onKey, true)
-    window.addEventListener('mousedown', onClick)
-    return () => {
-      window.removeEventListener('keydown', onKey, true)
-      window.removeEventListener('mousedown', onClick)
-    }
-  }, [open])
+  const close = useCallback(() => setOpen(false), [])
+  useDismiss(open, close, () => wrapperRef.current)
 
   const expiryMs = auth?.tokenExp ? auth.tokenExp * 1000 - Date.now() : null
   const expired = expiryMs !== null && expiryMs <= 0

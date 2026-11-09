@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useRef } from 'react'
 
 import { command, keycaps, IS_MAC, type CommandContext, type MenuItem } from '../commands.ts'
+import { useDismiss } from '../useDismiss.ts'
 
 interface Props {
   ctx: CommandContext
@@ -14,13 +15,11 @@ interface Props {
 export function ActionMenu({ ctx, sections, align = 'right', onClose }: Props) {
   const menuRef = useRef<HTMLDivElement>(null)
 
+  // The wrapper also holds the trigger button - its own onClick handles the toggle.
+  useDismiss(true, onClose, () => menuRef.current?.parentElement)
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') {
-        event.stopPropagation()
-        onClose()
-        return
-      }
       if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
       event.preventDefault()
       const items = [...(menuRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [])]
@@ -29,17 +28,9 @@ export function ActionMenu({ ctx, sections, align = 'right', onClose }: Props) {
       const next = event.key === 'ArrowDown' ? items[(index + 1) % items.length] : items[(index - 1 + items.length) % items.length]
       next.focus()
     }
-    const onClick = (event: MouseEvent): void => {
-      // The wrapper also holds the trigger button - its own onClick handles the toggle.
-      if (!menuRef.current?.parentElement?.contains(event.target as Node)) onClose()
-    }
     window.addEventListener('keydown', onKey, true)
-    window.addEventListener('mousedown', onClick)
-    return () => {
-      window.removeEventListener('keydown', onKey, true)
-      window.removeEventListener('mousedown', onClick)
-    }
-  }, [onClose])
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [])
 
   return (
     <div

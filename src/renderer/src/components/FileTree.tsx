@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { SyncGroup } from '../../../shared/types.ts'
 import { displayState, needsAttention, syncGroup, type FileEntry } from '../../../shared/status.ts'
@@ -6,6 +6,7 @@ import { buildTree, filesUnder, flattenVisible, orderPinnedFirst, pinnedGroupEnd
 import { command, fileContextActions, forPath, shortcutLabel, type CommandContext, type SidebarMode } from '../commands.ts'
 import { BanIcon, ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, FolderIcon, PinIcon } from '../icons.tsx'
 import { GROUP_META, STATE_META } from '../state-meta.ts'
+import { useDismiss } from '../useDismiss.ts'
 import { StateGlyph } from './StateGlyph.tsx'
 
 interface Props {
@@ -47,17 +48,8 @@ export function FileTree(props: Props) {
   const menuCtx = menu?.kind === 'file' ? forPath(props.ctx, menu.path) : null
 
   // While the context menu is open, Escape closes it (and nothing else).
-  useEffect(() => {
-    if (!menu) return
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') {
-        event.stopPropagation()
-        setMenu(null)
-      }
-    }
-    window.addEventListener('keydown', onKey, true)
-    return () => window.removeEventListener('keydown', onKey, true)
-  }, [menu])
+  const closeMenu = useCallback(() => setMenu(null), [])
+  useDismiss(menu !== null, closeMenu)
 
   // Changes mode narrows the same tree to the documents needing attention - and the open one.
   const { rows, pinnedPaths, groupEnds } = useMemo(() => {
