@@ -164,7 +164,8 @@ export function CommandPalette({ ctx, entries, mode, recents, onPick, onRun, onC
       setIndex(current => Math.max(current - 1, 0))
     } else if (event.key === 'Enter' && rows[index]) {
       event.preventDefault()
-      const stale = !commandMode && mode === 'search' && hits.query !== search.trim()
+      // Compared with the live input: the deferred one may still lag behind the last keystroke.
+      const stale = !commandMode && mode === 'search' && hits.query !== query.trim()
       if (!stale) activate(rows[index])
     }
   }
