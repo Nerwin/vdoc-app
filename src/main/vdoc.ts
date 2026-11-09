@@ -9,6 +9,7 @@ import { LOG_MAX, type VdocLogEntry } from '../shared/types.ts'
 import { mdLinkTargets, resolveRelative } from '../shared/links.ts'
 import { parseFrontmatter } from '../shared/frontmatter.ts'
 import { firstMatch, type SearchHit } from '../shared/search.ts'
+import { parseGitStatus } from '../shared/git-status.ts'
 import { hidesVdocOutput, redactVdocArgs, vdocCommandId } from '../shared/privacy.ts'
 import { DEFAULT_DOCS_ROOT, EXCLUDED_DIRS, loadSettings } from './settings.ts'
 import { logAppEvent } from './sentry.ts'
@@ -229,18 +230,9 @@ function vdocFailureMessage(args: string[], stderr: string, stdout: string): str
 /** Relative paths of files with uncommitted git changes under the content dirs, or among `paths`. */
 export function gitDirtyFiles(paths: string[] = getContentDirs()): Set<string> {
   try {
-    const output = execFileSync(
-      'git',
-      ['status', '--porcelain=v1', '--untracked-files=all', '--', ...paths],
-      { cwd: docsRoot(), encoding: 'utf8' },
-    )
-    return new Set(
-      output.split('\n')
-        .filter(line => line.length > 3)
-        // "XY path" - renames are "R  old -> new"; keep the new path.
-        .map(line => line.slice(3).split(' -> ').at(-1) ?? '')
-        .filter(Boolean),
-    )
+    const git = (args: string[]): string => execFileSync('git', args, { cwd: docsRoot(), encoding: 'utf8' })
+    const prefix = git(['rev-parse', '--show-prefix']).trim()
+    return parseGitStatus(git(['status', '--porcelain=v1', '-z', '--untracked-files=all', '--', ...paths]), prefix)
   } catch {
     return new Set()
   }
