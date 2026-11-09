@@ -254,6 +254,10 @@ function FindBar({ containerRef, scrollRef, html, seq, onClose }: {
   const [query, setQuery] = useState('')
   const [ranges, setRanges] = useState<Range[]>([])
   const [active, setActive] = useState(0)
+  /** Bumped when the user moves to a match (new query, Enter) - re-renders from typing never scroll. */
+  const [jump, setJump] = useState(0)
+  const scrolledJump = useRef(0)
+  const searched = useRef('')
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => inputRef.current?.select(), [seq])
@@ -263,6 +267,7 @@ function FindBar({ containerRef, scrollRef, html, seq, onClose }: {
     if (!container || query === '') {
       CSS.highlights.delete(FIND)
       setRanges([])
+      searched.current = ''
       return
     }
     // ponytail: per-text-node substring scan - a phrase crossing inline markup (bold, links) is missed.
@@ -283,7 +288,10 @@ function FindBar({ containerRef, scrollRef, html, seq, onClose }: {
     }
     CSS.highlights.set(FIND, new Highlight(...found))
     setRanges(found)
-    setActive(0)
+    const newQuery = searched.current !== query
+    searched.current = query
+    setActive(current => (newQuery || current >= found.length ? 0 : current))
+    if (newQuery) setJump(count => count + 1)
   }, [containerRef, query, html])
 
   // The active match gets its own highlight and scrolls to the middle of the pane.
@@ -295,10 +303,11 @@ function FindBar({ containerRef, scrollRef, html, seq, onClose }: {
     }
     CSS.highlights.set(FIND_ACTIVE, new Highlight(range))
     const scroller = scrollRef.current
-    if (!scroller) return
+    if (!scroller || scrolledJump.current === jump) return
+    scrolledJump.current = jump
     const offset = range.getBoundingClientRect().top - scroller.getBoundingClientRect().top
     scroller.scrollBy({ top: offset - scroller.clientHeight / 2 })
-  }, [ranges, active, scrollRef])
+  }, [ranges, active, jump, scrollRef])
 
   useEffect(() => () => {
     CSS.highlights.delete(FIND)
@@ -306,7 +315,9 @@ function FindBar({ containerRef, scrollRef, html, seq, onClose }: {
   }, [])
 
   const step = (delta: number): void => {
-    if (ranges.length > 0) setActive(current => (current + delta + ranges.length) % ranges.length)
+    if (ranges.length === 0) return
+    setActive(current => (current + delta + ranges.length) % ranges.length)
+    setJump(count => count + 1)
   }
 
   const onKeyDown = (event: React.KeyboardEvent): void => {
