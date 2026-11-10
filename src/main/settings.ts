@@ -17,6 +17,7 @@ export const EXCLUDED_DIRS = new Set(['Images', 'Private', 'Temp', '_audit', 'Sc
 const DEFAULTS: Settings = {
   theme: 'system',
   vdocBin: null,
+  repos: [],
   docsRoot: null,
   contentDirs: [],
   pinnedDirs: [],

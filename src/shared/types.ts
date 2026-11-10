@@ -234,11 +234,28 @@ export interface VdocLogEntry {
   stderr: string
 }
 
+/** One docs repository in the workspace. Paths are relative to `root`, `/`-separated. */
+interface RepoSettings {
+  /** Tree label and app-path prefix (`<alias>/<path>`) - unique, never contains a slash. */
+  alias: string
+  /** Absolute path of the folder holding `.git` or `.vdoc`. */
+  root: string
+  /** Folders shown in the tree; '' is the root itself. Only .md files are ever listed. */
+  contentDirs: string[]
+  /** Folder paths pinned to the top of their parent's listing. */
+  pinnedDirs: string[]
+  /** Pinned files in pin order - app data, never written to the file. */
+  pinnedFiles: string[]
+}
+
 export interface Settings {
   /** `system` follows the OS appearance; light/dark pin it. */
   theme: 'dark' | 'light' | 'system'
   /** Explicit vdoc binary path; null = auto-detect (~/.bun/bin/vdoc, then PATH). */
   vdocBin: string | null
+  /** Repositories in display order. No migration from the single-root keys: the sole user edits settings.json by hand. */
+  repos: RepoSettings[]
+  // shortcut: the single-root keys below are still what main and the renderer read, they go when the multi-repo IPC lands (phase B/C).
   /** Absolute path of the docs repository; null = $VDOC_APP_ROOT, then the built-in default. */
   docsRoot: string | null
   /** Root folders (relative to the docs repo) shown in the tree. Only .md files are ever listed. */
