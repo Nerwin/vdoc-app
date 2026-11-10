@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.25.0](https://github.com/Nerwin/vdoc-app/compare/v1.24.1...v1.25.0) (2026-11-10)
+
+### Features
+
+* **settings:** add multi-repo settings model and repo path helpers ([728ecaf](https://github.com/Nerwin/vdoc-app/commit/728ecaff03b91e7be7d49f3ce9beff4a3931bbef))
+
 ## [1.24.1](https://github.com/Nerwin/vdoc-app/compare/v1.24.0...v1.24.1) (2026-11-09)
 
 ### Bug Fixes
