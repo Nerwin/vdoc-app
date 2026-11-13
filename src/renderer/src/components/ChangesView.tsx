@@ -4,7 +4,7 @@ import type { ChangesScope, DisplayState, RepoStatus, SyncGroup, VersionEntry } 
 import { CHANGE_GROUPS, displayState, displayTitle, syncGroup, type FileEntry } from '../../../shared/status.ts'
 import { displayAuthor } from '../../../shared/confluence.ts'
 import { timeAgo } from '../../../shared/time.ts'
-import { command, forPath, shortcutLabel, type CommandContext } from '../commands.ts'
+import { command, FORCE_ACTIONS, forPath, shortcutLabel, type CommandContext } from '../commands.ts'
 import { ArrowRightIcon, CheckIcon, CloseIcon, MoreIcon } from '../icons.tsx'
 import { GROUP_META, STATE_META } from '../state-meta.ts'
 import { ActionMenu } from './ActionMenu.tsx'
@@ -49,7 +49,7 @@ const BULK_STRIP_MS = 4000
 const ROW_MENU: Record<'remote' | 'local' | 'conflict', string[]> = {
   remote: ['sync.pull'],
   local: ['sync.push'],
-  conflict: ['sync.forcePush', 'sync.forcePull'],
+  conflict: [],
 }
 const ROW_MENU_COMMON = ['file.editor', 'file.finder', 'file.copyUrl', 'file.browser']
 
@@ -417,7 +417,7 @@ function ChangeRow({ row, group, last, focused, finding, author, menuOpen, ctx, 
         {menuOpen && (
           <ActionMenu
             ctx={forPath(ctx, entry.path)}
-            sections={[group === 'remote' || group === 'local' || group === 'conflict' ? ROW_MENU[group] : [], ROW_MENU_COMMON]}
+            sections={[group === 'remote' || group === 'local' || group === 'conflict' ? ROW_MENU[group] : [], ROW_MENU_COMMON, FORCE_ACTIONS]}
             onClose={() => onMenu(false)}
           />
         )}

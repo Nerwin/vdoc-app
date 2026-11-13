@@ -162,21 +162,24 @@ export const isPinned = (ctx: CommandContext): boolean => ctx.selection !== null
 /** A menu row: a registry id, optionally relabelled for the surface it sits in. */
 export type MenuItem = string | { id: string, label: string }
 
-/** What `⋯` offers per state (R5 §5) - everything that is not the primary: writes and Confluence ops, then side-effect-free actions. */
+/** The forced writes, always the last red section of a linked document's menus - each one sits behind its own confirm. */
+export const FORCE_ACTIONS: MenuItem[] = ['sync.forcePush', 'sync.forcePull', 'sync.lossyPush']
+
+/** What `⋯` offers per state (R5 §5) - everything that is not the primary: writes and Confluence ops, side-effect-free actions, then the forced writes. */
 export function secondaryActions(ctx: CommandContext): MenuItem[][] {
   const common: MenuItem[] = ['file.editor', 'file.finder', 'file.copyUrl']
   const diff = { id: 'view.diff', label: 'Open diff' }
-  const lossy = ctx.selection && ctx.app.lossyPushPaths.has(ctx.selection) ? ['sync.lossyPush'] : []
   if (!ctx.state) return [common]
   switch (syncGroup(ctx.state)) {
-    case 'synced': return [[{ id: 'sync.push', label: 'Push anyway' }, { id: 'sync.pull', label: 'Pull anyway' }, ...lossy], common]
-    case 'local': return [[{ id: 'sync.forcePull', label: 'Discard local changes' }, ...lossy], [diff, ...common]]
+    case 'synced': return [[{ id: 'sync.push', label: 'Push anyway' }, { id: 'sync.pull', label: 'Pull anyway' }], common, FORCE_ACTIONS]
+    case 'local': return [[diff, ...common], FORCE_ACTIONS]
     case 'remote': return [
-      [{ id: 'sync.pull', label: ctx.view === 'diff' ? 'Accept all changes' : 'Pull without reviewing' }, { id: 'sync.forcePush', label: 'Keep mine - overwrite Confluence' }, ...lossy],
+      [{ id: 'sync.pull', label: ctx.view === 'diff' ? 'Accept all changes' : 'Pull without reviewing' }],
       ['file.browser', ...common],
+      FORCE_ACTIONS,
     ]
-    case 'conflict': return [[{ id: 'sync.forcePush', label: 'Keep all mine' }, { id: 'sync.forcePull', label: 'Keep all theirs' }, ...lossy], [diff, ...common]]
-    case 'unchecked': return [['sync.baseline', { id: 'sync.push', label: 'Push' }, 'sync.pull'], [diff, ...common]]
+    case 'conflict': return [[diff, ...common], FORCE_ACTIONS]
+    case 'unchecked': return [['sync.baseline', { id: 'sync.push', label: 'Push' }, 'sync.pull'], [diff, ...common], FORCE_ACTIONS]
     case 'unlinked': return [['sync.link', 'file.init'], common]
     case 'ignored': return [['file.finder']]
   }
@@ -274,7 +277,7 @@ export const COMMANDS: Command[] = [
   {
     id: 'sync.forcePull',
     group: 'Sync',
-    label: 'Discard local changes (keep all theirs)',
+    label: 'Force pull - discard local changes',
     icon: ArrowDown,
     tint: 'danger',
     reason: all(linked, ctx => (ctx.state === 'not-found' ? 'page not found' : undefined), idle, online),
@@ -304,16 +307,16 @@ export const COMMANDS: Command[] = [
   {
     id: 'sync.forcePush',
     group: 'Sync',
-    label: 'Push over remote changes (keep all mine)',
+    label: 'Force push - overwrite Confluence',
     icon: ArrowUp,
     tint: 'danger',
-    reason: all(linked, inGroup(['remote', 'conflict'], 'Confluence has not moved'), idle, online),
+    reason: all(linked, ctx => (ctx.state === 'not-found' ? 'page not found' : undefined), idle, online),
     run: ctx => void ctx.app.requestPush(ctx.selection!, true),
   },
   {
     id: 'sync.lossyPush',
     group: 'Sync',
-    label: 'Push force (overwrite remote)',
+    label: 'Push force - lossy overwrite',
     icon: ArrowUp,
     tint: 'danger',
     reason: all(linked, ctx => (ctx.app.lossyPushPaths.has(ctx.selection!) ? undefined : 'only after a push was blocked as lossy'), idle, online),
