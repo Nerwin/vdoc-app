@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.26.0](https://github.com/Nerwin/vdoc-app/compare/v1.25.0...v1.26.0) (2026-11-13)
+
+### Features
+
+* **workspace:** manage several docs repositories in one tree ([fe57ac1](https://github.com/Nerwin/vdoc-app/commit/fe57ac161a5a46357ad21c8b9d61771130a9e65d))
+
 ## [1.25.0](https://github.com/Nerwin/vdoc-app/compare/v1.24.1...v1.25.0) (2026-11-10)
 
 ### Features
