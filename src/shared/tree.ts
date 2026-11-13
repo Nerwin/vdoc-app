@@ -51,6 +51,13 @@ export function buildTree(paths: string[]): TreeNode[] {
   return roots
 }
 
+/** Every repository is a top-level folder, documents or not - a missing one is appended empty, roots stay sorted. */
+export function withRepoRoots(nodes: TreeNode[], aliases: readonly string[]): TreeNode[] {
+  const present = new Set(nodes.map(node => node.path))
+  const missing = aliases.filter(alias => !present.has(alias)).map((alias): TreeNode => ({ kind: 'dir', path: alias, name: alias, depth: 0, children: [] }))
+  return missing.length === 0 ? nodes : [...nodes, ...missing].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
+}
+
 /** Flatten the tree to the visible rows given a set of collapsed dir paths. */
 export function flattenVisible(nodes: TreeNode[], collapsed: ReadonlySet<string>): TreeNode[] {
   const rows: TreeNode[] = []

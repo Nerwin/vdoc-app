@@ -136,10 +136,11 @@ repository scanned, Confluence connected) followed by a guided walk through the 
 be relaunched any time from the command palette (**App: Welcome tour**). The same checks, by
 hand - open Settings (⌘, / Ctrl+,) and set up, top to bottom:
 
-1. **Docs repository** - point it at your clone of the docs repo (native folder picker).
-2. **Folders** - the root folders the tree shows. Only Markdown files are listed.
-3. **Space mapping** (optional) - folder → Confluence space key; prefills Create's space and
-   narrows Find matching page's title search.
+1. **Repositories** - add the root of each git repository holding docs (native folder picker).
+   Several repositories share one tree, each under its own name.
+2. **Folders** - per repository, the folders the tree shows. Only Markdown files are listed.
+3. **Space mapping** (optional) - folder name → Confluence space key, shared by every
+   repository; prefills Create's space and narrows Find matching page's title search.
 4. **Confluence authentication** - if you skipped step 2.
 5. **vdoc CLI** - leave empty for auto-detect; the resolved `--version` shown here is your
    confirmation the binary works.
@@ -147,7 +148,7 @@ hand - open Settings (⌘, / Ctrl+,) and set up, top to bottom:
 **Validate the whole chain:**
 
 - Settings shows a CLI version → binary found and runnable.
-- The sidebar tree lists your Markdown files → docs root and folders are right.
+- The sidebar tree lists your Markdown files → repositories and folders are right.
 - Press ⌘⇧R (Check all) → sync states appear on every tracked file → Confluence auth works.
 - Anything failing? The **Logs** button in the status bar shows every CLI command the app ran,
   with its exact stderr - right-click an entry to copy the command and re-run it in a terminal.
@@ -262,7 +263,7 @@ remove a root folder.
 
 ## Settings (⌘,)
 
-App-local preferences (theme, docs root, folders, pins, binary path) live in `settings.json`
+App-local preferences (theme, repositories with their folders and pins, binary path) live in `settings.json`
 under Electron's `userData` directory. Everything Confluence-related - credentials, auth
 method, the **space mapping**, and the **assets folder** (where pulled page images land,
 `confluence.assetsDir`) - lives in the shared `.vdocrc` written through `vdoc config set`, so
@@ -270,8 +271,8 @@ the CLI and the app always agree. The **Config file** section shows the resolved
 (`vdoc config path`) with buttons to open or edit it directly.
 
 - **Theme** - system, light, or dark (UI and the Monaco editors).
-- **Docs repository** - the docs repo clone the whole app works in (`VDOC_APP_ROOT` is the fallback).
-- **Folders & spaces** - root folders, folder → space mapping, assets folder.
+- **Repositories & spaces** - the repositories in the workspace with their folders, the folder
+  name → space mapping, and the assets folder (resolved under each file's top-level folder).
 - **Confluence authentication** - session token or API key, plus the ID, key, and name of every
   space accessible to the authenticated account.
 - **vdoc CLI** - explicit binary path (empty = auto-detect), with the detected and minimum
@@ -387,7 +388,6 @@ version as-is (no bump), use `bunx commit-and-tag-version --first-release && bun
 
 ## Environment
 
-- `VDOC_APP_ROOT` - docs repo root fallback when none is set in Settings
 - `VDOC_DEBUG_PORT` - expose Chrome DevTools Protocol on that port (automation/debugging)
 - `VDOC_SHOT=/path.png` - capture a window screenshot and quit (`VDOC_SHOT_JS` runs a renderer
   script first, `VDOC_SHOT_DELAY_MS` tunes the wait) - used for automated visual checks

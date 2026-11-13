@@ -1,14 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { readFileSync, renameSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { app } from 'electron'
 
-import type { Settings } from '../shared/types.ts'
+import type { RepoSettings, Settings } from '../shared/types.ts'
 import { atomicWriteFile } from './atomic-write.ts'
-
-/** Docs repo fallback when neither the docsRoot setting nor $VDOC_APP_ROOT is set. */
-export const DEFAULT_DOCS_ROOT = homedir()
 
 /** Directory names never scanned or watched, wherever they appear in the tree. */
 // ponytail: constant, not a Settings field - promote to Settings if another repo layout ever needs it.
@@ -18,10 +14,6 @@ const DEFAULTS: Settings = {
   theme: 'system',
   vdocBin: null,
   repos: [],
-  docsRoot: null,
-  contentDirs: [],
-  pinnedDirs: [],
-  pinnedFiles: {},
   crashReports: false,
   installId: '',
 }
@@ -37,6 +29,7 @@ export function loadSettings(): Settings {
   let unreadable = false
   try {
     cache = { ...DEFAULTS, ...JSON.parse(readFileSync(settingsFile(), 'utf8')) as Partial<Settings> }
+    cache.repos = repoList(cache.repos)
   } catch (error) {
     // Keep an unreadable file aside instead of overwriting it with defaults.
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
@@ -54,6 +47,21 @@ export function loadSettings(): Settings {
     if (!unreadable) saveSettings(cache)
   }
   return cache
+}
+
+/** settings.json is hand-edited: an entry may omit its lists; one without alias or root, or repeating an alias, is dropped. */
+function repoList(value: unknown): RepoSettings[] {
+  if (!Array.isArray(value)) return []
+  const seen = new Set<string>()
+  return (value as Array<Partial<RepoSettings>>).flatMap(entry => {
+    if (typeof entry?.alias !== 'string' || typeof entry.root !== 'string' || seen.has(entry.alias)) return []
+    seen.add(entry.alias)
+    return [{ alias: entry.alias, root: entry.root, contentDirs: entry.contentDirs ?? [], pinnedDirs: entry.pinnedDirs ?? [], pinnedFiles: entry.pinnedFiles ?? [] }]
+  })
+}
+
+export function repoByAlias(alias: string): RepoSettings | undefined {
+  return loadSettings().repos.find(repo => repo.alias === alias)
 }
 
 export function saveSettings(settings: Settings): void {

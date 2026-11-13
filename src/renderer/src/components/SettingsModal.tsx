@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 
-import type { AuthStatus, CredentialKey, Settings, SettingsInfo } from "../../../shared/types.ts";
+import type { AuthStatus, CredentialKey, RepoStatus, Settings, SettingsInfo } from "../../../shared/types.ts";
 import { humanTtl } from "../../../shared/time.ts";
 import { extractVersion, isVersionBelowMinimum } from "../../../shared/version.ts";
 import { ModalButton } from "./Modal.tsx";
@@ -10,6 +10,10 @@ interface Props {
   settings: SettingsInfo;
   auth: AuthStatus | null;
   busy: boolean;
+  /** Availability of each repository, as the last scan saw it. */
+  repos: RepoStatus[];
+  /** Top-level folder names the mapping can target. */
+  mappingFolders: string[];
   spaceMapping: Record<string, string>;
   onUpdate(patch: Partial<Settings>): void;
   onSetAssetsDir(dir: string | null): void;
@@ -20,8 +24,10 @@ interface Props {
   onSetAuthMethod(method: "api-token" | "session-token"): void;
   onCredentialPreview(key: CredentialKey): Promise<string | null>;
   onClearCredential(key: CredentialKey): void;
-  onAddFolder(): void;
-  onPickDocsRoot(): void;
+  onAddRepo(): void;
+  onRemoveRepo(alias: string): void;
+  onAddFolder(alias: string): void;
+  /** `path` is the folder's app path - the bare alias is the repository root. */
   onRemoveFolder(path: string): void;
   onSetSpaceMapping(dir: string, space: string | null): void;
   onRevealConfig(): void;
@@ -30,7 +36,7 @@ interface Props {
   onClose(): void;
 }
 
-const SECTIONS = ["Appearance", "Folders & spaces", "Confluence auth", "vdoc CLI", "Config file"] as const;
+const SECTIONS = ["Appearance", "Repositories & spaces", "Confluence auth", "vdoc CLI", "Config file"] as const;
 type Section = (typeof SECTIONS)[number];
 
 export function SettingsModal(props: Props) {
@@ -83,7 +89,7 @@ export function SettingsModal(props: Props) {
 
           <div className="min-w-0 flex-1 overflow-y-auto px-5 py-[18px] [&>*+*]:mt-7 [&>*+*]:border-t [&>*+*]:border-line-subtle [&>*+*]:pt-7">
             {section === "Appearance" && <Appearance {...props} />}
-            {section === "Folders & spaces" && <Folders {...props} />}
+            {section === "Repositories & spaces" && <Repositories {...props} />}
             {section === "Confluence auth" && <Confluence {...props} />}
             {section === "vdoc CLI" && <Cli {...props} />}
             {section === "Config file" && <Config {...props} />}
@@ -134,65 +140,74 @@ function Appearance({ settings, onUpdate }: Props) {
   );
 }
 
-function Folders({ settings, spaceMapping, busy, onAddFolder, onPickDocsRoot, onRemoveFolder, onSetSpaceMapping, onSetAssetsDir }: Props) {
+function Repositories({ settings, repos, mappingFolders, spaceMapping, busy, onAddRepo, onRemoveRepo, onAddFolder, onRemoveFolder, onSetSpaceMapping, onSetAssetsDir }: Props) {
   const [mapDir, setMapDir] = useState("");
   const [mapSpace, setMapSpace] = useState("");
   const [assets, setAssets] = useState(settings.assetsDir ?? "");
   const assetsDirty = (assets.trim() || null) !== settings.assetsDir;
-  const unmapped = settings.contentDirs.filter((dir) => !(dir in spaceMapping));
+  // The mapping is keyed by top-level folder name and shared by every repository.
+  const unmapped = mappingFolders.filter((dir) => !(dir in spaceMapping));
+  const unavailable = new Set(repos.filter((repo) => !repo.available).map((repo) => repo.alias));
 
   return (
     <Section
-      title="Folders & spaces"
-      description="Folders must live inside the docs repository - only Markdown files are listed. The space prefills Create and narrows Sync's title search."
+      title="Repositories & spaces"
+      description="Each repository is the root of a git repository; its folders show in the tree under its name - only Markdown files are listed. The space prefills Create and narrows Sync's title search."
     >
-      <Field label="DOCS REPOSITORY">
-        <div className="flex items-center gap-2">
-          <span
-            className="flex-1 truncate rounded-md border border-control bg-well px-2.5 py-[7px] font-mono text-[12.5px] text-ink-dim"
-            title={settings.resolvedRoot}
-          >
-            {settings.resolvedRoot}
-          </span>
-          <ModalButton label="Change…" disabled={busy} onClick={onPickDocsRoot} />
-        </div>
-      </Field>
-      <div className="overflow-hidden rounded-md border border-control">
-        <div className="grid grid-cols-[1fr_132px_30px] bg-sidebar text-[10.5px] tracking-[1px] text-ink-label">
-          <span className="px-2.5 py-[7px]">FOLDER</span>
-          <span className="py-[7px]">SPACE</span>
-          <span />
-        </div>
-        {settings.contentDirs.map((dir) => (
-          <div key={dir} className="grid grid-cols-[1fr_132px_30px] items-center border-t border-row-sep">
-            <span className="truncate px-2.5 py-[7px] font-mono text-[12.5px] text-ink">{dir}</span>
-            {spaceMapping[dir] ? (
-              <button
-                onClick={() => onSetSpaceMapping(dir, null)}
-                title={`Remove the ${dir} → ${spaceMapping[dir]} mapping`}
-                className="w-fit rounded border border-info-edge bg-info-bg px-1.5 py-px font-mono text-[11.5px] text-info-ink"
-              >
-                {spaceMapping[dir]}
-              </button>
-            ) : (
-              <span className="text-[12px] text-ink-mute">not mapped</span>
-            )}
+      {settings.repos.map((repo) => (
+        <div key={repo.alias} className="overflow-hidden rounded-md border border-control">
+          <div className="flex items-center gap-2 bg-sidebar px-2.5 py-[7px]">
+            <span className="text-[12.5px] font-medium text-ink">{repo.alias}</span>
+            <span className="min-w-0 flex-1 truncate font-mono text-[11.5px] text-ink-label" title={repo.root}>{repo.root}</span>
+            {unavailable.has(repo.alias) && <span className="shrink-0 text-[11px] text-warn-text">folder not found</span>}
+            <ModalButton label="+ Add folder…" disabled={busy || unavailable.has(repo.alias)} onClick={() => onAddFolder(repo.alias)} />
             <button
-              onClick={() => onRemoveFolder(dir)}
-              title={`Remove ${dir} from the tree`}
+              onClick={() => onRemoveRepo(repo.alias)}
+              title={`Remove ${repo.alias} from the workspace`}
               className="flex h-6 w-6 items-center justify-center rounded text-ink-mute hover:bg-danger hover:text-conflict"
             >
               <CloseIcon size={12} />
             </button>
           </div>
-        ))}
-        {settings.contentDirs.length === 0 && (
-          <p className="border-t border-row-sep px-2.5 py-[7px] text-[12px] text-ink-mute">No folders - the tree is empty.</p>
-        )}
-      </div>
+          <div className="grid grid-cols-[1fr_132px_30px] border-t border-row-sep bg-sidebar text-[10.5px] tracking-[1px] text-ink-label">
+            <span className="px-2.5 py-[5px]">FOLDER</span>
+            <span className="py-[5px]">SPACE</span>
+            <span />
+          </div>
+          {repo.contentDirs.map((dir) => (
+            <div key={dir} className="grid grid-cols-[1fr_132px_30px] items-center border-t border-row-sep">
+              <span className="truncate px-2.5 py-[7px] font-mono text-[12.5px] text-ink">{dir || <span className="text-ink-dim">(repository root)</span>}</span>
+              {spaceMapping[dir] ? (
+                <button
+                  onClick={() => onSetSpaceMapping(dir, null)}
+                  title={`Remove the ${dir} → ${spaceMapping[dir]} mapping`}
+                  className="w-fit rounded border border-info-edge bg-info-bg px-1.5 py-px font-mono text-[11.5px] text-info-ink"
+                >
+                  {spaceMapping[dir]}
+                </button>
+              ) : (
+                <span className="text-[12px] text-ink-mute">{dir === "" ? "per folder" : "not mapped"}</span>
+              )}
+              <button
+                onClick={() => onRemoveFolder(dir ? `${repo.alias}/${dir}` : repo.alias)}
+                title={`Remove ${dir || "the repository root"} from the tree`}
+                className="flex h-6 w-6 items-center justify-center rounded text-ink-mute hover:bg-danger hover:text-conflict"
+              >
+                <CloseIcon size={12} />
+              </button>
+            </div>
+          ))}
+          {repo.contentDirs.length === 0 && (
+            <p className="border-t border-row-sep px-2.5 py-[7px] text-[12px] text-ink-mute">No folders - nothing of this repository is in the tree.</p>
+          )}
+        </div>
+      ))}
+      {settings.repos.length === 0 && (
+        <p className="rounded-md border border-control px-2.5 py-[7px] text-[12px] text-ink-mute">No repository yet - the tree is empty.</p>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
-        <ModalButton label="+ Add folder…" disabled={busy} onClick={onAddFolder} />
+        <ModalButton label="+ Add repository…" disabled={busy} onClick={onAddRepo} />
         <div className="flex items-center gap-1.5 rounded-md border border-control px-1.5 py-1">
           <select
             value={unmapped.includes(mapDir) ? mapDir : ""}
@@ -233,7 +248,10 @@ function Folders({ settings, spaceMapping, busy, onAddFolder, onPickDocsRoot, on
         </div>
       </Field>
 
-      <InfoStrip>Mapping and assets folder live in the CLI config file, so the CLI reads the same values.</InfoStrip>
+      <InfoStrip>
+        Mapping and assets folder live in the CLI config file, shared by every repository: a folder name maps to the same space everywhere,
+        and the assets folder is resolved under each file's top-level folder.
+      </InfoStrip>
     </Section>
   );
 }

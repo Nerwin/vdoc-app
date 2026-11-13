@@ -48,9 +48,9 @@ function pinPosition(path: string, pinned: string[]): string {
 
 const stamp = (at: number): string => new Date(at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 
-function loadSections(root: string): OpenSections {
+function loadSections(): OpenSections {
   try {
-    const saved = JSON.parse(localStorage.getItem(`inspectorSections:${root}`) ?? '{}') as Partial<OpenSections>
+    const saved = JSON.parse(localStorage.getItem('inspectorSections') ?? '{}') as Partial<OpenSections>
     return { outline: saved.outline !== false, info: saved.info !== false }
   } catch {
     return { outline: true, info: true }
@@ -59,19 +59,18 @@ function loadSections(root: string): OpenSections {
 
 /**
  * The inspector: Outline and Info as collapsible sections, no close control - only the
- * top-bar toggle and ⌘I open or close it. Open sections and width persist per workspace.
+ * top-bar toggle and ⌘I open or close it. Open sections and width persist.
  */
 export function DocumentInfo(props: Props) {
   const { ctx, entry, content } = props
-  const root = ctx.app.root
-  const [open, setOpen] = useState<OpenSections>(() => loadSections(root))
+  const [open, setOpen] = useState<OpenSections>(loadSections)
   const [width, setWidth] = useState(() => {
-    const saved = Number(localStorage.getItem(`inspectorWidth:${root}`))
+    const saved = Number(localStorage.getItem('inspectorWidth'))
     return saved >= WIDTH_MIN && saved <= WIDTH_MAX ? saved : 300
   })
   const toggle = (id: SectionId): void => {
     const next = { ...open, [id]: !open[id] }
-    localStorage.setItem(`inspectorSections:${root}`, JSON.stringify(next))
+    localStorage.setItem('inspectorSections', JSON.stringify(next))
     setOpen(next)
   }
 
@@ -83,7 +82,7 @@ export function DocumentInfo(props: Props) {
     const onUp = (up: MouseEvent): void => {
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
-      localStorage.setItem(`inspectorWidth:${root}`, String(widthAt(up.clientX)))
+      localStorage.setItem('inspectorWidth', String(widthAt(up.clientX)))
     }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)

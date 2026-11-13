@@ -5,6 +5,7 @@
  */
 import type { VdocLogEntry } from './types.ts'
 import { vdocCommandId } from './privacy.ts'
+import { fromCliPath } from './repo-path.ts'
 
 export type CliOutcome = 'success' | 'findings' | 'warning' | 'error'
 
@@ -109,9 +110,12 @@ export function interpretCli(entry: Pick<VdocLogEntry, 'args' | 'exitCode' | 'st
   }
 }
 
-/** The document a command ran against - the first argument that is a known repo path. */
-export function documentOf(args: string[], known: (path: string) => boolean): string | null {
-  return args.find(arg => arg.endsWith('.md') && known(arg.replace(/^\.\//, ''))) ?? null
+type LoggedCommand = Pick<VdocLogEntry, 'args' | 'repo'>
+
+/** The document a command ran against - the first argument that is a known path of the repository it ran in. */
+export function documentOf({ args, repo }: LoggedCommand, known: (path: string) => boolean): string | null {
+  if (repo === undefined) return null
+  return args.map(arg => fromCliPath(repo, arg)).find(path => path.endsWith('.md') && known(path)) ?? null
 }
 
 export interface RerunTarget {
@@ -120,9 +124,9 @@ export interface RerunTarget {
 }
 
 /** Rerun is limited to read-only single-document commands - nothing that writes or skips a preview. */
-export function rerunTarget(args: string[]): RerunTarget | null {
+export function rerunTarget({ args, repo }: LoggedCommand): RerunTarget | null {
   const [group, verb, ...rest] = args.filter(arg => arg !== '--json')
-  if (group !== 'cf' || rest.length !== 1 || rest[0].startsWith('-')) return null
-  if (verb === 'check' || verb === 'diff' || verb === 'lint') return { kind: verb, path: rest[0] }
+  if (repo === undefined || group !== 'cf' || rest.length !== 1 || rest[0].startsWith('-')) return null
+  if (verb === 'check' || verb === 'diff' || verb === 'lint') return { kind: verb, path: fromCliPath(repo, rest[0]) }
   return null
 }

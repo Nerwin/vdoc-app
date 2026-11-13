@@ -10,6 +10,8 @@ import { OutcomeIcon } from './StateGlyph.tsx'
 interface Props {
   entries: VdocLogEntry[]
   /** Documents in the tree - turns a path argument into a link. */
+  /** Repository root per alias - the copied command starts with a cd into it. */
+  repoRoots: Record<string, string>
   known(path: string): boolean
   /** The open document, for the "This document only" scope. */
   selection: string | null
@@ -33,8 +35,15 @@ const EDGE: Record<CliOutcome, string> = {
 const duration = (ms: number): string => (ms >= 1000 ? `${(ms / 1000).toFixed(2)} s` : `${ms} ms`)
 const time = (at: number): string => new Date(at).toLocaleTimeString([], { hour12: false })
 
+/** The command as it ran: per-file commands from their repository root, the rest from anywhere. */
+function commandLine(entry: VdocLogEntry, repoRoots: Record<string, string>, shell: ShellKind): string {
+  const vdoc = shellCommand(['vdoc', ...entry.args], shell)
+  const root = entry.repo === undefined ? undefined : repoRoots[entry.repo]
+  return root === undefined ? vdoc : `${shellCommand(['cd', root], shell)}${shell === 'powershell' ? '; ' : ' && '}${vdoc}`
+}
+
 /** Full overlay of every CLI command this session: semantic status from the JSON, output as real text. */
-export function LogsView({ entries, known, selection, notify, onOpenDocument, onReviewProblems, onRerun, onClose }: Props) {
+export function LogsView({ entries, repoRoots, known, selection, notify, onOpenDocument, onReviewProblems, onRerun, onClose }: Props) {
   const [query, setQuery] = useState('')
   const [segment, setSegment] = useState<Segment>('all')
   const [thisDoc, setThisDoc] = useState(false)
@@ -46,8 +55,8 @@ export function LogsView({ entries, known, selection, notify, onOpenDocument, on
   const rows = useMemo(() => [...entries]
     .filter(entry => entry.id > clearedBefore)
     .reverse()
-    .map(entry => ({ entry, status: cliStatus(entry), command: shellCommand(['vdoc', ...entry.args], shell), document: documentOf(entry.args, known) })),
-  [entries, clearedBefore, known, shell])
+    .map(entry => ({ entry, status: cliStatus(entry), command: commandLine(entry, repoRoots, shell), document: documentOf(entry, known) })),
+  [entries, clearedBefore, known, repoRoots, shell])
 
   const counts = useMemo(() => {
     const result = { success: 0, findings: 0, warning: 0, error: 0 }
@@ -256,7 +265,7 @@ function LogRow({ entry, status, command, document, open, focused, onToggle, onC
   onRerun(target: RerunTarget): void
 }) {
   const meta = OUTCOME_META[status.outcome]
-  const rerun = rerunTarget(entry.args)
+  const rerun = rerunTarget(entry)
   const interpretation = interpretCli(entry, status)
   const output = [entry.stdout, entry.stderr].filter(text => text.trim() !== '').join('\n')
   return (

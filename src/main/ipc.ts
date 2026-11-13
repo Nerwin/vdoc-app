@@ -1,34 +1,69 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { readFileSync, realpathSync, statSync } from 'node:fs'
-import { isAbsolute, join, relative } from 'node:path'
+import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { basename, isAbsolute, join, relative, sep } from 'node:path'
 import { app, BrowserWindow, clipboard, dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
 
-import type { AuthStatus, CheckFile, CommentEntry, CreateResult, CredentialKey, DiffResult, FileWriteRequest, FileWriteResult, GetPageRecursiveResult, GetPageResult, InitResult, LintFile, PullFile, PushFile, Settings, SettingsInfo, SyncFile, VersionEntry } from '../shared/types.ts'
+import type { AuthStatus, CheckFile, CommentEntry, CreateResult, CredentialKey, DiffResult, FileWriteResult, GetPageRecursiveResult, GetPageResult, InitResult, LintFile, PullFile, PushFile, RepoSettings, Settings, SettingsInfo, SyncFile, VersionEntry } from '../shared/types.ts'
 import { parseVdocCliRequirement, type VdocCliRequirement } from '../shared/app-config.ts'
 import { clipboardText } from '../shared/clipboard.ts'
 import { parseConfluenceSpaces } from '../shared/confluence.ts'
 import { isTrustedRendererLocation, PACKAGED_RENDERER_URL } from '../shared/electron-policy.ts'
 import { contentForGuardedWrite } from '../shared/file-write.ts'
 import { CancellableOperation } from '../shared/cancellable-operation.ts'
-import { relativeAppPath, resolveExistingPathInsideRoot } from '../shared/path-policy.ts'
+import { relativeAppPath, resolvePathInsideRoot } from '../shared/path-policy.ts'
+import { fromCliPath, joinRepoPath, splitRepoPath, uniqueAlias } from '../shared/repo-path.ts'
 import { LossyPushAccess } from '../shared/lossy-push.ts'
 import { maskSecret } from '../shared/secret.ts'
 import { OperationTickets } from '../shared/operation-tickets.ts'
 import { atomicWriteFile } from './atomic-write.ts'
-import { backlinksTo, docsRoot, fileForPageId, gitDirtyFiles, resolvedVdocBin, runVdoc, runVdocJson, scanFiles, scanMarkdownFiles, searchContent, setVdocBin, VdocCancelledError, vdocLogs } from './vdoc.ts'
-import { loadSettings, saveSettings } from './settings.ts'
+import { availableRepos, backlinksTo, fileForPageId, gitDirtyFiles, resolveAppPath, resolvedVdocBin, runVdoc, runVdocJson, scanFiles, scanMarkdownFiles, searchContent, setVdocBin, VdocCancelledError, vdocLogs, type RepoPath } from './vdoc.ts'
+import { loadSettings, repoByAlias, saveSettings } from './settings.ts'
 import { sentryActive, traceAppAction } from './sentry.ts'
 import { checkForUpdates, getUpdateStatus, restartAndInstallUpdate } from './update.ts'
 import { watchDocs } from './watcher.ts'
 
 const CHECK_BATCH = 24
 
-/** One CLI run per batch, in order - keeps argv far below Windows' 32,767-character command line. */
-async function inBatches<T>(paths: string[], run: (batch: string[]) => Promise<T[]>): Promise<T[]> {
+interface RepoBatch {
+  repo: RepoSettings
+  rels: string[]
+}
+
+/** A scanned app path back to its repository - the alias is known, the scan just produced it. */
+const scannedPath = (path: string): Pick<RepoPath, 'repo' | 'rel'> => {
+  const { alias, rel } = splitRepoPath(path)
+  return { repo: repoByAlias(alias)!, rel }
+}
+
+/** Batches of 24 per repository, in order - keeps argv far below Windows' 32,767-character command line. */
+function repoBatches(paths: Array<Pick<RepoPath, 'repo' | 'rel'>>): RepoBatch[] {
+  const groups = new Map<string, RepoBatch>()
+  for (const { repo, rel } of paths) {
+    const group = groups.get(repo.alias) ?? { repo, rels: [] }
+    group.rels.push(rel)
+    groups.set(repo.alias, group)
+  }
+  return [...groups.values()].flatMap(({ repo, rels }) => {
+    const batches: RepoBatch[] = []
+    for (let i = 0; i < rels.length; i += CHECK_BATCH) batches.push({ repo, rels: rels.slice(i, i + CHECK_BATCH) })
+    return batches
+  })
+}
+
+/** One CLI run per repository batch, every result's `file` turned back into an app path. */
+async function inBatches<T extends { file: string }>(paths: RepoPath[], run: (batch: RepoBatch) => Promise<T[]>): Promise<T[]> {
   const results: T[] = []
-  for (let i = 0; i < paths.length; i += CHECK_BATCH) results.push(...await run(paths.slice(i, i + CHECK_BATCH)))
+  for (const batch of repoBatches(paths)) results.push(...(await run(batch)).map(item => appFile(batch.repo, item)))
   return results
 }
+
+/** The CLI echoes paths relative to the repository it ran in; the renderer only knows app paths. */
+const appFile = <T extends { file: string }>(repo: RepoSettings, item: T): T => ({ ...item, file: fromCliPath(repo.alias, item.file) })
+
+/** What a repo list change means for the running check and the watchers - pins do not count. */
+const repoLayout = (repos: RepoSettings[]): string => JSON.stringify(repos.map(repo => [repo.alias, repo.root, repo.contentDirs]))
+
 const PUSH_PREVIEW_TTL_MS = 5 * 60 * 1000
 
 interface PendingPush {
@@ -73,23 +108,33 @@ function booleanValue(value: unknown, label: string): boolean {
   return value
 }
 
-function docsPath(value: unknown, label = 'path'): string {
-  const path = relativeAppPath(value, label)
-  resolveExistingPathInsideRoot(docsRoot(), path, label)
-  return path
+/** An existing document: `<alias>/<path inside the repository>`. */
+const docsPath = (value: unknown, label = 'path'): RepoPath => resolveAppPath(value, label)
+
+/** An existing folder - the bare alias is the repository root. */
+function docsDir(value: unknown, label = 'directory'): RepoPath {
+  const target = resolveAppPath(value, label, true)
+  if (!statSync(target.abs).isDirectory()) throw new Error(`Invalid ${label}`)
+  return target
 }
 
-function docsPaths(value: unknown, label = 'paths'): string[] {
+function docsPaths(value: unknown, label = 'paths'): RepoPath[] {
   if (!Array.isArray(value) || value.length > 5000) throw new Error(`Invalid ${label}`)
   return value.map((path, index) => docsPath(path, `${label}[${index}]`))
 }
 
-function contentHash(path: string): string {
-  const content = readFileSync(resolveExistingPathInsideRoot(docsRoot(), path))
-  return createHash('sha256').update(content).digest('hex')
+function contentHash(abs: string): string {
+  return createHash('sha256').update(readFileSync(abs)).digest('hex')
 }
 
-function fileWriteRequest(value: unknown): FileWriteRequest {
+interface FileWrite {
+  target: RepoPath
+  expected: string
+  next: string
+  revision: number
+}
+
+function fileWriteRequest(value: unknown): FileWrite {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid file write')
   const request = value as Record<string, unknown>
   const allowed = new Set(['path', 'expected', 'next', 'revision'])
@@ -97,7 +142,7 @@ function fileWriteRequest(value: unknown): FileWriteRequest {
   const revision = request.revision
   if (!Number.isSafeInteger(revision) || (revision as number) < 0) throw new Error('Invalid file revision')
   return {
-    path: docsPath(request.path),
+    target: docsPath(request.path),
     expected: stringValue(request.expected, 'expected file content', 32 * 1024 * 1024, true),
     next: stringValue(request.next, 'file content', 32 * 1024 * 1024, true),
     revision: revision as number,
@@ -117,7 +162,7 @@ function serializeFileWrite<T>(path: string, write: () => T): Promise<T> {
 function settingsPatch(value: unknown): Partial<Settings> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid settings patch')
   const patch = value as Record<string, unknown>
-  const allowed = new Set(['theme', 'vdocBin', 'contentDirs', 'pinnedDirs', 'pinnedFiles', 'crashReports'])
+  const allowed = new Set(['theme', 'vdocBin', 'repos', 'crashReports'])
   if (Object.keys(patch).some(key => !allowed.has(key))) throw new Error('Invalid settings patch')
 
   const result: Partial<Settings> = {}
@@ -131,31 +176,39 @@ function settingsPatch(value: unknown): Partial<Settings> {
     }
     result.vdocBin = patch.vdocBin as string | null
   }
-  if ('contentDirs' in patch) result.contentDirs = settingPaths(patch.contentDirs, 'content directories')
-  if ('pinnedDirs' in patch) result.pinnedDirs = settingPaths(patch.pinnedDirs, 'pinned directories')
-  if ('pinnedFiles' in patch) result.pinnedFiles = pinnedFilesPatch(patch.pinnedFiles)
+  if ('repos' in patch) result.repos = repoListPatch(patch.repos)
   if ('crashReports' in patch) result.crashReports = booleanValue(patch.crashReports, 'diagnostics setting')
   return result
 }
 
-/** Only the current workspace's list can change; other roots are carried over untouched. */
-function pinnedFilesPatch(value: unknown): Record<string, string[]> {
-  const root = docsRoot()
-  const lists = value && typeof value === 'object' && !Array.isArray(value) ? Object.entries(value) : []
-  if (lists.length !== 1 || lists[0][0] !== root || !Array.isArray(lists[0][1]) || lists[0][1].length > 5000) {
-    throw new Error('Invalid pinned files')
-  }
-  const paths = (lists[0][1] as unknown[]).map((path, index) => relativeAppPath(path, `pinned files[${index}]`))
-  return { ...loadSettings().pinnedFiles, [root]: [...new Set(paths)] }
+/**
+ * The whole list is replaced, but a root only ever enters through the native add-repo dialog: the renderer
+ * may reorder, drop and edit the lists of known repositories. Paths are checked lexically only (an unplugged
+ * drive keeps its entry).
+ */
+function repoListPatch(value: unknown): RepoSettings[] {
+  if (!Array.isArray(value) || value.length > 50) throw new Error('Invalid repositories')
+  const known = new Map(loadSettings().repos.map(repo => [repo.alias, repo.root]))
+  const aliases = new Set<string>()
+  return value.map((entry: unknown) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw new Error('Invalid repository')
+    const { alias, root, contentDirs, pinnedDirs, pinnedFiles } = entry as Record<string, unknown>
+    if (typeof alias !== 'string' || !known.has(alias) || aliases.has(alias)) throw new Error('Invalid repository alias')
+    aliases.add(alias)
+    if (typeof root !== 'string' || root !== known.get(alias)) throw new Error('Invalid repository root')
+    return {
+      alias,
+      root,
+      contentDirs: settingPaths(contentDirs, 'content directories', true),
+      pinnedDirs: settingPaths(pinnedDirs, 'pinned directories'),
+      pinnedFiles: settingPaths(pinnedFiles, 'pinned files', false, 5000),
+    }
+  })
 }
 
-function settingPaths(value: unknown, label: string): string[] {
-  if (!Array.isArray(value) || value.length > 100) throw new Error(`Invalid ${label}`)
-  return value.map((path, index) => {
-    const validated = docsPath(path, `${label}[${index}]`)
-    if (!statSync(resolveExistingPathInsideRoot(docsRoot(), validated)).isDirectory()) throw new Error(`Invalid ${label}`)
-    return validated
-  })
+function settingPaths(value: unknown, label: string, allowRoot = false, max = 100): string[] {
+  if (!Array.isArray(value) || value.length > max) throw new Error(`Invalid ${label}`)
+  return [...new Set(value.map((path, index) => (allowRoot && path === '' ? '' : relativeAppPath(path, `${label}[${index}]`))))]
 }
 
 export function registerIpc(
@@ -170,42 +223,33 @@ export function registerIpc(
   }
 
   handle('scan', () => {
-    const dirty = gitDirtyFiles()
-    const scanned = scanMarkdownFiles()
-    const root = docsRoot()
-    const settings = loadSettings()
-    // First scan of a workspace seeds its pins from legacy `vdocPin: true`; after that the flag is inert.
-    if (!settings.pinnedFiles[root]) {
-      const seed = scanned.filter(file => file.legacyPin).map(file => file.path).sort()
-      saveSettings({ ...settings, pinnedFiles: { ...settings.pinnedFiles, [root]: seed } })
-    }
-    const files = scanned.map(({ legacyPin: _, ...file }) => ({ ...file, gitDirty: dirty.has(file.path) }))
-    return { root, files, pinnedFiles: loadSettings().pinnedFiles[root] }
+    const repos = loadSettings().repos.map(repo => ({ alias: repo.alias, root: repo.root, available: existsSync(repo.root) }))
+    const dirty = new Set(availableRepos().flatMap(repo => [...gitDirtyFiles(repo)].map(rel => joinRepoPath(repo.alias, rel))))
+    const files = scanMarkdownFiles().map(file => ({ ...file, gitDirty: dirty.has(file.path) }))
+    return { repos, files }
   })
 
   handle('scan-files', (_event, input: unknown) => {
-    const paths = docsPaths(input)
+    if (!Array.isArray(input) || input.length > 5000) throw new Error('Invalid paths')
+    const paths = input.map((path, index) => relativeAppPath(path, `paths[${index}]`))
     const scanned = scanFiles(paths)
     if (!scanned) return null
-    const dirty = gitDirtyFiles(paths)
-    return scanned.map(({ legacyPin: _, ...file }) => ({ ...file, gitDirty: dirty.has(file.path) }))
+    const dirty = new Set(repoBatches(paths.map(scannedPath)).flatMap(({ repo, rels }) => [...gitDirtyFiles(repo, rels)].map(rel => joinRepoPath(repo.alias, rel))))
+    return scanned.map(file => ({ ...file, gitDirty: dirty.has(file.path) }))
   })
 
   handle('check-all', async event => {
     const signal = checkOperation.start()
     try {
       const tracked = scanMarkdownFiles().filter(file => file.tracked && !file.ignored).map(file => file.path)
-      for (let i = 0; i < tracked.length; i += CHECK_BATCH) {
+      let done = 0
+      for (const { repo, rels } of repoBatches(tracked.map(scannedPath))) {
         if (signal.aborted) break
-        const batch = tracked.slice(i, i + CHECK_BATCH)
         try {
-          const { files } = await runVdocJson<{ files: CheckFile[] }>(['cf', 'check', ...batch], { signal })
+          const { files } = await runVdocJson<{ files: CheckFile[] }>(['cf', 'check', ...rels], { signal, repo })
+          done += rels.length
           if (!event.sender.isDestroyed()) {
-            event.sender.send('check-progress', {
-              done: Math.min(i + CHECK_BATCH, tracked.length),
-              total: tracked.length,
-              results: files,
-            })
+            event.sender.send('check-progress', { done, total: tracked.length, results: files.map(file => appFile(repo, file)) })
           }
         } catch (error) {
           if (error instanceof VdocCancelledError) break
@@ -222,12 +266,10 @@ export function registerIpc(
     checkOperation.cancel()
   })
 
-  handle('check-files', async (_event, input: unknown) => {
-    const paths = docsPaths(input)
-    return inBatches(paths, async batch => (await runVdocJson<{ files: CheckFile[] }>(['cf', 'check', ...batch])).files)
-  })
+  handle('check-files', (_event, input: unknown) =>
+    inBatches(docsPaths(input), async ({ repo, rels }) => (await runVdocJson<{ files: CheckFile[] }>(['cf', 'check', ...rels], { repo })).files))
 
-  handle('read-file', (_event, input: unknown) => readFileSync(resolveExistingPathInsideRoot(docsRoot(), input), 'utf8'))
+  handle('read-file', (_event, input: unknown) => readFileSync(docsPath(input).abs, 'utf8'))
 
   handle('backlinks', (_event, input: unknown) => backlinksTo(docsPath(input)))
 
@@ -243,7 +285,7 @@ export function registerIpc(
 
   handle('write-file', async (_event, input: unknown): Promise<FileWriteResult> => {
     const request = fileWriteRequest(input)
-    const path = resolveExistingPathInsideRoot(docsRoot(), request.path)
+    const path = request.target.abs
     return serializeFileWrite(path, () => {
       const current = readFileSync(path, 'utf8')
       atomicWriteFile(path, contentForGuardedWrite(current, request.expected, request.next))
@@ -251,57 +293,63 @@ export function registerIpc(
     })
   })
 
-  handle('diff', (_event, input: unknown) => runVdocJson<DiffResult>(['cf', 'diff', docsPath(input)]))
+  handle('diff', async (_event, input: unknown) => {
+    const { repo, rel } = docsPath(input)
+    return appFile(repo, await runVdocJson<DiffResult>(['cf', 'diff', rel], { repo }))
+  })
 
-  handle('record-baseline', (_event, input: unknown) =>
-    runVdocJson<DiffResult>(['cf', 'diff', docsPath(input), '--record']))
+  handle('record-baseline', async (_event, input: unknown) => {
+    const { repo, rel } = docsPath(input)
+    return appFile(repo, await runVdocJson<DiffResult>(['cf', 'diff', rel, '--record'], { repo }))
+  })
 
   handle('last-version', async (_event, input: unknown) => {
-    const path = docsPath(input)
-    const { versions } = await runVdocJson<{ versions: VersionEntry[] }>(['cf', 'versions', path, '--limit', '1'])
+    const { repo, rel } = docsPath(input)
+    const { versions } = await runVdocJson<{ versions: VersionEntry[] }>(['cf', 'versions', rel, '--limit', '1'], { repo })
     return versions[0] ?? null
   })
 
   handle('comments', async (_event, input: unknown) => {
-    const path = docsPath(input)
-    const { comments } = await runVdocJson<{ comments: CommentEntry[] }>(['cf', 'comments', path])
+    const { repo, rel } = docsPath(input)
+    const { comments } = await runVdocJson<{ comments: CommentEntry[] }>(['cf', 'comments', rel], { repo })
     return comments
   })
 
   handle('post-comment', async (_event, pathInput: unknown, textInput: unknown, replyToInput?: unknown) => {
-    const path = docsPath(pathInput)
+    const { repo, rel } = docsPath(pathInput)
     const text = stringValue(textInput, 'comment', 32_000)
     // shortcut: oclif reads a leading "-" as a flag, drop once the CLI accepts the body another way
     if (text.startsWith('-')) throw new Error('A comment cannot start with "-": the vdoc CLI reads it as a flag')
     if (replyToInput !== undefined && (typeof replyToInput !== 'string' || !/^\d{1,20}$/.test(replyToInput))) {
       throw new Error('Invalid comment id')
     }
-    await runVdocJson(['cf', 'comment', path, text, ...(replyToInput === undefined ? [] : ['--reply-to', replyToInput])])
+    await runVdocJson(['cf', 'comment', rel, text, ...(replyToInput === undefined ? [] : ['--reply-to', replyToInput])], { repo })
   })
 
   handle('labels', async (_event, input: unknown) => {
-    const path = docsPath(input)
-    const { labels } = await runVdocJson<{ labels: string[] }>(['cf', 'labels', path])
+    const { repo, rel } = docsPath(input)
+    const { labels } = await runVdocJson<{ labels: string[] }>(['cf', 'labels', rel], { repo })
     return labels
   })
 
-  handle('pull', async (_event, pathsInput: unknown, forceInput?: unknown) => {
+  handle('pull', (_event, pathsInput: unknown, forceInput?: unknown) => {
     const paths = docsPaths(pathsInput)
     const force = forceInput === undefined ? false : booleanValue(forceInput, 'force flag')
-    return inBatches(paths, async batch => (await runVdocJson<{ files: PullFile[] }>(['cf', 'pull', ...batch, ...(force ? ['--force'] : [])])).files)
+    return inBatches(paths, async ({ repo, rels }) => (await runVdocJson<{ files: PullFile[] }>(['cf', 'pull', ...rels, ...(force ? ['--force'] : [])], { repo })).files)
   })
 
   handle('push-preview', async (_event, pathInput: unknown, forceInput?: unknown, allowLossyInput?: unknown) => {
-    const path = docsPath(pathInput)
+    const target = docsPath(pathInput)
+    const path = relativeAppPath(pathInput)
     const force = forceInput === undefined ? false : booleanValue(forceInput, 'force flag')
     const allowLossy = allowLossyInput === undefined ? false : booleanValue(allowLossyInput, 'allow lossy flag')
     if (allowLossy && !lossyPushAccess.allows(path)) throw new Error('Push force is not available for this file')
-    const args = ['cf', 'push', path, '--dry-run']
+    const args = ['cf', 'push', target.rel, '--dry-run']
     if (force) args.push('--force')
     if (allowLossy) args.push('--allow-lossy')
     let files: PushFile[]
     try {
-      ({ files } = await runVdocJson<{ files: PushFile[] }>(args))
+      ({ files } = await runVdocJson<{ files: PushFile[] }>(args, { repo: target.repo }))
     } catch (error) {
       if (!allowLossy) lossyPushAccess.grantAfterError(path, error)
       throw error
@@ -309,21 +357,22 @@ export function registerIpc(
     const result = files[0]
     if (!result) throw new Error('Push preview returned no file')
     const token = randomUUID()
-    pushTickets.issue(token, { path, force, allowLossy, contentHash: contentHash(path) })
-    return { token, result }
+    pushTickets.issue(token, { path, force, allowLossy, contentHash: contentHash(target.abs) })
+    return { token, result: appFile(target.repo, result) }
   })
 
   handle('push-commit', async (_event, tokenInput: unknown) => {
     const token = stringValue(tokenInput, 'push preview token', 100)
     const pending = pushTickets.take(token)
-    if (contentHash(pending.path) !== pending.contentHash) throw new Error('File changed after the push preview; preview it again')
+    const target = docsPath(pending.path)
+    if (contentHash(target.abs) !== pending.contentHash) throw new Error('File changed after the push preview; preview it again')
     if (pending.allowLossy && !lossyPushAccess.allows(pending.path)) throw new Error('Push force is no longer available for this file')
-    const args = ['cf', 'push', pending.path]
+    const args = ['cf', 'push', target.rel]
     if (pending.force) args.push('--force')
     if (pending.allowLossy) args.push('--allow-lossy')
     let files: PushFile[]
     try {
-      ({ files } = await runVdocJson<{ files: PushFile[] }>(args))
+      ({ files } = await runVdocJson<{ files: PushFile[] }>(args, { repo: target.repo }))
     } catch (error) {
       if (!pending.allowLossy) lossyPushAccess.grantAfterError(pending.path, error)
       throw error
@@ -331,47 +380,51 @@ export function registerIpc(
     const result = files[0]
     if (!result) throw new Error('Push returned no file')
     lossyPushAccess.revoke(pending.path)
-    return result
+    return appFile(target.repo, result)
   })
 
-  handle('create', (_event, pathInput: unknown, spaceInput: unknown, parentInput?: unknown) => {
-    const path = docsPath(pathInput)
+  handle('create', async (_event, pathInput: unknown, spaceInput: unknown, parentInput?: unknown) => {
+    const { repo, rel } = docsPath(pathInput)
     const space = stringValue(spaceInput, 'space key', 255)
     if (!/^[A-Za-z0-9_-]+$/.test(space)) throw new Error('Invalid space key')
     const parent = parentInput === undefined ? undefined : stringValue(parentInput, 'parent page', 2048)
-    const args = ['cf', 'push', path, '--create', '--space', space]
+    const args = ['cf', 'push', rel, '--create', '--space', space]
     if (parent) args.push('--parent', parent)
-    return runVdocJson<CreateResult>(args)
+    return appFile(repo, await runVdocJson<CreateResult>(args, { repo }))
   })
 
-  handle('md-init', (_event, input: unknown) =>
-    runVdocJson<InitResult>(['md', 'init', docsPath(input)]))
+  handle('md-init', async (_event, input: unknown) => {
+    const { repo, rel } = docsPath(input)
+    const { files } = await runVdocJson<InitResult>(['md', 'init', rel], { repo })
+    return { files: files.map(file => appFile(repo, file)) }
+  })
 
-  handle('get-page', (_event, pageInput: unknown, dirInput: unknown, recursiveInput?: unknown) => {
+  handle('get-page', async (_event, pageInput: unknown, dirInput: unknown, recursiveInput?: unknown) => {
     const input = stringValue(pageInput, 'page URL or id', 2048)
-    const dir = docsPath(dirInput, 'output directory')
-    if (!statSync(resolveExistingPathInsideRoot(docsRoot(), dir)).isDirectory()) throw new Error('Invalid output directory')
-    const args = ['cf', 'get', input, '--out', dir]
+    const { repo, rel } = docsDir(dirInput, 'output directory')
+    const args = ['cf', 'get', input, '--out', rel || '.']
     if (recursiveInput === true) args.push('--recursive')
-    return runVdocJson<GetPageResult | GetPageRecursiveResult>(args)
+    const result = await runVdocJson<GetPageResult | GetPageRecursiveResult>(args, { repo })
+    if ('pages' in result) return { ...result, pages: result.pages.map(page => appFile(repo, page)) }
+    return result.file ? appFile(repo, { ...result, file: result.file }) : result
   })
 
   handle('file-for-page-id', (_event, input: unknown) => fileForPageId(stringValue(input, 'page id', 32)))
 
   handle('sync', async (_event, pathInput: unknown, spaceInput?: unknown) => {
-    const path = docsPath(pathInput)
+    const { repo, rel } = docsPath(pathInput)
     const space = spaceInput === undefined ? undefined : stringValue(spaceInput, 'space key', 255)
     if (space && !/^[A-Za-z0-9_-]+$/.test(space)) throw new Error('Invalid space key')
-    const args = ['cf', 'sync', path]
+    const args = ['cf', 'sync', rel]
     if (space) args.push('--space', space)
-    const { files } = await runVdocJson<{ files: SyncFile[] }>(args)
-    return files
+    const { files } = await runVdocJson<{ files: SyncFile[] }>(args, { repo })
+    return files.map(file => appFile(repo, file))
   })
 
   handle('lint', async (_event, input: unknown) => {
-    const path = docsPath(input)
-    const { files } = await runVdocJson<{ files: LintFile[] }>(['cf', 'lint', path])
-    return files
+    const { repo, rel } = docsPath(input)
+    const { files } = await runVdocJson<{ files: LintFile[] }>(['cf', 'lint', rel], { repo })
+    return files.map(file => appFile(repo, file))
   })
 
   handle('auth-status', () => authStatus())
@@ -411,73 +464,79 @@ export function registerIpc(
   })
 
   handle('confluence-url', async (_event, input: unknown) => {
-    const path = docsPath(input)
-    const { url } = await runVdocJson<{ url: string }>(['cf', 'open', path, '--print'])
+    const { repo, rel } = docsPath(input)
+    const { url } = await runVdocJson<{ url: string }>(['cf', 'open', rel, '--print'], { repo })
     return url
   })
 
   handle('open-editor', async (_event, input: unknown) => {
-    const error = await shell.openPath(resolveExistingPathInsideRoot(docsRoot(), input))
+    const error = await shell.openPath(docsPath(input).abs)
     if (error) throw new Error(error)
   })
 
   handle('reveal-finder', (_event, input: unknown) => {
-    shell.showItemInFolder(resolveExistingPathInsideRoot(docsRoot(), input))
+    shell.showItemInFolder(docsPath(input).abs)
   })
 
   handle('settings-get', () => settingsInfo())
 
   handle('settings-set', (event, input: unknown) => {
     const patch = settingsPatch(input)
-    const settings = { ...loadSettings(), ...patch }
+    const previous = loadSettings()
+    const settings = { ...previous, ...patch }
     saveSettings(settings)
     setVdocBin(settings.vdocBin)
-    if (patch.contentDirs) {
+    if (patch.repos && repoLayout(patch.repos) !== repoLayout(previous.repos)) {
+      // A running check would send results for files that just left the tree.
+      checkOperation.cancel()
       const window = BrowserWindow.fromWebContents(event.sender)
       if (window) watchDocs(window)
     }
     return settingsInfo('vdocBin' in patch)
   })
 
-  handle('pick-folder', async event => {
+  handle('pick-folder', async (event, aliasInput: unknown) => {
+    const repo = repoByAlias(stringValue(aliasInput, 'repository alias', 100))
+    if (!repo) throw new Error('Unknown repository')
     const window = BrowserWindow.fromWebContents(event.sender)
     if (!window) return null
     const result = await dialog.showOpenDialog(window, {
-      defaultPath: docsRoot(),
+      defaultPath: repo.root,
       properties: ['openDirectory'],
-      message: 'Pick a folder inside the docs repository',
+      message: `Pick a folder inside ${repo.alias}`,
     })
     if (result.canceled || result.filePaths.length === 0) return null
-    const root = realpathSync(docsRoot())
-    const selected = realpathSync(result.filePaths[0])
-    const rel = relative(root, selected)
-    if (rel === '' || rel === '..' || rel.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`) || isAbsolute(rel)) {
-      throw new Error('The folder must be inside the docs repository')
-    }
-    // App-internal paths always use forward slashes, whatever the OS.
-    return relativeAppPath(rel.replaceAll('\\', '/'), 'content directory')
+    const rel = relative(realpathSync(repo.root), realpathSync(result.filePaths[0]))
+    if (rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) throw new Error(`The folder must be inside ${repo.alias} (${repo.root})`)
+    // App-internal paths always use forward slashes, whatever the OS; '' is the repository root.
+    return rel === '' ? '' : relativeAppPath(rel.replaceAll('\\', '/'), 'content directory')
   })
 
-  handle('pick-docs-root', async event => {
+  handle('add-repo', async event => {
     const window = BrowserWindow.fromWebContents(event.sender)
     if (!window) return null
     const result = await dialog.showOpenDialog(window, {
-      defaultPath: docsRoot(),
+      defaultPath: homedir(),
       properties: ['openDirectory'],
-      message: 'Pick the docs repository root',
+      message: 'Pick the root folder of a docs repository',
     })
     if (result.canceled || result.filePaths.length === 0) return null
     const root = realpathSync(result.filePaths[0])
-    if (!statSync(root).isDirectory() || !isAbsolute(root)) throw new Error('Invalid docs repository root')
-    // A running check would spawn its next batches in the new root with the old root's paths.
-    checkOperation.cancel()
-    saveSettings({ ...loadSettings(), docsRoot: root })
+    if (!statSync(root).isDirectory() || !isAbsolute(root)) throw new Error('Invalid repository root')
+    // The CLI keeps its state next to .git (or .vdoc): anything else would share state with a parent folder.
+    if (!existsSync(join(root, '.git')) && !existsSync(join(root, '.vdoc'))) throw new Error('Pick the root of a git repository - the folder holding .git (or .vdoc)')
+    const settings = loadSettings()
+    if (settings.repos.some(repo => repo.root === root)) throw new Error(`${root} is already in the workspace`)
+    // The alias is a path segment: no separators, drive-letter look-alikes or dot names.
+    const base = basename(root).replace(/[^\w.-]+/g, '-')
+    const alias = uniqueAlias(/^\.{0,2}$/.test(base) ? 'repo' : base, settings.repos.map(repo => repo.alias))
+    saveSettings({ ...settings, repos: [...settings.repos, { alias, root, contentDirs: [''], pinnedDirs: [], pinnedFiles: [] }] })
     watchDocs(window)
-    return settingsInfo()
+    return settingsInfo(false)
   })
 
   handle('open-folder', async (_event, input: unknown) => {
-    const error = await shell.openPath(resolveExistingPathInsideRoot(docsRoot(), input))
+    const error = await shell.openPath(docsDir(input).abs)
     if (error) throw new Error(error)
   })
 
@@ -501,8 +560,15 @@ export function registerIpc(
   handle('space-mapping-get', () => spaceMapping())
 
   handle('space-mapping-set', async (_event, dirInput: unknown, spaceInput: unknown) => {
-    const dir = docsPath(dirInput, 'mapping directory')
-    if (!statSync(resolveExistingPathInsideRoot(docsRoot(), dir)).isDirectory()) throw new Error('Invalid mapping directory')
+    const dir = relativeAppPath(dirInput, 'mapping directory')
+    const isFolder = (repo: RepoSettings): boolean => {
+      try {
+        return statSync(resolvePathInsideRoot(repo.root, dir)).isDirectory()
+      } catch {
+        return false
+      }
+    }
+    if (!availableRepos().some(isFolder)) throw new Error('Invalid mapping directory')
     const space = spaceInput === null ? null : stringValue(spaceInput, 'space key', 255)
     if (space && !/^[A-Za-z0-9_-]+$/.test(space)) throw new Error('Invalid space key')
     const key = `confluence.spaceMapping.${dir}`
@@ -553,7 +619,6 @@ async function settingsInfo(refreshCli = true): Promise<SettingsInfo> {
   return {
     ...loadSettings(),
     resolvedBin: resolvedVdocBin(),
-    resolvedRoot: docsRoot(),
     cliRequirement: loadCliRequirement(),
     appVersion: app.getVersion(),
     ...cliInfo,
@@ -580,7 +645,7 @@ function configScalar(key: string): Promise<string | null> {
     .catch(() => null)
 }
 
-/** The shared config file's folder → space mapping ({} when absent). */
+/** The shared config file's top-level folder name → space mapping ({} when absent). */
 function spaceMapping(): Promise<Record<string, string>> {
   return runVdocJson<Record<string, string>>(['config', 'get', 'confluence.spaceMapping'])
     .then(mapping => mapping ?? {})

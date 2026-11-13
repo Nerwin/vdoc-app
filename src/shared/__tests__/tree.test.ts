@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { buildTree, flattenVisible, filesUnder, orderPinnedFirst, pinnedGroupEnds } from '../tree.ts'
+import { buildTree, flattenVisible, filesUnder, orderPinnedFirst, pinnedGroupEnds, withRepoRoots } from '../tree.ts'
 import { displayState } from '../status.ts'
 
 test('buildTree nests files under their directories', () => {
@@ -76,4 +76,12 @@ test('displayState refuses to show green without a local-edit baseline', () => {
   assert.equal(displayState({ ...base, check: { file: 'x.md', state: 'in-sync' } }), 'unverified')
   assert.equal(displayState({ ...base, check: { file: 'x.md', state: 'in-sync', localEdits: false } }), 'in-sync')
   assert.equal(displayState({ ...base, check: { file: 'x.md', state: 'conflict', localEdits: true } }), 'conflict')
+})
+
+test('withRepoRoots appends an empty folder for a repository without documents, roots sorted', () => {
+  const tree = withRepoRoots(buildTree(['docs/a.md', 'zeta/b.md']), ['docs', 'alpha', 'zeta'])
+  assert.deepEqual(tree.map(node => [node.kind, node.path, node.depth]), [['dir', 'alpha', 0], ['dir', 'docs', 0], ['dir', 'zeta', 0]])
+  assert.deepEqual(filesUnder(tree[0]), [])
+  const same = buildTree(['docs/a.md'])
+  assert.equal(withRepoRoots(same, ['docs']), same)
 })

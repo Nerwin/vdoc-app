@@ -45,19 +45,22 @@ describe('cliStatus', () => {
       stdout: '{"error":{"message":"1 inline comment anchor(s) highlight text that docs/a.md changed - re-run with --allow-lossy","code":"VALIDATION_ERROR"}}',
     }
     assert.match(interpretCli(anchors, cliStatus(anchors)) ?? '', /inline comments/)
-    assert.equal(documentOf(['cf', 'check', './docs/a.md', 'docs/b.md'], path => path === 'docs/b.md'), 'docs/b.md')
-    assert.equal(documentOf(['config', 'path'], () => true), null)
+    assert.equal(documentOf({ args: ['cf', 'check', './docs/a.md', 'docs/b.md'], repo: 'r' }, path => path === 'r/docs/b.md'), 'r/docs/b.md')
+    assert.equal(documentOf({ args: ['cf', 'check', 'docs/a.md'] }, () => true), null)
+    assert.equal(documentOf({ args: ['config', 'path'], repo: 'r' }, () => true), null)
   })
 })
 
 describe('rerunTarget', () => {
   it('only allows read-only single-document commands', () => {
-    assert.deepEqual(rerunTarget(['cf', 'diff', 'a.md', '--json']), { kind: 'diff', path: 'a.md' })
-    assert.deepEqual(rerunTarget(['cf', 'check', 'a.md', '--json']), { kind: 'check', path: 'a.md' })
-    assert.deepEqual(rerunTarget(['cf', 'lint', 'a.md', '--json']), { kind: 'lint', path: 'a.md' })
-    assert.equal(rerunTarget(['cf', 'diff', 'a.md', '--record', '--json']), null)
-    assert.equal(rerunTarget(['cf', 'check', 'a.md', 'b.md', '--json']), null)
-    assert.equal(rerunTarget(['cf', 'push', 'a.md', '--dry-run', '--json']), null)
-    assert.equal(rerunTarget(['cf', 'pull', 'a.md', '--json']), null)
+    const logged = (...args: string[]) => ({ args, repo: 'r' })
+    assert.deepEqual(rerunTarget(logged('cf', 'diff', 'a.md', '--json')), { kind: 'diff', path: 'r/a.md' })
+    assert.deepEqual(rerunTarget(logged('cf', 'check', 'a.md', '--json')), { kind: 'check', path: 'r/a.md' })
+    assert.deepEqual(rerunTarget(logged('cf', 'lint', 'a.md', '--json')), { kind: 'lint', path: 'r/a.md' })
+    assert.equal(rerunTarget({ args: ['cf', 'check', 'a.md', '--json'] }), null)
+    assert.equal(rerunTarget(logged('cf', 'diff', 'a.md', '--record', '--json')), null)
+    assert.equal(rerunTarget(logged('cf', 'check', 'a.md', 'b.md', '--json')), null)
+    assert.equal(rerunTarget(logged('cf', 'push', 'a.md', '--dry-run', '--json')), null)
+    assert.equal(rerunTarget(logged('cf', 'pull', 'a.md', '--json')), null)
   })
 })

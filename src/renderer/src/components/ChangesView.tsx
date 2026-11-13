@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import type { ChangesScope, DisplayState, SyncGroup, VersionEntry } from '../../../shared/types.ts'
+import type { ChangesScope, DisplayState, RepoStatus, SyncGroup, VersionEntry } from '../../../shared/types.ts'
 import { CHANGE_GROUPS, displayState, displayTitle, syncGroup, type FileEntry } from '../../../shared/status.ts'
 import { displayAuthor } from '../../../shared/confluence.ts'
 import { timeAgo } from '../../../shared/time.ts'
@@ -8,10 +8,13 @@ import { command, forPath, shortcutLabel, type CommandContext } from '../command
 import { ArrowRightIcon, CheckIcon, CloseIcon, MoreIcon } from '../icons.tsx'
 import { GROUP_META, STATE_META } from '../state-meta.ts'
 import { ActionMenu } from './ActionMenu.tsx'
+import { ModalButton } from './Modal.tsx'
 import { StateGlyph } from './StateGlyph.tsx'
 
 interface Props {
   ctx: CommandContext
+  /** Null until the first scan returns. */
+  repos: RepoStatus[] | null
   entries: Map<string, FileEntry>
   counts: { files: number, tracked: number, attention: number, remote: number, unchecked: number }
   authors: Map<string, VersionEntry | null>
@@ -31,6 +34,8 @@ interface Props {
   onCancelCheck(): void
   onCheckUnchecked(): void
   onClearScope(): void
+  onAddRepo(): void
+  onOpenSettings(): void
 }
 
 interface Row {
@@ -107,8 +112,9 @@ export function ChangesView(props: Props) {
 
   const visibleGroups = CHANGE_GROUPS.filter(group => (scope ? group === scope : true))
   const attention = visibleGroups.reduce((sum, group) => sum + (ordered.get(group)?.length ?? 0), 0)
-  const scanning = entries.size === 0
-  const empty = !scanning && attention === 0
+  const noRepos = props.repos?.length === 0
+  const scanning = props.repos === null
+  const empty = !scanning && !noRepos && attention === 0
   const showBulk = props.bulkResult !== null && Date.now() - props.bulkResult.at < BULK_STRIP_MS
 
   const navigable = visibleGroups.flatMap(group => {
@@ -149,7 +155,7 @@ export function ChangesView(props: Props) {
     ? `${plural(attention, 'document')} ${GROUP_TITLE[scope]}`
     : `${plural(attention, 'document')} need${attention === 1 ? 's' : ''} your attention`
 
-  const calm = empty && !props.checking && !scope
+  const calm = (empty || noRepos) && !props.checking && !scope
 
   return (
     <div className="flex h-full flex-col overflow-y-auto">
@@ -229,6 +235,19 @@ export function ChangesView(props: Props) {
               <div className="h-7 w-20 rounded-md bg-raised" />
             </div>
           ))}
+        </div>
+      )}
+
+      {noRepos && (
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 pb-16">
+          <span className="text-[20px] font-semibold text-ink">No repository yet</span>
+          <span className="max-w-[380px] text-center text-[12.5px] text-ink-mute">
+            Add the root folder of a git repository holding Markdown docs. Several repositories share one tree, each under its own name.
+          </span>
+          <div className="mt-2 flex items-center gap-2">
+            <ModalButton label="Add repository…" primary disabled={props.busy} onClick={props.onAddRepo} />
+            <ModalButton label="Open Settings" onClick={props.onOpenSettings} />
+          </div>
         </div>
       )}
 

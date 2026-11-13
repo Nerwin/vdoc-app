@@ -1,28 +1,42 @@
 import { execFile, execFileSync } from 'node:child_process'
-import { closeSync, existsSync, fstatSync, openSync, readdirSync, readSync } from 'node:fs'
+import { closeSync, existsSync, fstatSync, openSync, readdirSync, readSync, realpathSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
 import { BrowserWindow } from 'electron'
 
-import { LOG_MAX, type VdocLogEntry } from '../shared/types.ts'
+import { LOG_MAX, type RepoSettings, type VdocLogEntry } from '../shared/types.ts'
 import { mdLinkTargets, resolveRelative } from '../shared/links.ts'
 import { parseFrontmatter } from '../shared/frontmatter.ts'
+import { relativeAppPath, resolveExistingPathInsideRoot, resolvePathInsideRoot } from '../shared/path-policy.ts'
+import { joinRepoPath, splitRepoPath } from '../shared/repo-path.ts'
 import { firstMatch, type SearchHit } from '../shared/search.ts'
 import { parseGitStatus } from '../shared/git-status.ts'
 import { hidesVdocOutput, redactVdocArgs, vdocCommandId } from '../shared/privacy.ts'
-import { DEFAULT_DOCS_ROOT, EXCLUDED_DIRS, loadSettings } from './settings.ts'
+import { EXCLUDED_DIRS, loadSettings, repoByAlias } from './settings.ts'
 import { logAppEvent } from './sentry.ts'
 
-/** The docs repository root: Settings → $VDOC_APP_ROOT → home directory. */
-// env read at call time, not import time - importLoginShellEnv runs after module load.
-export function docsRoot(): string {
-  return loadSettings().docsRoot ?? process.env.VDOC_APP_ROOT ?? DEFAULT_DOCS_ROOT
+/** Configured repositories whose root folder exists - the only ones scanned, watched or run against. */
+export function availableRepos(): RepoSettings[] {
+  return loadSettings().repos.filter(repo => existsSync(repo.root))
 }
 
-/** User-configured root folders (Settings → Folders). */
-export function getContentDirs(): string[] {
-  return loadSettings().contentDirs
+export interface RepoPath {
+  repo: RepoSettings
+  /** Path inside the repository, `/`-separated; '' is the root itself. */
+  rel: string
+  abs: string
+}
+
+/**
+ * `<alias>/<rel>` → the configured repository and the existing absolute path inside it.
+ * Unknown aliases are refused before any filesystem access; the bare alias (the root) only with `allowRoot`.
+ */
+export function resolveAppPath(value: unknown, label = 'path', allowRoot = false): RepoPath {
+  const { alias, rel } = splitRepoPath(relativeAppPath(value, label))
+  const repo = repoByAlias(alias)
+  if (!repo || (rel === '' && !allowRoot)) throw new Error(`Invalid ${label}`)
+  return { repo, rel, abs: rel === '' ? realpathSync(repo.root) : resolveExistingPathInsideRoot(repo.root, rel, label) }
 }
 
 // Bun's global bin dir on every OS; on Windows bun writes vdoc.exe shims.
@@ -75,6 +89,8 @@ export interface VdocRun {
 export interface VdocRunOptions {
   signal?: AbortSignal
   timeoutMs?: number
+  /** The repository the command runs in (cwd = its root, paths relative to it); global commands run from home. */
+  repo?: RepoSettings
 }
 
 type VdocTermination = 'cancelled' | 'timeout'
@@ -101,12 +117,13 @@ export function vdocLogs(): VdocLogEntry[] {
 const detach = (text: string): string => Buffer.from(text, 'utf8').toString('utf8')
 
 /** Sensitive values never reach the renderer's command log. */
-function recordRun(args: string[], run: VdocRun, startedAt: number): void {
+function recordRun(args: string[], run: VdocRun, startedAt: number, repo: RepoSettings | undefined): void {
   const hideOutput = hidesVdocOutput(args)
   const entry: VdocLogEntry = {
     id: ++logId,
     at: startedAt,
     args: redactVdocArgs(args),
+    ...(repo ? { repo: repo.alias } : {}),
     exitCode: run.exitCode,
     ...(run.termination ? { termination: run.termination } : {}),
     durationMs: Date.now() - startedAt,
@@ -134,7 +151,7 @@ export function runVdoc(args: string[], options: VdocRunOptions = {}): Promise<V
       resolvedVdocBin(),
       args,
       {
-        cwd: docsRoot(),
+        cwd: options.repo?.root ?? homedir(),
         env: {
           ...process.env,
           NO_COLOR: '1',
@@ -163,7 +180,7 @@ export function runVdoc(args: string[], options: VdocRunOptions = {}): Promise<V
               ? ((error as NodeJS.ErrnoException & { code?: number | string }).code === 'ENOENT' ? -1 : (typeof (error as { code?: unknown }).code === 'number' ? (error as { code: number }).code : 1))
               : 0
         const run: VdocRun = { exitCode, stdout, stderr, ...(termination ? { termination } : {}) }
-        recordRun(args, run, startedAt)
+        recordRun(args, run, startedAt, options.repo)
         resolve(run)
       },
     )
@@ -227,12 +244,12 @@ function vdocFailureMessage(args: string[], stderr: string, stdout: string): str
   return `vdoc ${command} failed${detail ? `:\n${detail}` : ''}`
 }
 
-/** Relative paths of files with uncommitted git changes under the content dirs, or among `paths`. */
-export function gitDirtyFiles(paths: string[] = getContentDirs()): Set<string> {
+/** Repo-relative paths of files with uncommitted git changes under the content dirs, or among `rels`. */
+export function gitDirtyFiles(repo: RepoSettings, rels: string[] = repo.contentDirs): Set<string> {
   try {
-    const git = (args: string[]): string => execFileSync('git', args, { cwd: docsRoot(), encoding: 'utf8' })
+    const git = (args: string[]): string => execFileSync('git', args, { cwd: repo.root, encoding: 'utf8' })
     const prefix = git(['rev-parse', '--show-prefix']).trim()
-    return parseGitStatus(git(['status', '--porcelain=v1', '-z', '--untracked-files=all', '--', ...paths]), prefix)
+    return parseGitStatus(git(['status', '--porcelain=v1', '-z', '--untracked-files=all', '--', ...rels.map(rel => rel || '.')]), prefix)
   } catch {
     return new Set()
   }
@@ -244,42 +261,41 @@ interface FileMeta {
   pageId?: string
   ignored?: boolean
   hidden?: boolean
-  /** Legacy `vdocPin: true` - only seeds a workspace's first pinnedFiles entry. */
-  legacyPin?: boolean
   mtimeMs?: number
 }
 
-/** Relative paths of all Markdown files in the content dirs - directory listings only, no file reads. */
-function markdownPaths(): string[] {
-  const paths: string[] = []
-  const root = docsRoot()
+/** Repo-relative paths of all Markdown files in the content dirs - directory listings only, no file reads. */
+function markdownPaths(repo: RepoSettings): string[] {
+  const paths = new Set<string>()
   const walk = (relDir: string): void => {
-    const absDir = join(root, relDir)
+    const absDir = join(repo.root, relDir)
     if (!existsSync(absDir)) return
     for (const entry of readdirSync(absDir, { withFileTypes: true })) {
       if (entry.name.startsWith('.') || EXCLUDED_DIRS.has(entry.name)) continue
-      const relPath = `${relDir}/${entry.name}`
+      const relPath = relDir ? `${relDir}/${entry.name}` : entry.name
       if (entry.isDirectory()) walk(relPath)
-      else if (entry.name.endsWith('.md')) paths.push(relPath)
+      else if (entry.name.endsWith('.md')) paths.add(relPath)
     }
   }
-  for (const dir of getContentDirs()) walk(dir)
-  return paths
+  for (const dir of repo.contentDirs) walk(dir)
+  return [...paths]
 }
 
-/** All Markdown files in the content dirs, tracked = has confluencePageId frontmatter. */
+/** All Markdown files of every available repository, as app paths; tracked = has confluencePageId frontmatter. */
 export function scanMarkdownFiles(): Array<FileMeta & { path: string }> {
-  const root = docsRoot()
-  return markdownPaths().map(path => ({ path, ...fileMeta(join(root, path)) }))
+  return availableRepos().flatMap(repo => markdownPaths(repo).map(rel => ({ path: joinRepoPath(repo.alias, rel), ...fileMeta(join(repo.root, rel)) })))
 }
 
-/** Fresh metadata for known files - `null` once one is gone, so the caller rescans everything. */
+/** Fresh metadata for known app paths - `null` once one is gone (or its repository), so the caller rescans everything. */
 export function scanFiles(paths: string[]): Array<FileMeta & { path: string }> | null {
-  const root = docsRoot()
   const files: Array<FileMeta & { path: string }> = []
   for (const path of paths) {
-    if (!existsSync(join(root, path))) return null
-    files.push({ path, ...fileMeta(join(root, path)) })
+    const { alias, rel } = splitRepoPath(path)
+    const repo = repoByAlias(alias)
+    if (!repo || rel === '') return null
+    const abs = resolvePathInsideRoot(repo.root, rel)
+    if (!existsSync(abs)) return null
+    files.push({ path, ...fileMeta(abs) })
   }
   return files
 }
@@ -290,30 +306,32 @@ export async function searchContent(query: string): Promise<SearchHit[]> {
   const trimmed = query.trim()
   if (trimmed.length < 2) return []
   const hits: SearchHit[] = []
-  for (const path of markdownPaths()) {
-    try {
-      const match = firstMatch(await readFile(join(docsRoot(), path), 'utf8'), trimmed)
-      if (match) hits.push({ path, ...match })
-    } catch {
-      // Unreadable file: no hit.
+  for (const repo of availableRepos()) {
+    for (const rel of markdownPaths(repo)) {
+      try {
+        const match = firstMatch(await readFile(join(repo.root, rel), 'utf8'), trimmed)
+        if (match) hits.push({ path: joinRepoPath(repo.alias, rel), ...match })
+      } catch {
+        // Unreadable file: no hit.
+      }
+      if (hits.length >= 50) return hits
     }
-    if (hits.length >= 50) break
   }
   return hits
 }
 
-/** Docs under the content dirs whose markdown links resolve to `target`. */
+/** Docs of the same repository whose markdown links resolve to `target`. */
 // ponytail: full rescan per call (async), no index - an index if the corpus reaches thousands of large files.
-export async function backlinksTo(target: string): Promise<string[]> {
+export async function backlinksTo(target: RepoPath): Promise<string[]> {
   const result: string[] = []
-  const name = target.split('/').at(-1)!
-  for (const path of markdownPaths()) {
-    if (path === target) continue
+  const name = target.rel.split('/').at(-1)!
+  for (const rel of markdownPaths(target.repo)) {
+    if (rel === target.rel) continue
     try {
-      const text = await readFile(join(docsRoot(), path), 'utf8')
+      const text = await readFile(join(target.repo.root, rel), 'utf8')
       // A link to the target spells its file name, plain or URI-encoded; most files are skipped without parsing.
       if (!text.includes(name) && !text.includes(encodeURI(name))) continue
-      if (mdLinkTargets(text).some(href => resolveRelative(path, href) === target)) result.push(path)
+      if (mdLinkTargets(text).some(href => resolveRelative(rel, href) === target.rel)) result.push(joinRepoPath(target.repo.alias, rel))
     } catch {
       // Unreadable file: not a backlink.
     }
@@ -321,7 +339,7 @@ export async function backlinksTo(target: string): Promise<string[]> {
   return result
 }
 
-/** Tracked file whose frontmatter carries this confluencePageId, or null. */
+/** Tracked file whose frontmatter carries this confluencePageId - the first in repository order - or null. */
 // ponytail: full rescan per call, same trade as backlinksTo.
 export function fileForPageId(pageId: string): string | null {
   if (!/^\d+$/.test(pageId)) return null
@@ -345,7 +363,7 @@ function fileMeta(absPath: string): FileMeta {
     }
     const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(head)
     if (!frontmatter) return { tracked: false, mtimeMs }
-    const { title, confluencePageId, confluenceIgnore, vdocHide, vdocPin } = parseFrontmatter(head)
+    const { title, confluencePageId, confluenceIgnore, vdocHide } = parseFrontmatter(head)
     return {
       mtimeMs,
       tracked: /^confluencePageId\s*:/m.test(frontmatter[1]),
@@ -353,7 +371,6 @@ function fileMeta(absPath: string): FileMeta {
       pageId: confluencePageId,
       ignored: confluenceIgnore,
       hidden: vdocHide,
-      legacyPin: vdocPin,
     }
   } catch {
     return { tracked: false }

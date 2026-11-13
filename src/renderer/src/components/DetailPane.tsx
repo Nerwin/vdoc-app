@@ -4,6 +4,7 @@ import type { editor as MonacoEditor } from 'monaco-editor'
 import type { DiffResult, VdocLogEntry } from '../../../shared/types.ts'
 import { parseFrontmatter } from '../../../shared/frontmatter.ts'
 import { resolveRelative } from '../../../shared/links.ts'
+import { mappingKey } from '../../../shared/repo-path.ts'
 import { displayState, displayTitle, syncGroup, type FileEntry } from '../../../shared/status.ts'
 import { timeAgo } from '../../../shared/time.ts'
 import { command, isPinned, isReviewable, primaryAction, secondaryActions, shortcutLabel, type CommandContext, type ViewMode } from '../commands.ts'
@@ -67,7 +68,7 @@ export function DetailPane(props: Props) {
   const [editor, setEditor] = useState<MonacoEditor.IStandaloneCodeEditor | null>(null)
   const [previewScroller, setPreviewScroller] = useState<HTMLDivElement | null>(null)
   useScrollSync(editor, previewScroller, view === 'split')
-  const diffLayoutKey = `diffLayout:${ctx.app.root}`
+  const diffLayoutKey = 'diffLayout'
   const [diffInline, setDiffInline] = useState(() => localStorage.getItem(diffLayoutKey) === 'inline')
   const [editorLoaded, setEditorLoaded] = useState(false)
   const [saveState, setSaveState] = useState<'saved' | 'unsaved' | 'saving' | 'blocked'>('saved')
@@ -240,7 +241,7 @@ export function DetailPane(props: Props) {
   const synced = group === 'synced'
   const pageId = ignored ? undefined : check?.pageId ?? entry.pageId
   const space = useMemo(() => (content === null ? undefined : parseFrontmatter(content).confluenceSpace), [content])
-    ?? ctx.app.spaceMapping[path.split('/')[0]]
+    ?? ctx.app.spaceMapping[mappingKey(path)]
   const primary = primaryAction(ctx)
   const primaryCommand = primary ? command(primary.commandId) : null
   const primaryReason = primaryCommand?.reason?.(ctx)

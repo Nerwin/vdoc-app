@@ -18,3 +18,13 @@ export function uniqueAlias(base: string, taken: Iterable<string>): string {
   while (used.has(`${base}-${n}`)) n++
   return `${base}-${n}`
 }
+
+/** A path the CLI echoed back (as given, `./`-prefixed, or backslashed on Windows) as an app path. */
+export function fromCliPath(alias: string, file: string): string {
+  return joinRepoPath(alias, file.replaceAll('\\', '/').replace(/^\.\//, ''))
+}
+
+/** The space mapping is keyed by the top-level folder inside the repository. */
+export function mappingKey(path: string): string {
+  return splitRepoPath(path).rel.split('/')[0]
+}

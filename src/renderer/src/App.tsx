@@ -19,6 +19,7 @@ import { CliVersionWarning } from './components/CliVersionWarning.tsx'
 import { commandFor, isMod, selectionState, type CommandContext, type SidebarMode, type ViewMode } from './commands.ts'
 import { useApp } from './useApp.ts'
 import { cliStatus, documentOf, worstOutcome } from '../../shared/cli-status.ts'
+import { mappingKey } from '../../shared/repo-path.ts'
 import { lastSyncAt } from '../../shared/status.ts'
 import { isVersionBelowMinimum } from '../../shared/version.ts'
 
@@ -38,9 +39,8 @@ function useResolvedTheme(preference: 'dark' | 'light' | 'system'): 'dark' | 'li
   return preference === 'system' ? (systemDark ? 'dark' : 'light') : preference
 }
 
-/** A panel's open state, persisted per docs root. Panels start open. */
-function useWorkspaceFlag(name: string, root: string): [boolean, (next: SetStateAction<boolean>) => void] {
-  const key = `${name}:${root}`
+/** A panel's open state, persisted. Panels start open. */
+function useWorkspaceFlag(key: string): [boolean, (next: SetStateAction<boolean>) => void] {
   const [open, setOpen] = useState(true)
   useEffect(() => setOpen(localStorage.getItem(key) !== '0'), [key])
   const update = useCallback((next: SetStateAction<boolean>) => setOpen(current => {
@@ -92,12 +92,8 @@ export function App() {
     document.documentElement.dataset.theme = theme
   }, [theme])
 
-  // The Source tab layout persists per workspace.
-  const layoutKey = `sourceLayout:${app.root}`
-  const [sourceLayout, setSourceLayoutState] = useState<SourceLayout>('content')
-  useEffect(() => {
-    setSourceLayoutState(localStorage.getItem(layoutKey) === 'split' ? 'split' : 'content')
-  }, [layoutKey])
+  const layoutKey = 'sourceLayout'
+  const [sourceLayout, setSourceLayoutState] = useState<SourceLayout>(() => (localStorage.getItem(layoutKey) === 'split' ? 'split' : 'content'))
   /** Every way into Source (tab menu, palette) goes through here, so the layout choice persists. */
   const showView = (next: ViewMode): void => {
     if (next === 'content' || next === 'split') {
@@ -107,9 +103,9 @@ export function App() {
     setView(next)
   }
 
-  const [sidebarOpen, setSidebarOpen] = useWorkspaceFlag('sidebarOpen', app.root)
-  const [infoOpen, setInfoOpen] = useWorkspaceFlag('inspectorOpen', app.root)
-  const [legendOpen, setLegendOpen] = useWorkspaceFlag('legendOpen', app.root)
+  const [sidebarOpen, setSidebarOpen] = useWorkspaceFlag('sidebarOpen')
+  const [infoOpen, setInfoOpen] = useWorkspaceFlag('inspectorOpen')
+  const [legendOpen, setLegendOpen] = useWorkspaceFlag('legendOpen')
 
   const selected = app.selection ? app.entries.get(app.selection) ?? null : null
   const inspectorAvailable = selected !== null && !logsOpen
@@ -122,7 +118,7 @@ export function App() {
   const known = useCallback((path: string) => app.entries.has(path), [app.entries])
   const cliOutcome = useMemo(() => worstOutcome(app.logs.map(entry => cliStatus(entry).outcome)), [app.logs])
   const lastCli = useMemo(
-    () => (selected ? [...app.logs].reverse().find(entry => documentOf(entry.args, known) === selected.path) : undefined),
+    () => (selected ? [...app.logs].reverse().find(entry => documentOf(entry, known) === selected.path) : undefined),
     [app.logs, known, selected],
   )
   const remoteVersion = selected && !selected.ignored ? selected.check?.remoteVersion : undefined
@@ -261,8 +257,9 @@ export function App() {
               counts={app.counts}
               mode={sidebarMode}
               selection={app.selection}
-              rootDirs={app.settings?.contentDirs ?? []}
-              pinnedDirs={app.settings?.pinnedDirs ?? []}
+              repos={app.repos}
+              rootDirs={app.contentDirs}
+              pinnedDirs={app.pinnedDirs}
               pinnedFiles={app.pinnedFiles}
               legendOpen={legendOpen}
               onToggleLegend={() => setLegendOpen(open => !open)}
@@ -273,7 +270,9 @@ export function App() {
               onTogglePin={app.togglePin}
               onOpenFolder={path => void app.openFolder(path)}
               onGetPage={path => app.setGetForm({ dir: path })}
-              onRemoveFolder={app.removeFolder}
+              onRemoveFolder={path => void app.removeFolder(path)}
+              onAddFolder={alias => void app.addFolder(alias)}
+              onRemoveRepo={alias => void app.removeRepo(alias)}
             />
             <div onMouseDown={startSidebarResize} className="absolute inset-y-0 -right-0.5 z-10 w-1 cursor-col-resize" />
           </aside>
@@ -311,6 +310,7 @@ export function App() {
               : (
                   <ChangesView
                     ctx={ctx}
+                    repos={app.repos}
                     entries={app.entries}
                     counts={app.counts}
                     authors={app.authors}
@@ -329,6 +329,8 @@ export function App() {
                     onCancelCheck={app.cancelCheck}
                     onCheckUnchecked={app.checkUnchecked}
                     onClearScope={() => app.setChangesScope(null)}
+                    onAddRepo={() => void app.addRepo()}
+                    onOpenSettings={() => setSettingsOpen(true)}
                   />
                 )}
         </main>
@@ -369,6 +371,7 @@ export function App() {
       {logsOpen && (
         <LogsView
           entries={app.logs}
+          repoRoots={Object.fromEntries((app.settings?.repos ?? []).map(repo => [repo.alias, repo.root]))}
           known={known}
           selection={app.selection}
           notify={app.notify}
@@ -459,6 +462,8 @@ export function App() {
           settings={app.settings}
           auth={app.auth}
           busy={app.busyOp !== null}
+          repos={app.repos ?? []}
+          mappingFolders={app.mappingFolders}
           spaceMapping={app.spaceMapping}
           onUpdate={app.updateSettings}
           onSetAssetsDir={app.setAssetsDir}
@@ -469,9 +474,10 @@ export function App() {
           onSetAuthMethod={method => void app.setAuthMethod(method)}
           onCredentialPreview={app.credentialPreview}
           onClearCredential={key => void app.clearCredential(key)}
-          onAddFolder={() => void app.addFolder()}
-          onPickDocsRoot={() => void app.pickDocsRoot()}
-          onRemoveFolder={app.removeFolder}
+          onAddRepo={() => void app.addRepo()}
+          onRemoveRepo={alias => void app.removeRepo(alias)}
+          onAddFolder={alias => void app.addFolder(alias)}
+          onRemoveFolder={path => void app.removeFolder(path)}
           onSetSpaceMapping={app.setSpaceMappingEntry}
           onRevealConfig={() => void app.revealConfig()}
           onEditConfig={() => void app.editConfig()}
@@ -486,7 +492,7 @@ export function App() {
       {app.createForm && (
         <CreateForm
           path={app.createForm.path}
-          defaultSpace={app.spaceMapping[app.createForm.path.split('/')[0]] ?? ''}
+          defaultSpace={app.spaceMapping[mappingKey(app.createForm.path)] ?? ''}
           busy={app.busyOp !== null}
           onSubmit={app.submitCreate}
           onClose={() => app.setCreateForm(null)}
@@ -495,7 +501,7 @@ export function App() {
 
       {app.getForm && (
         <GetForm
-          folders={app.settings?.contentDirs ?? []}
+          folders={app.contentDirs}
           presetDir={app.getForm.dir}
           busy={app.busyOp !== null}
           findExisting={app.fileForPageId}

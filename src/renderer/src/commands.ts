@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowDownToLine, ArrowUp, ArrowUpToLine, Ban, Check, ChevronLeft, ChevronRight, CircleArrowUp, CircleHelp, Columns3, Clock, Command as CommandKey, Copy, CornerDownLeft, Download, ExternalLink, FilePlus, FileText, FolderOpen, House, KeyRound, Link, ListTree, PanelLeft, PanelRight, Pin, Plus, Power, RefreshCw, RotateCw, Search, Settings, Sparkles, SquarePen, SunMoon, Terminal, TriangleAlert, X, type LucideIcon } from 'lucide-react'
-import type { ChangesScope, DisplayState } from '../../shared/types.ts'
+import type { ChangesScope, DisplayState, RepoSettings } from '../../shared/types.ts'
+import { splitRepoPath } from '../../shared/repo-path.ts'
 import { reviewedText, reviewOutcome } from '../../shared/review.ts'
 import { reviewPrimary, statePrimary, type PrimaryAction } from '../../shared/actions.ts'
 import { displayState, syncGroup, type FileEntry } from '../../shared/status.ts'
@@ -122,8 +123,11 @@ const copy = (ctx: CommandContext, text: string, what: string): void => {
 }
 
 /** OS-native absolute path for pasting outside the app (app-internal paths always use '/'). */
-const absolutePath = (root: string, path: string): string =>
-  (root.includes('\\') ? `${root}\\${path.replaceAll('/', '\\')}` : `${root}/${path}`)
+function absolutePath(repos: RepoSettings[], path: string): string {
+  const { alias, rel } = splitRepoPath(path)
+  const root = repos.find(repo => repo.alias === alias)?.root ?? alias
+  return root.includes('\\') ? `${root}\\${rel.replaceAll('/', '\\')}` : `${root}/${rel}`
+}
 
 /** The same registry, aimed at another document - Changes rows run commands without selecting. */
 export function forPath(ctx: CommandContext, path: string): CommandContext {
@@ -342,7 +346,7 @@ export const COMMANDS: Command[] = [
     icon: Download,
     tint: 'pull',
     reason: all(
-      ctx => ((ctx.app.settings?.contentDirs.length ?? 0) > 0 ? undefined : 'no folders in the tree - add one in Settings'),
+      ctx => (ctx.app.contentDirs.length > 0 ? undefined : 'no folders in the tree - add a repository or a folder in Settings'),
       idle,
       online,
     ),
@@ -456,7 +460,7 @@ export const COMMANDS: Command[] = [
     label: 'Copy document path',
     icon: Copy,
     reason: noFile,
-    run: ctx => copy(ctx, absolutePath(ctx.app.root, ctx.selection!), 'Document path'),
+    run: ctx => copy(ctx, absolutePath(ctx.app.settings?.repos ?? [], ctx.selection!), 'Document path'),
   },
   {
     id: 'file.browser',

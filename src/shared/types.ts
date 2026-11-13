@@ -128,7 +128,7 @@ export interface GetPageResult {
   pageId: string
   title: string
   version: number
-  /** Written path, relative to the docs root (the CLI runs with cwd there). */
+  /** Written path - the CLI echoes it relative to the repository root, main turns it into an app path. */
   file?: string
   opaqueNodes: number
   mermaidDiagrams: number
@@ -201,11 +201,16 @@ export interface ScanFile {
   mtimeMs?: number
 }
 
-export interface ScanResult {
+/** A configured repository as the scan saw it - `available` is false while its root folder is missing. */
+export interface RepoStatus {
+  alias: string
   root: string
+  available: boolean
+}
+
+export interface ScanResult {
+  repos: RepoStatus[]
   files: ScanFile[]
-  /** This workspace's pinned files, in pin order. */
-  pinnedFiles: string[]
 }
 
 export interface CheckProgress {
@@ -224,6 +229,8 @@ export interface VdocLogEntry {
   at: number
   /** argv after the binary - credential values are replaced with •••. */
   args: string[]
+  /** Alias of the repository the command ran in (its root was the cwd); absent for global commands. */
+  repo?: string
   exitCode: number
   /** Set when the app stopped the process itself - never a CLI result. */
   termination?: 'cancelled' | 'timeout'
@@ -235,7 +242,7 @@ export interface VdocLogEntry {
 }
 
 /** One docs repository in the workspace. Paths are relative to `root`, `/`-separated. */
-interface RepoSettings {
+export interface RepoSettings {
   /** Tree label and app-path prefix (`<alias>/<path>`) - unique, never contains a slash. */
   alias: string
   /** Absolute path of the folder holding `.git` or `.vdoc`. */
@@ -253,17 +260,8 @@ export interface Settings {
   theme: 'dark' | 'light' | 'system'
   /** Explicit vdoc binary path; null = auto-detect (~/.bun/bin/vdoc, then PATH). */
   vdocBin: string | null
-  /** Repositories in display order. No migration from the single-root keys: the sole user edits settings.json by hand. */
+  /** Repositories in display order. No migration from the single-root keys of 1.25: the sole user edits settings.json by hand. */
   repos: RepoSettings[]
-  // shortcut: the single-root keys below are still what main and the renderer read, they go when the multi-repo IPC lands (phase B/C).
-  /** Absolute path of the docs repository; null = $VDOC_APP_ROOT, then the built-in default. */
-  docsRoot: string | null
-  /** Root folders (relative to the docs repo) shown in the tree. Only .md files are ever listed. */
-  contentDirs: string[]
-  /** Folder paths pinned to the top of their parent's listing. */
-  pinnedDirs: string[]
-  /** Pinned files per docs root, in pin order - app data, never written to the file. */
-  pinnedFiles: Record<string, string[]>
   /** Send privacy-filtered error, crash, and command/action timing reports to Sentry. */
   crashReports: boolean
   /** Random id generated on first launch - the only user identifier ever sent to Sentry. */
@@ -272,8 +270,6 @@ export interface Settings {
 
 export interface SettingsInfo extends Settings {
   resolvedBin: string
-  /** The docs repository root actually in use. */
-  resolvedRoot: string
   /** `vdoc --version` output, null when the binary cannot be run. */
   version: string | null
   /** Release-owned compatibility requirement from package.json; null when not configured. */
@@ -331,7 +327,7 @@ export interface VdocApi {
   create(path: string, space: string, parent?: string): Promise<CreateResult>
   /** Add missing authoring frontmatter through `vdoc md init`; existing values are preserved. */
   initFile(path: string): Promise<InitResult>
-  /** Download a page (URL or id) into `dir`; the CLI names the file after the page title. */
+  /** Download a page (URL or id) into `dir` (an app path, the alias alone = the repository root); the CLI names the file after the page title. */
   getPage(input: string, dir: string): Promise<GetPageResult>
   /** Download a page and every nested descendant flat into `dir`. */
   getPageRecursive(input: string, dir: string): Promise<GetPageRecursiveResult>
@@ -363,12 +359,12 @@ export interface VdocApi {
   installUpdate(): Promise<void>
   /** True when the main process initialized Sentry - the renderer inits its side only then. */
   sentryActive(): Promise<boolean>
-  /** Native folder picker rooted at the docs repo; returns a relative path or null. */
-  pickFolder(): Promise<string | null>
-  /** Pick and apply the docs repository root; returns fresh settings or null when cancelled. */
-  pickDocsRoot(): Promise<SettingsInfo | null>
+  /** Native folder picker inside one repository; returns the repo-relative path ('' = the root) or null. */
+  pickFolder(alias: string): Promise<string | null>
+  /** Pick a repository root and add it to the workspace; returns fresh settings or null when cancelled. */
+  addRepo(): Promise<SettingsInfo | null>
   openFolder(path: string): Promise<void>
-  /** Folder → Confluence space mapping, stored in the shared config file. */
+  /** Top-level folder name → Confluence space mapping, stored in the shared config file. */
   spaceMappingGet(): Promise<Record<string, string>>
   /** Set (or delete with null) one mapping entry; returns the fresh mapping. */
   spaceMappingSet(dir: string, space: string | null): Promise<Record<string, string>>

@@ -1,8 +1,8 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import type { SyncGroup } from '../../../shared/types.ts'
+import type { RepoStatus, SyncGroup } from '../../../shared/types.ts'
 import { displayState, needsAttention, syncGroup, type FileEntry } from '../../../shared/status.ts'
-import { buildTree, filesUnder, flattenVisible, orderPinnedFirst, pinnedGroupEnds, type TreeNode } from '../../../shared/tree.ts'
+import { buildTree, filesUnder, flattenVisible, orderPinnedFirst, pinnedGroupEnds, withRepoRoots, type TreeNode } from '../../../shared/tree.ts'
 import { command, fileContextActions, forPath, shortcutLabel, type CommandContext, type SidebarMode } from '../commands.ts'
 import { BanIcon, ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, FolderIcon, PinIcon } from '../icons.tsx'
 import { GROUP_META, STATE_META } from '../state-meta.ts'
@@ -15,7 +15,9 @@ interface Props {
   counts: { files: number, attention: number }
   mode: SidebarMode
   selection: string | null
-  /** Configured root folders - the only ones removable from the tree. */
+  /** Every repository is a top-level folder, documents or not; null until the first scan returns. */
+  repos: RepoStatus[] | null
+  /** Configured content folders as app paths (the bare alias = the repository root) - the only ones removable from the tree. */
   rootDirs: string[]
   pinnedDirs: string[]
   pinnedFiles: string[]
@@ -29,6 +31,8 @@ interface Props {
   onOpenFolder(path: string): void
   onGetPage(path: string): void
   onRemoveFolder(path: string): void
+  onAddFolder(alias: string): void
+  onRemoveRepo(alias: string): void
 }
 
 interface ContextMenu {
@@ -41,11 +45,12 @@ interface ContextMenu {
 const LEGEND: SyncGroup[] = ['synced', 'local', 'remote', 'conflict', 'unchecked']
 
 export function FileTree(props: Props) {
-  const { entries, selection, pinnedDirs, pinnedFiles, mode } = props
+  const { entries, selection, pinnedDirs, pinnedFiles, mode, repos } = props
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [menu, setMenu] = useState<ContextMenu | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const menuCtx = menu?.kind === 'file' ? forPath(props.ctx, menu.path) : null
+  const missingRoot = menu && repos?.find(repo => repo.alias === menu.path)?.available === false ? 'folder not found' : undefined
 
   // While the context menu is open, Escape closes it (and nothing else).
   const closeMenu = useCallback(() => setMenu(null), [])
@@ -58,9 +63,10 @@ export function FileTree(props: Props) {
     const paths = [...entries.values()]
       .filter(entry => !entry.hidden && (mode === 'all' || entry.path === selection || needsAttention(displayState(entry))))
       .map(entry => entry.path)
-    const rows = flattenVisible(orderPinnedFirst(buildTree(paths), pins), collapsed)
+    const tree = buildTree(paths)
+    const rows = flattenVisible(orderPinnedFirst(mode === 'all' ? withRepoRoots(tree, (repos ?? []).map(repo => repo.alias)) : tree, pins), collapsed)
     return { rows, pinnedPaths, groupEnds: pinnedGroupEnds(rows, pinnedPaths) }
-  }, [entries, collapsed, pinnedDirs, pinnedFiles, mode, selection])
+  }, [entries, collapsed, pinnedDirs, pinnedFiles, mode, repos, selection])
 
   // The open document is always revealed in the tree: its folders expand, then its row scrolls into view.
   const revealRef = useRef<string | null>(null)
@@ -152,7 +158,7 @@ export function FileTree(props: Props) {
       >
         {rows.length === 0 && (
           <p className="px-4 py-8 text-center text-[12px] text-ink-label">
-            {entries.size === 0 ? 'Scanning…' : mode === 'changes' ? 'Nothing needs attention' : 'No documents'}
+            {repos === null ? 'Scanning…' : mode === 'changes' ? 'Nothing needs attention' : 'No repository yet - add one in Settings'}
           </p>
         )}
         {rows.map(row => (
@@ -164,6 +170,7 @@ export function FileTree(props: Props) {
             pinned={pinnedPaths.has(row.path)}
             collapsed={collapsed.has(row.path)}
             subLabel={mode === 'changes'}
+            hint={row.kind === 'dir' && row.depth === 0 ? repoHint(row, repos ?? []) : null}
             onClick={() => (row.kind === 'dir' ? toggleDir(row.path) : props.onSelect(row.path))}
             onContextMenu={event => {
               event.preventDefault()
@@ -205,25 +212,39 @@ export function FileTree(props: Props) {
             style={{ left: Math.min(menu.x, window.innerWidth - 288), top: Math.min(menu.y, window.innerHeight - 240) }}
             onClick={event => event.stopPropagation()}
           >
-            {menu.kind === 'dir'
+            {menu.kind === 'dir' && !menu.path.includes('/')
               ? (
                   <>
-                    <MenuItem
-                      icon={<PinIcon size={11} className="text-brand" />}
-                      label={pinnedDirs.includes(menu.path) ? 'Unpin from top' : 'Pin on top'}
-                      onClick={() => { props.onTogglePin(menu.path); setMenu(null) }}
-                    />
-                    <MenuItem label="Check this folder" onClick={() => { props.onCheckFolder(menu.path); setMenu(null) }} />
-                    <MenuItem label="Get page from Confluence…" onClick={() => { props.onGetPage(menu.path); setMenu(null) }} />
-                    <MenuItem label="Open folder" onClick={() => { props.onOpenFolder(menu.path); setMenu(null) }} />
+                    <MenuItem label="Check this repository" onClick={() => { props.onCheckFolder(menu.path); setMenu(null) }} />
                     {props.rootDirs.includes(menu.path) && (
-                      <>
-                        <MenuRule />
-                        <MenuItem label="Remove from tree" danger onClick={() => { props.onRemoveFolder(menu.path); setMenu(null) }} />
-                      </>
+                      <MenuItem label="Get page from Confluence…" onClick={() => { props.onGetPage(menu.path); setMenu(null) }} />
                     )}
+                    <MenuItem label="Open folder" disabled={missingRoot} onClick={() => { props.onOpenFolder(menu.path); setMenu(null) }} />
+                    <MenuRule />
+                    <MenuItem label="Add folder to the tree…" disabled={missingRoot} onClick={() => { props.onAddFolder(menu.path); setMenu(null) }} />
+                    <MenuRule />
+                    <MenuItem label="Remove repository from the workspace" danger onClick={() => { props.onRemoveRepo(menu.path); setMenu(null) }} />
                   </>
                 )
+              : menu.kind === 'dir'
+                ? (
+                    <>
+                      <MenuItem
+                        icon={<PinIcon size={11} className="text-brand" />}
+                        label={pinnedDirs.includes(menu.path) ? 'Unpin from top' : 'Pin on top'}
+                        onClick={() => { props.onTogglePin(menu.path); setMenu(null) }}
+                      />
+                      <MenuItem label="Check this folder" onClick={() => { props.onCheckFolder(menu.path); setMenu(null) }} />
+                      <MenuItem label="Get page from Confluence…" onClick={() => { props.onGetPage(menu.path); setMenu(null) }} />
+                      <MenuItem label="Open folder" onClick={() => { props.onOpenFolder(menu.path); setMenu(null) }} />
+                      {props.rootDirs.includes(menu.path) && (
+                        <>
+                          <MenuRule />
+                          <MenuItem label="Remove from tree" danger onClick={() => { props.onRemoveFolder(menu.path); setMenu(null) }} />
+                        </>
+                      )}
+                    </>
+                  )
               : fileContextActions(menuCtx!).map((section, index) => (
                   <Fragment key={index}>
                     {index > 0 && <MenuRule />}
@@ -302,6 +323,12 @@ const MenuRule = () => <div className="mx-1.5 my-[3px] h-px bg-line" />
 
 const indentOf = (depth: number): string => `${10 + depth * 16}px`
 
+/** Repository row sub-label: why it shows nothing - a missing root folder, or no documents under its folders. */
+function repoHint(node: TreeNode, repos: RepoStatus[]): string | null {
+  if (repos.find(repo => repo.alias === node.path)?.available === false) return 'folder not found'
+  return node.kind === 'dir' && node.children.length === 0 ? 'no documents - add a folder' : null
+}
+
 /** Changes-mode folder sub-label: the attention count, else what is not checked. */
 function rollup(node: TreeNode, entries: Map<string, FileEntry>): string | null {
   let attention = 0
@@ -325,15 +352,17 @@ interface RowProps {
   collapsed: boolean
   /** Folder rows spell out what they hold - Changes mode only. */
   subLabel: boolean
+  /** Repository rows: why the folder is empty, when it is. */
+  hint: string | null
   onClick(): void
   onContextMenu?(event: React.MouseEvent): void
 }
 
-function Row({ node, entries, selected, pinned, collapsed, subLabel, onClick, onContextMenu }: RowProps) {
+function Row({ node, entries, selected, pinned, collapsed, subLabel, hint, onClick, onContextMenu }: RowProps) {
   const indent = { paddingLeft: indentOf(node.depth) }
 
   if (node.kind === 'dir') {
-    const sub = subLabel ? rollup(node, entries) : null
+    const sub = hint ?? (subLabel ? rollup(node, entries) : null)
     return (
       <button
         onClick={onClick}
@@ -345,7 +374,7 @@ function Row({ node, entries, selected, pinned, collapsed, subLabel, onClick, on
         <FolderIcon size={14} className={`shrink-0 ${node.depth === 0 ? 'text-brand' : 'text-ink-dim'}`} />
         <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
           <span className={`truncate text-[12.5px] ${node.depth === 0 ? 'font-medium text-ink' : 'text-ink-body'}`}>{node.name}</span>
-          {sub && <span className={`text-[11px] ${sub.includes('attention') ? 'text-warn' : 'text-ink-mute'}`}>{sub}</span>}
+          {sub && <span className={`text-[11px] ${sub.includes('attention') || sub.includes('not found') ? 'text-warn' : 'text-ink-mute'}`}>{sub}</span>}
         </span>
         {pinned && <PinIcon size={11} className="shrink-0 text-brand" aria-label="Pinned on top" />}
         <span className="font-mono text-[11px] text-ink-mute">{filesUnder(node).length}</span>

@@ -5,10 +5,9 @@ import { pathToFileURL } from 'node:url'
 import { app, BrowserWindow, dialog, Menu, nativeTheme, net, protocol, session } from 'electron'
 
 import { isAllowedNavigation, PACKAGED_RENDERER_URL, SECURE_WEB_PREFERENCES } from '../shared/electron-policy.ts'
-import { resolveExistingPathInsideRoot } from '../shared/path-policy.ts'
 import { CloseGuardState } from '../shared/close-guard.ts'
 import type { Settings } from '../shared/types.ts'
-import { docsRoot, importLoginShellEnv, setVdocBin } from './vdoc.ts'
+import { importLoginShellEnv, resolveAppPath, setVdocBin } from './vdoc.ts'
 import { loadSettings } from './settings.ts'
 import { registerIpc } from './ipc.ts'
 import { initSentry } from './sentry.ts'
@@ -22,12 +21,12 @@ protocol.registerSchemesAsPrivileged([{
 
 const IMAGE_EXTENSIONS = /\.(png|jpe?g|gif|svg|webp)$/i
 
-/** Local images of the previewed markdown (`docImageUrl`), confined to the docs root. */
+/** Local images of the previewed markdown (`docImageUrl`, `<alias>/<path>`), confined to that repository's root. */
 function serveDocImage(url: URL): Promise<Response> | Response {
   try {
     const path = decodeURIComponent(url.pathname.slice(1))
     if (!IMAGE_EXTENSIONS.test(path)) return new Response(null, { status: 404 })
-    return net.fetch(pathToFileURL(resolveExistingPathInsideRoot(docsRoot(), path)).href)
+    return net.fetch(pathToFileURL(resolveAppPath(path).abs).href)
   } catch {
     return new Response(null, { status: 404 })
   }

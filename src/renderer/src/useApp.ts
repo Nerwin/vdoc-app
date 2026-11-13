@@ -1,8 +1,9 @@
 import { captureException } from '@sentry/electron/renderer'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { LOG_MAX, type AppUpdateStatus, type AuthStatus, type ChangesScope, type CheckFile, type CredentialKey, type DiffResult, type PushFile, type ScanResult, type Settings, type SettingsInfo, type VdocLogEntry, type VersionEntry } from '../../shared/types.ts'
+import { LOG_MAX, type AppUpdateStatus, type AuthStatus, type ChangesScope, type CheckFile, type CredentialKey, type DiffResult, type PushFile, type RepoSettings, type RepoStatus, type ScanResult, type Settings, type SettingsInfo, type VdocLogEntry, type VersionEntry } from '../../shared/types.ts'
 import { setFrontmatterFlag } from '../../shared/frontmatter.ts'
+import { joinRepoPath, mappingKey, splitRepoPath } from '../../shared/repo-path.ts'
 import { initMessage } from '../../shared/init.ts'
 import { isLossyPushError } from '../../shared/lossy-push.ts'
 import { reviewedText, reviewOutcome, spliceMerged } from '../../shared/review.ts'
@@ -57,11 +58,10 @@ function loadJson<T>(key: string, fallback: T): T {
   }
 }
 
-/** Persisted check results - sync state survives restarts, keyed to the docs root. */
+/** Persisted check results - sync state survives restarts; results for files no longer in the tree are dropped on restore. */
 const CHECKS_KEY = 'checkState'
 
 interface SavedChecks {
-  root: string
   /** Epoch ms of the last full check, when one ran - restored into “last checked”. */
   at: number | null
   results: SavedCheck[]
@@ -81,10 +81,9 @@ const TARGETED_SCAN_MAX = 50
 export function useApp() {
   const api = window.vdoc
 
-  const [root, setRoot] = useState('')
+  /** The configured repositories as the last scan saw them; null until the first scan returns. */
+  const [repos, setRepos] = useState<RepoStatus[] | null>(null)
   const [entries, setEntries] = useState<Map<string, FileEntry>>(new Map())
-  /** This workspace's pinned files, in pin order (settings.json, never the file). */
-  const [pinnedFiles, setPinnedFiles] = useState<string[]>([])
   const [selection, setSelection] = useState<string | null>(null)
   /** Files navigated away from, oldest first - Back pops from the end. */
   const [history, setHistory] = useState<string[]>([])
@@ -130,7 +129,6 @@ export function useApp() {
   const authorsRequested = useRef(new Set<string>())
   /** Lookups that failed - retried once Confluence is connected again. */
   const failedAuthors = useRef(new Set<string>())
-  const rootRef = useRef('')
   /** The latest diff request - an older or invalidated response is dropped. */
   const diffRequest = useRef({ id: 0, path: '', pending: false })
   /** The latest loadDiff, for the file watcher's long-lived subscription. */
@@ -226,38 +224,11 @@ export function useApp() {
     return request.path
   }, [])
 
-  /** Rescan the tree. A different docs root starts over: no check, diff or history carries across. */
+  /** Rescan the tree - every repository at once; a document keeps its check while it stays listed and tracked. */
   const rescan = useCallback(async (): Promise<ScanResult> => {
     const scan = await api.scan()
-    const switched = rootRef.current !== '' && rootRef.current !== scan.root
-    rootRef.current = scan.root
-    setRoot(scan.root)
-    setPinnedFiles(scan.pinnedFiles)
-    setEntries(prev => new Map(scan.files.map(file => [file.path, scanEntry(file, switched ? undefined : prev.get(file.path))])))
-    if (switched) {
-      setSelection(null)
-      setHistory([])
-      setForward([])
-      diffRequest.current.id++
-      diffRequest.current.pending = false
-      pushRun.current++
-      setDiff(null)
-      setDiffLoading(null)
-      setReview(null)
-      setLastChecked(null)
-      setLossyPushPaths(new Set())
-      setPushPreview(null)
-      setPushQueue([])
-      setPullConfirm(null)
-      setAuthors(new Map())
-      // Recents and sync activity are relative paths too - they belong to the previous repository.
-      setRecents([])
-      setActivity([])
-      localStorage.removeItem('recentFiles')
-      localStorage.removeItem('syncActivity')
-      authorsRequested.current.clear()
-      failedAuthors.current.clear()
-    }
+    setRepos(scan.repos)
+    setEntries(prev => new Map(scan.files.map(file => [file.path, scanEntry(file, prev.get(file.path))])))
     return scan
   }, [api])
 
@@ -304,7 +275,7 @@ export function useApp() {
         // Restore the last session's check results (age shown as "last checked …";
         // the focus refresh re-checks when they are over an hour old).
         const saved = loadJson<SavedChecks | null>(CHECKS_KEY, null)
-        if (saved?.root === scan.root && Array.isArray(saved.results)) {
+        if (Array.isArray(saved?.results)) {
           const tracked = new Set(scan.files.filter(file => file.tracked).map(file => file.path))
           const results = saved.results.filter(result => tracked.has(normalize(result.file)))
           if (results.length > 0) {
@@ -324,13 +295,12 @@ export function useApp() {
   // Persist whatever check results exist - full checks, single files, folder checks.
   // An empty result set never overwrites a saved snapshot (startup runs before restore).
   useEffect(() => {
-    if (root === '') return
     const results = [...entries.values()].flatMap(entry => (entry.tracked && entry.check ? [{ ...entry.check, checkedAt: entry.checkedAt }] : []))
     if (results.length === 0) return
     // Coalesced: entries change on every autosave, and the snapshot is the whole workspace.
-    const timer = setTimeout(() => localStorage.setItem(CHECKS_KEY, JSON.stringify({ root, at: lastChecked?.getTime() ?? null, results } satisfies SavedChecks)), 1000)
+    const timer = setTimeout(() => localStorage.setItem(CHECKS_KEY, JSON.stringify({ at: lastChecked?.getTime() ?? null, results } satisfies SavedChecks)), 1000)
     return () => clearTimeout(timer)
-  }, [entries, lastChecked, root])
+  }, [entries, lastChecked])
 
   useEffect(() => {
     void api.logs().then(setLogs).catch(() => undefined)
@@ -575,7 +545,7 @@ export function useApp() {
 
   const syncFile = useCallback((path: string) => runOp('sync', async () => {
     // Restrict the title search to the folder's mapped space when one is configured.
-    const [result] = await api.sync(path, spaceMapping[path.split('/')[0]])
+    const [result] = await api.sync(path, spaceMapping[mappingKey(path)])
     const name = path.split('/').at(-1)
     switch (result?.status) {
       case 'linked':
@@ -769,64 +739,92 @@ export function useApp() {
     void api.setSite(site).then(setSettings).catch(fail)
   }, [api, fail])
 
-  /** Settings change that alters which files exist in the tree → rescan after. */
-  const applyFolderSettings = useCallback(async (patch: Partial<Settings>) => {
+  /** Pins and content folders live per repository; the tree sees them as app paths. */
+  const pinnedFiles = useMemo(() => settings?.repos.flatMap(repo => repo.pinnedFiles.map(path => joinRepoPath(repo.alias, path))) ?? [], [settings])
+  const pinnedDirs = useMemo(() => settings?.repos.flatMap(repo => repo.pinnedDirs.map(dir => joinRepoPath(repo.alias, dir))) ?? [], [settings])
+  const contentDirs = useMemo(() => settings?.repos.flatMap(repo => repo.contentDirs.map(dir => joinRepoPath(repo.alias, dir))) ?? [], [settings])
+  /** Folder names a space can map to: every top-level folder a scanned document sits in, shared across repositories. */
+  const mappingFolders = useMemo(() => [...new Set([...entries.keys()].map(mappingKey).filter(key => !key.endsWith('.md')))].sort(), [entries])
+
+  /** One repository's entry changed; `rescan` when the change alters which files the tree lists. */
+  const updateRepo = useCallback(async (alias: string, change: (repo: RepoSettings) => Partial<RepoSettings>, rescanAfter: boolean) => {
+    if (!settings) return
     try {
-      setSettings(await api.settingsSet(patch))
+      setSettings(await api.settingsSet({ repos: settings.repos.map(repo => (repo.alias === alias ? { ...repo, ...change(repo) } : repo)) }))
+      if (rescanAfter) await rescan()
+    } catch (error) {
+      fail(error)
+    }
+  }, [api, fail, rescan, settings])
+
+  const addRepo = useCallback(async () => {
+    try {
+      const nextSettings = await api.addRepo()
+      if (!nextSettings) return
+      setSettings(nextSettings)
       await rescan()
+      const added = nextSettings.repos.at(-1)
+      setMessage({ kind: 'info', text: `Added ${added?.alias ?? 'the repository'} - narrow it to specific folders in Settings` })
     } catch (error) {
       fail(error)
     }
   }, [api, fail, rescan])
 
-  const pickDocsRoot = useCallback(async () => {
+  const removeRepo = useCallback(async (alias: string) => {
+    if (!settings) return
+    // Drafts are keyed by app path - one under this alias could never be saved afterwards.
+    if (!await flushEdits()) {
+      setMessage({ kind: 'error', text: `${alias} not removed - resolve the blocked save first` })
+      return
+    }
+    setSelection(current => (current !== null && splitRepoPath(current).alias === alias ? null : current))
     try {
-      // Drafts are keyed by relative path - one must never land in the other repository.
-      if (!await flushEdits()) {
-        setMessage({ kind: 'error', text: 'Docs repository not changed - resolve the blocked save first' })
-        return
-      }
-      const nextSettings = await api.pickDocsRoot()
-      if (!nextSettings) return
-      setSettings(nextSettings)
+      setSettings(await api.settingsSet({ repos: settings.repos.filter(repo => repo.alias !== alias) }))
       await rescan()
-      setMessage({ kind: 'info', text: `Docs repository is now ${nextSettings.resolvedRoot}` })
+      setMessage({ kind: 'info', text: `Removed ${alias} from the workspace - add it back in Settings` })
     } catch (error) {
       fail(error)
     }
-  }, [api, fail, flushEdits, rescan])
+  }, [api, fail, flushEdits, rescan, settings])
 
-  const addFolder = useCallback(async () => {
+  const addFolder = useCallback(async (alias: string) => {
     try {
-      const picked = await api.pickFolder()
-      if (!picked || !settings) return
-      if (settings.contentDirs.includes(picked)) {
-        setMessage({ kind: 'info', text: `${picked} is already in the tree` })
+      const picked = await api.pickFolder(alias)
+      const repo = settings?.repos.find(entry => entry.alias === alias)
+      if (picked === null || !repo) return
+      const label = joinRepoPath(alias, picked)
+      if (repo.contentDirs.includes(picked)) {
+        setMessage({ kind: 'info', text: `${label} is already in the tree` })
         return
       }
-      await applyFolderSettings({ contentDirs: [...settings.contentDirs, picked].sort() })
-      setMessage({ kind: 'info', text: `Added ${picked} - right-click it to check its files` })
+      await updateRepo(alias, () => ({ contentDirs: [...repo.contentDirs, picked].sort() }), true)
+      setMessage({ kind: 'info', text: `Added ${label} - right-click it to check its files` })
     } catch (error) {
       fail(error)
     }
-  }, [api, applyFolderSettings, fail, settings])
+  }, [api, fail, settings, updateRepo])
 
-  const removeFolder = useCallback((dir: string) => {
-    if (!settings) return
-    setSelection(current => (current?.startsWith(`${dir}/`) ? null : current))
-    void applyFolderSettings({
-      contentDirs: settings.contentDirs.filter(entry => entry !== dir),
-      pinnedDirs: settings.pinnedDirs.filter(entry => entry !== dir && !entry.startsWith(`${dir}/`)),
-    }).then(() => setMessage({ kind: 'info', text: `Removed ${dir} from the tree - add it back in Settings` }))
-  }, [applyFolderSettings, settings])
+  /** `path` is the folder's app path; the bare alias is the repository root folder. */
+  const removeFolder = useCallback(async (path: string) => {
+    const { alias, rel } = splitRepoPath(path)
+    if (!await flushEdits()) {
+      setMessage({ kind: 'error', text: `${path} not removed - resolve the blocked save first` })
+      return
+    }
+    setSelection(current => (current?.startsWith(`${path}/`) ? null : current))
+    await updateRepo(alias, repo => ({
+      contentDirs: repo.contentDirs.filter(entry => entry !== rel),
+      pinnedDirs: rel === '' ? repo.pinnedDirs : repo.pinnedDirs.filter(entry => entry !== rel && !entry.startsWith(`${rel}/`)),
+    }), true)
+    setMessage({ kind: 'info', text: `Removed ${path} from the tree - add it back in Settings` })
+  }, [flushEdits, updateRepo])
 
-  const togglePin = useCallback((dir: string) => {
-    if (!settings) return
-    const pinned = settings.pinnedDirs.includes(dir)
-      ? settings.pinnedDirs.filter(entry => entry !== dir)
-      : [...settings.pinnedDirs, dir]
-    updateSettings({ pinnedDirs: pinned })
-  }, [settings, updateSettings])
+  const togglePin = useCallback((path: string) => {
+    const { alias, rel } = splitRepoPath(path)
+    void updateRepo(alias, repo => ({
+      pinnedDirs: repo.pinnedDirs.includes(rel) ? repo.pinnedDirs.filter(entry => entry !== rel) : [...repo.pinnedDirs, rel],
+    }), false)
+  }, [updateRepo])
 
   const setSpaceMappingEntry = useCallback((dir: string, space: string | null) => {
     void api.spaceMappingSet(dir.trim(), space === null ? null : space.trim().toUpperCase())
@@ -862,11 +860,12 @@ export function useApp() {
   }), [api, runOp])
 
   const setPinned = useCallback((path: string, pinned: boolean) => {
-    const next = pinned ? [...pinnedFiles.filter(entry => entry !== path), path] : pinnedFiles.filter(entry => entry !== path)
-    setPinnedFiles(next)
-    updateSettings({ pinnedFiles: { [root]: next } })
+    const { alias, rel } = splitRepoPath(path)
+    void updateRepo(alias, repo => ({
+      pinnedFiles: pinned ? [...repo.pinnedFiles.filter(entry => entry !== rel), rel] : repo.pinnedFiles.filter(entry => entry !== rel),
+    }), false)
     setMessage({ kind: 'info', text: `${path.split('/').at(-1)} ${pinned ? 'pinned on top' : 'unpinned'}` })
-  }, [pinnedFiles, root, updateSettings])
+  }, [updateRepo])
 
   const reloadVersion = useCallback(() => {
     void api.vdocVersion()
@@ -918,7 +917,7 @@ export function useApp() {
   }, [api, fail])
 
   return {
-    root,
+    repos,
     entries,
     selection,
     setSelection: select,
@@ -960,11 +959,15 @@ export function useApp() {
     setAssetsDir,
     setSite,
     reloadVersion,
+    addRepo,
+    removeRepo,
     addFolder,
-    pickDocsRoot,
     removeFolder,
     togglePin,
     pinnedFiles,
+    pinnedDirs,
+    contentDirs,
+    mappingFolders,
     setPinned,
     checkFolder,
     setIgnored,

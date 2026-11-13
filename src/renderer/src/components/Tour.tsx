@@ -57,11 +57,13 @@ function SetupChecks({ ctx }: { ctx: CommandContext }) {
       />
       <CheckRow
         ok={settings ? files > 0 : null}
-        label="Docs repository"
+        label="Repositories"
         detail={settings
-          ? files > 0
-            ? `${settings.resolvedRoot} - ${files} Markdown file(s)`
-            : `no Markdown files under ${settings.resolvedRoot} - check the docs root and folders in Settings`
+          ? settings.repos.length === 0
+            ? 'no repository yet - add one in Settings'
+            : files > 0
+              ? `${settings.repos.map(repo => repo.alias).join(', ')} - ${files} Markdown file(s)`
+              : `no Markdown files under ${settings.repos.map(repo => repo.alias).join(', ')} - check the folders in Settings`
           : 'scanning…'}
       />
       <CheckRow
