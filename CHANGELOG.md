@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.27.0](https://github.com/Nerwin/vdoc-app/compare/v1.26.0...v1.27.0) (2026-11-13)
+
+### Features
+
+* **actions:** offer the forced writes in their own red section of every linked document's menu ([365af8e](https://github.com/Nerwin/vdoc-app/commit/365af8e081c89c8da423a631948faf3012721aed))
+
 ## [1.26.0](https://github.com/Nerwin/vdoc-app/compare/v1.25.0...v1.26.0) (2026-11-13)
 
 ### Features
